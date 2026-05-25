@@ -1,0 +1,78 @@
+---
+title: V-Invoice — Role & Permission Matrix
+---
+flowchart LR
+    classDef adminCls   fill:#fde8e8,stroke:#9b4040,color:#1a1814,font-weight:bold
+    classDef mgrCls     fill:#fef3c7,stroke:#8c7340,color:#92400e,font-weight:bold
+    classDef userCls    fill:#dcfce7,stroke:#4a7c59,color:#14532d,font-weight:bold
+    classDef viewerCls  fill:#f1f5f9,stroke:#94a3b8,color:#475569
+    classDef pageCls    fill:#eff6ff,stroke:#3b82f6,color:#1e40af
+    classDef actionCls  fill:#fafaf7,stroke:#c8c3bb,color:#1a1814
+
+    %% ── ROLES ────────────────────────────────────────────────────────
+    ADMIN["🔑 ADMIN\nFull access"]
+    MGR["👔 MANAGER\nApprove · Edit all"]
+    USER["👤 USER\nCreate · Edit own drafts"]
+    VIEWER["👁️ VIEWER\nRead only · Export"]
+
+    %% ── PAGES ────────────────────────────────────────────────────────
+    subgraph PAGES["📄 Pages & Actions"]
+        direction TB
+
+        PG1["📊 /dashboard\nStats · Recent invoices"]
+        PG2["📋 /invoices\nList · Filter · Pagination"]
+        PG3["📄 /invoices/new\nCreate invoice"]
+        PG4["📄 /invoices/id\nView detail"]
+        PG5["✏️ /invoices/id/edit\nEdit items · Gems"]
+        PG6["📂 /import\nImport Excel JM"]
+        PG7["🖨️ /invoices/id/print\nPrint A4"]
+        PG8["💰 /admin/metal-rates\nCRUD daily rates"]
+        PG9["📐 /admin/pricing-rules\nCRUD multipliers"]
+        PG10["📦 /admin/products\nCRUD SKU catalog"]
+        PG11["👥 /admin/users\nManage accounts"]
+    end
+
+    %% ── ADMIN ACCESS ─────────────────────────────────────────────────
+    ADMIN -->|"✓ Full"| PG1 & PG2 & PG3 & PG4 & PG5 & PG6 & PG7 & PG8 & PG9 & PG10 & PG11
+
+    %% ── MANAGER ACCESS ───────────────────────────────────────────────
+    MGR -->|"✓"| PG1 & PG2 & PG3 & PG4 & PG5 & PG6 & PG7
+    MGR -->|"✗ No access"| PG8 & PG9 & PG10 & PG11
+
+    %% ── USER ACCESS ──────────────────────────────────────────────────
+    USER -->|"✓"| PG1 & PG2 & PG4 & PG6 & PG7
+    USER -->|"✓ own drafts only"| PG3 & PG5
+    USER -->|"✗"| PG8 & PG9 & PG10 & PG11
+
+    %% ── VIEWER ACCESS ────────────────────────────────────────────────
+    VIEWER -->|"✓ read"| PG1 & PG2 & PG4 & PG7
+    VIEWER -->|"✗"| PG3 & PG5 & PG6 & PG8 & PG9 & PG10 & PG11
+
+    %% ── WORKFLOW TRANSITIONS ──────────────────────────────────────────
+    subgraph WF["🔄 Workflow Transitions"]
+        direction TB
+        T1["draft → pending\n👤 user · manager · admin"]
+        T2["pending → approved\n👔 manager · admin"]
+        T3["pending → draft\n👔 manager · admin"]
+        T4["approved → invoiced\n🔑 admin only"]
+        T5["approved → pending\n🔑 admin only"]
+    end
+
+    %% ── COLUMN VISIBILITY ────────────────────────────────────────────
+    subgraph COL["👁️ Price Column Visibility"]
+        direction TB
+        COL1["Gold Value · HPUSA · CIF\n✓ admin · manager · user"]
+        COL2["Tag Price · FR Price\nSell Price · Discount %\n✓ admin · manager ONLY"]
+    end
+
+    ADMIN -->|"See all"| COL2
+    MGR   -->|"See all"| COL2
+    USER  -->|"See"| COL1
+    VIEWER-->|"Cannot see prices"| COL1
+
+    %% ── STYLES ───────────────────────────────────────────────────────
+    class ADMIN adminCls
+    class MGR mgrCls
+    class USER userCls
+    class VIEWER viewerCls
+    class PG1,PG2,PG3,PG4,PG5,PG6,PG7,PG8,PG9,PG10,PG11 pageCls

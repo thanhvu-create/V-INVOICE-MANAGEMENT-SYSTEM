@@ -1,0 +1,94 @@
+---
+title: V-Invoice — Pricing Calculation Chain
+---
+flowchart TD
+    classDef inputCls  fill:#f0f9ff,stroke:#0ea5e9,color:#0c4a6e
+    classDef gemCls    fill:#fdf4ff,stroke:#a855f7,color:#581c87
+    classDef feeCls    fill:#fff7ed,stroke:#f97316,color:#7c2d12
+    classDef calcCls   fill:#f0fdf4,stroke:#22c55e,color:#14532d,font-weight:bold
+    classDef priceCls  fill:#fef9c3,stroke:#eab308,color:#713f12,font-weight:bold
+    classDef ruleCls   fill:#fde8e8,stroke:#9b4040,color:#1a1814
+
+    %% ── INPUTS ───────────────────────────────────────────────────────
+    subgraph INP["📥 Inputs từ người dùng"]
+        direction LR
+        I1["⚖️ weight_gold_actual_gr\nTrọng lượng vàng thực (gram)"]
+        I2["🏷️ metal_type\n18KW · 18KY · 14KY · PT950 · AG · PD"]
+        I3["📅 daily_metal_rates\nUSD per gram"]
+        I4["📉 casting_loss_pct\n% hao hụt đúc (VD: 5%)"]
+    end
+
+    %% ── GEMS ─────────────────────────────────────────────────────────
+    subgraph GEM["💎 Gem Details — GENERATED bởi PostgreSQL"]
+        direction LR
+        G1["weight_ct_after × 0.2\n→ weight_gr"]
+        G2["weight_ct_after × unit_price_per_ct\n→ total_price"]
+        G3["qty_pcs × setting_fee_per_pcs\n→ total_setting_fee"]
+    end
+    NOTE1["⚠️ KHÔNG tính trong TypeScript!\nChỉ đọc GENERATED cols từ DB"]
+
+    %% ── FEES ─────────────────────────────────────────────────────────
+    subgraph FEES["💼 Fees — auto-copy từ bom_products"]
+        direction LR
+        F1["labor_fee"]
+        F2["casting_fee"]
+        F3["design_fee"]
+        F4["resin_fee"]
+        F5["misc_fee"]
+    end
+
+    %% ── PRICING RULE ─────────────────────────────────────────────────
+    subgraph RULE["📐 Pricing Rule (active)"]
+        direction LR
+        R1["cif_multiplier\nVD: 1.10"]
+        R2["tag_multiplier\nVD: 1.25"]
+        R3["fr_multiplier\nVD: 1.08"]
+    end
+
+    %% ── CALCULATIONS ─────────────────────────────────────────────────
+    GV["🟡 gold_value_usd\n= weight × rate × (1 + loss/100)\nVD: 3.5g × 72.34 × 1.05 = $265.85"]
+
+    HP["🟢 hpusa\n= gold_value\n+ Σ gem.total_price\n+ Σ gem.total_setting_fee\n+ Σ fees"]
+
+    CIF["🔵 cif_price\n= hpusa × cif_multiplier"]
+
+    TAG["🟠 tag_price\n= cif_price × tag_multiplier\n👁️ manager / admin only"]
+
+    FR["🟣 fr_price\n= cif_price × fr_multiplier\n👁️ manager / admin only"]
+
+    %% ── METAL RATE LOOKUP ────────────────────────────────────────────
+    subgraph LOOKUP["🗺️ Metal Type → Rate Column"]
+        direction LR
+        L1["18KW → gold_18kw\n18KY → gold_18ky\n14KY → gold_14ky"]
+        L2["PT / PT950 → platinum\nAG → silver\nPD → palladium\n24K → gold_24k"]
+    end
+
+    %% ── CONNECTIONS ──────────────────────────────────────────────────
+    I1 --> GV
+    I2 --> LOOKUP --> GV
+    I3 --> GV
+    I4 --> GV
+
+    GEM --> HP
+    NOTE1 -.->|"Không compute\ntrong code"| GEM
+    FEES --> HP
+    GV --> HP
+
+    HP --> CIF
+    CIF --> TAG
+    CIF --> FR
+    R1 --> CIF
+    R2 --> TAG
+    R3 --> FR
+
+    %% ── TRIGGER CONDITIONS ───────────────────────────────────────────
+    TRIGGER["🔄 Recalculate chạy khi:\n• Thay đổi weight, fee, metal_type\n• Thêm / sửa / xóa gem\n• Đổi metal_rate_id hoặc pricing_rule_id"]
+    TRIGGER -.-> HP
+
+    %% ── STYLES ───────────────────────────────────────────────────────
+    class I1,I2,I3,I4 inputCls
+    class G1,G2,G3,NOTE1 gemCls
+    class F1,F2,F3,F4,F5 feeCls
+    class GV,HP calcCls
+    class CIF,TAG,FR priceCls
+    class R1,R2,R3,RULE ruleCls

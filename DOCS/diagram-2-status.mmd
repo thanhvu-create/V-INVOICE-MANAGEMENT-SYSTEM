@@ -1,0 +1,56 @@
+---
+title: V-Invoice — Status State Machine & Role Permissions
+---
+stateDiagram-v2
+    direction LR
+
+    [*] --> draft : Create invoice\n(user / manager / admin)
+
+    draft --> pending_approval : Submit for Approval\n👤 user · manager · admin
+
+    pending_approval --> approved : Approve\n👔 manager · admin
+
+    pending_approval --> draft : Return to Draft\n👔 manager · admin\n(+ note lý do)
+
+    approved --> pending_approval : Return for Review\n🔑 admin only
+
+    approved --> invoiced : Mark as Invoiced\n🔑 admin only\n⚠️ KHÔNG THỂ HOÀN TÁC
+
+    invoiced --> [*]
+
+    note right of draft
+        Có thể sửa:
+        • Items / Gems
+        • Header fields
+        • Import Excel
+    end note
+
+    note right of pending_approval
+        Chờ duyệt
+        Manager kiểm tra
+        JM Form View
+    end note
+
+    note right of approved
+        Đã duyệt
+        Sẵn sàng invoice
+    end note
+
+    note right of invoiced
+        🔒 FROZEN
+        PostgreSQL trigger:
+        • snapshot_data JSONB
+        • is_locked = true
+        • snapshot_at = now()
+        Không ai sửa được
+    end note
+
+    classDef draftSt   fill:#f1f5f9,stroke:#94a3b8,color:#1e293b
+    classDef pendSt    fill:#fef3c7,stroke:#d97706,color:#92400e,font-weight:bold
+    classDef appSt     fill:#dcfce7,stroke:#16a34a,color:#14532d,font-weight:bold
+    classDef invSt     fill:#1a1814,stroke:#374151,color:#f9fafb,font-weight:bold
+
+    class draft draftSt
+    class pending_approval pendSt
+    class approved appSt
+    class invoiced invSt

@@ -1,0 +1,82 @@
+---
+title: V-Invoice — Invoice Lifecycle
+---
+flowchart TD
+    classDef adminCls  fill:#fde8e8,stroke:#9b4040,color:#1a1814,font-weight:bold
+    classDef mgrCls    fill:#fef3c7,stroke:#8c7340,color:#1a1814
+    classDef userCls   fill:#dcfce7,stroke:#4a7c59,color:#1a1814
+    classDef frozenCls fill:#1a1814,stroke:#333,color:#fafaf7,font-weight:bold
+    classDef outCls    fill:#dbeafe,stroke:#4a6b8c,color:#1a1814
+
+    %% ── PHASE 1: SETUP ──────────────────────────────────────────────
+    subgraph P1["⚙️  PHASE 1 — Setup  (Admin · chỉ làm 1 lần)"]
+        direction LR
+        A1["👤 Tạo Users\nsupabase auth + app_users"]
+        A2["📐 Pricing Rule\ncif × 1.10  tag × 1.25  fr × 1.08"]
+        A3["📦 SKU Catalog\n/admin/products"]
+        A1 --> A2 --> A3
+    end
+
+    %% ── PHASE 2: DAILY ───────────────────────────────────────────────
+    subgraph P2["☀️  Mỗi sáng — Admin/Manager"]
+        B1["💰 Add Metal Rate · /admin/metal-rates\n24K · 18KW · 18KY · 14KY · PT · AG · PD"]
+    end
+
+    %% ── PHASE 3: CREATE ──────────────────────────────────────────────
+    subgraph P3["📝  Tạo & Chỉnh Invoice — User"]
+        direction TB
+        C0{Cách tạo?}
+        C1["📂 Import Excel JM\n/import\nValidate SKU · qty · weight"]
+        C2["✍️ Thủ công\n/invoices/new"]
+        C3["📄 DRAFT\n· có thể sửa bất cứ lúc nào"]
+        C4["🗒 JM Form View\n15 cột · SKU vàng · Ba Sao đỏ"]
+        C5["🔍 Detail View\nInline edit · Gem CRUD"]
+        C6(["⚡ Recalculate\ngold_value → hpusa → cif → tag → fr"])
+
+        C0 -->|Excel| C1
+        C0 -->|Manual| C2
+        C1 --> C3
+        C2 --> C3
+        C3 --> C4 & C5
+        C4 & C5 --> C6 --> C3
+    end
+
+    %% ── PHASE 4: APPROVAL ────────────────────────────────────────────
+    subgraph P4["✅  Approval — Manager"]
+        D1(["⏳ PENDING APPROVAL"])
+        D2{Review kỹ\ninvoice?}
+        D3(["✅ APPROVED"])
+        D4["↩️ Return to Draft\n+ ghi chú lý do"]
+
+        D1 --> D2
+        D2 -->|Approve| D3
+        D2 -->|Reject| D4
+    end
+
+    %% ── PHASE 5: LOCK ────────────────────────────────────────────────
+    subgraph P5["🔒  Lock — Admin only"]
+        E1(["🔒 INVOICED · FROZEN"])
+        E2["🗄 PostgreSQL Trigger tự động\n• snapshot_data JSONB lưu toàn bộ\n• is_locked = true\n• Không ai sửa được"]
+        E1 --> E2
+    end
+
+    %% ── OUTPUT ───────────────────────────────────────────────────────
+    subgraph P6["📤  Output"]
+        F1["📊 Export .xlsx\nadmin/manager → 15 cột\nuser/viewer   → 13 cột"]
+        F2["🖨️ Print A4\n/invoices/id/print\nCtrl + P"]
+    end
+
+    %% ── CONNECTIONS ──────────────────────────────────────────────────
+    P1 --> P2
+    P2 -->|"Rate gắn vào invoice\ntại ngày tạo"| P3
+    C3 -->|"Submit for Approval"| D1
+    D4 --> C3
+    D3 -->|"Mark as Invoiced\n⚠️ KHÔNG THỂ HOÀN TÁC"| E1
+    E2 --> F1 & F2
+
+    %% ── STYLES ───────────────────────────────────────────────────────
+    class A1,A2,A3,B1 adminCls
+    class D1,D2,D3,D4 mgrCls
+    class C0,C1,C2,C3,C4,C5,C6 userCls
+    class E1,E2 frozenCls
+    class F1,F2 outCls
