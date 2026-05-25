@@ -76,7 +76,8 @@ export function RecentInvoices({ rows, loading }: { rows: RecentRow[]; loading: 
               textDecoration: 'none',
               color:          'inherit',
               background:     'transparent',
-              transition:     'background 0.15s',
+              transition:     'background 0.18s ease-out',
+              animation:      `fadeIn 0.3s ease-out ${idx * 55}ms both`,
             }}
             onMouseEnter={e => ((e.currentTarget as HTMLAnchorElement).style.background = 'var(--bg-hover)')}
             onMouseLeave={e => ((e.currentTarget as HTMLAnchorElement).style.background = 'transparent')}

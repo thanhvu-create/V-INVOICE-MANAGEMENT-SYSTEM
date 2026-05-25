@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { toast } from '@/components/ui/Toast'
 
 const STEPS = ['draft', 'pending_approval', 'approved', 'invoiced'] as const
 
@@ -57,6 +58,7 @@ export function WorkflowBar({ invoiceId, currentStatus, availableTransitions, on
       if (!json.success) { setError(json.message); return }
       setShowNote(false)
       setTarget('')
+      toast(`Status updated to ${target.replace(/_/g, ' ')}`, 'success')
       onTransitioned()
     } finally {
       setPending(false)
@@ -145,6 +147,7 @@ export function WorkflowBar({ invoiceId, currentStatus, availableTransitions, on
             alignItems: 'center',
             justifyContent: 'center',
             zIndex:     300,
+            animation:  'fadeIn 0.15s ease-out both',
           }}
           onClick={e => { if (e.target === e.currentTarget) { setShowNote(false); setTarget('') } }}
         >
@@ -154,6 +157,7 @@ export function WorkflowBar({ invoiceId, currentStatus, availableTransitions, on
             padding:    '2rem 2.5rem',
             width:      460,
             maxWidth:   '92vw',
+            animation:  'slideUpFade 0.2s ease-out both',
           }}>
             {/* Header */}
             <h3 style={{

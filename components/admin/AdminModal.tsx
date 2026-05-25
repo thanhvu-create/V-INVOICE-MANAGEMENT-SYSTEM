@@ -23,7 +23,7 @@ export function AdminModal({ title, onClose, children, width = 520 }: Props) {
       }}
       onClick={e => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="modal-dialog" style={{ maxWidth: width }}>
+      <div className="modal-dialog modal-enter" style={{ maxWidth: width }}>
         {/* Modal header */}
         <div style={{
           display:        'flex',

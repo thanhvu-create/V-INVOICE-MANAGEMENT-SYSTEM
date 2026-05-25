@@ -48,6 +48,7 @@ export default function LoginPage() {
     color:         'var(--text-primary)',
     fontFamily:    'var(--font-body)',
     outline:       'none',
+    transition:    'border-color 0.18s ease-out',
   }
 
   return (
@@ -68,6 +69,7 @@ export default function LoginPage() {
           background: 'var(--bg-surface)',
           border:     '1px solid var(--border-base)',
           padding:    '3rem 2.5rem',
+          animation:  'slideUpFade 0.3s ease-out both',
         }}
       >
         {/* Brand */}

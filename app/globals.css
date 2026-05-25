@@ -185,6 +185,141 @@ table { border-collapse: collapse; width: 100%; }
 ::-webkit-scrollbar-thumb { background: var(--border-base); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
+/* ── Animations ─────────────────────────────────────────────────────────── */
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* Modal entry — editorial lift: subtle Y + opacity */
+@keyframes slideUpFade {
+  from { opacity: 0; transform: translateY(10px) scale(0.99); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);    }
+}
+
+/* Mobile nav dropdown */
+@keyframes slideDownFade {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0);    }
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position:  400px 0; }
+}
+
+/* Pending badge subtle pulse */
+@keyframes pendingPulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.55; }
+}
+
+/* Notification slide-in from top */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Notification slide-out */
+@keyframes toastOut {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-8px); }
+}
+
+/* ── Animation utility classes ───────────────────────────────────────────── */
+
+/* Apply to main page content wrapper */
+.page-enter {
+  animation: fadeIn 0.25s ease-out both;
+}
+
+/* Apply to modal dialog */
+.modal-enter {
+  animation: slideUpFade 0.2s ease-out both;
+}
+
+/* Mobile nav open */
+.nav-enter {
+  animation: slideDownFade 0.18s ease-out both;
+}
+
+/* Skeleton loading block */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-muted) 0%,
+    var(--bg-hover) 40%,
+    var(--bg-muted) 80%
+  );
+  background-size: 400px 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 0;
+  display: inline-block;
+}
+
+/* Staggered children fade-in */
+.stagger-children > * {
+  animation: fadeIn 0.3s ease-out both;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0.04s; }
+.stagger-children > *:nth-child(2) { animation-delay: 0.08s; }
+.stagger-children > *:nth-child(3) { animation-delay: 0.12s; }
+.stagger-children > *:nth-child(4) { animation-delay: 0.16s; }
+.stagger-children > *:nth-child(5) { animation-delay: 0.20s; }
+
+/* Pending invoice badge pulse */
+.status-pending-pulse {
+  animation: pendingPulse 2.4s ease-in-out infinite;
+}
+
+/* Button active press feedback */
+.btn-primary:active,
+.btn-outline:active,
+.btn-danger:active {
+  transform: scale(0.975);
+  transition: transform 0.06s ease-out, background 0.06s;
+}
+
+/* Smooth link/button transitions (global) */
+a { transition: color 0.15s ease-out; }
+
+/* Toast notification container */
+.toast-container {
+  position:       fixed;
+  top:            1.25rem;
+  right:          1.25rem;
+  z-index:        9999;
+  display:        flex;
+  flex-direction: column;
+  gap:            0.5rem;
+  pointer-events: none;
+}
+
+.toast {
+  background:    var(--bg-surface);
+  border:        1px solid var(--border-base);
+  border-left:   3px solid var(--color-success);
+  padding:       0.75rem 1.25rem;
+  font-family:   var(--font-body);
+  font-size:     var(--text-sm);
+  color:         var(--text-primary);
+  pointer-events: auto;
+  animation:     toastIn 0.2s ease-out both;
+  max-width:     320px;
+  box-shadow:    0 4px 20px rgba(42,39,37,0.10);
+}
+.toast.toast-error  { border-left-color: var(--color-danger); }
+.toast.toast-warn   { border-left-color: var(--color-warning); }
+.toast.toast-exit   { animation: toastOut 0.2s ease-out both; }
+
+/* Spinner utility */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spin { animation: spin 0.8s linear infinite; }
+
 /* ── Utility ────────────────────────────────────────────────────────────── */
 .font-mono { font-family: var(--font-mono); }
 .font-tabular { font-variant-numeric: tabular-nums; }
@@ -222,7 +357,7 @@ table { border-collapse: collapse; width: 100%; }
     padding:         0;
     z-index:         200;
   }
-  .topnav-row2.open { display: flex; }
+  .topnav-row2.open { display: flex; animation: slideDownFade 0.18s ease-out both; }
   .topnav-row2 a {
     padding:       14px 1.5rem !important;
     border-bottom: 1px solid var(--border-light) !important;

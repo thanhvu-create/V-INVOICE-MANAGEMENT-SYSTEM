@@ -103,10 +103,38 @@ function ActionBtn({
 export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
   if (loading) {
     return (
-      <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-        <i className="fa-solid fa-circle-notch fa-spin" style={{ marginRight: 8 }} />
-        Loading invoices...
-      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <tbody>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <tr key={i} style={{ borderBottom: '1px solid var(--border-light)', animation: `fadeIn 0.3s ease-out ${i * 60}ms both` }}>
+              <td style={{ padding: '0.75rem 1rem' }}>
+                <span className="skeleton" style={{ width: 110, height: 14 }} />
+              </td>
+              <td style={{ padding: '0.75rem 1rem' }}>
+                <span className="skeleton" style={{ width: 60, height: 12 }} />
+              </td>
+              <td style={{ padding: '0.75rem 1rem' }}>
+                <span className="skeleton" style={{ width: 80, height: 20 }} />
+              </td>
+              <td style={{ padding: '0.75rem 1rem' }}>
+                <span className="skeleton" style={{ width: 70, height: 12 }} />
+              </td>
+              <td style={{ padding: '0.75rem 1rem' }}>
+                <span className="skeleton" style={{ width: 90, height: 12 }} />
+              </td>
+              <td style={{ padding: '0.75rem 1rem' }}>
+                <span className="skeleton" style={{ width: 100, height: 12 }} />
+              </td>
+              <td style={{ padding: '0.75rem 1rem' }}>
+                <span className="skeleton" style={{ width: 72, height: 12 }} />
+              </td>
+              <td style={{ padding: '0.75rem 1rem', textAlign: 'right' }}>
+                <span className="skeleton" style={{ width: 50, height: 24 }} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     )
   }
   if (!rows.length) {
@@ -141,10 +169,11 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
               <th style={{ ...th, textAlign: 'right' }} />
             </tr>
           </thead>
-          <tbody>
+          <tbody className="stagger-children">
             {rows.map(row => (
               <tr
                 key={row.id}
+                style={{ transition: 'background 0.18s ease-out' }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                 onMouseLeave={e => (e.currentTarget.style.background = '')}
               >

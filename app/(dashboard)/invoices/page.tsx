@@ -70,7 +70,7 @@ function InvoiceListContent() {
   }
 
   return (
-    <div>
+    <div className="page-enter">
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', fontWeight: 400, margin: 0 }}>
           Invoices
