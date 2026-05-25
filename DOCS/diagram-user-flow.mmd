@@ -1,0 +1,83 @@
+---
+title: V-Invoice — Hướng dẫn sử dụng
+---
+flowchart TD
+    classDef morning  fill:#fef9c3,stroke:#ca8a04,color:#1a1814
+    classDef create   fill:#dbeafe,stroke:#2563eb,color:#1a1814
+    classDef check    fill:#ede9fe,stroke:#7c3aed,color:#1a1814
+    classDef approve  fill:#dcfce7,stroke:#16a34a,color:#1a1814
+    classDef done     fill:#1a1814,stroke:#1a1814,color:#fafaf7,font-weight:bold
+    classDef export   fill:#f0fdf4,stroke:#16a34a,color:#1a1814
+    classDef decision fill:#fff7ed,stroke:#ea580c,color:#1a1814
+
+    %% ── SÁNG ─────────────────────────────────────────────────────────
+    START(["🌅 Bắt đầu ngày làm việc"])
+
+    subgraph MORNING["☀️  ADMIN / MANAGER — Mỗi sáng"]
+        M1["💰 Cập nhật giá vàng hôm nay\n\nVào: Menu → Metal Rates → Add Rate\nNhập giá: 24K · 18KW · 18KY · Platinum · Silver\n(lấy từ SJC hoặc Kitco)"]
+    end
+
+    %% ── TẠO INVOICE ─────────────────────────────────────────────────
+    subgraph CREATE["📝  USER — Tạo Invoice mới"]
+        C0{Bạn có\nfile Excel\nkhông?}
+        C1["📂 Import từ Excel\n\nVào: Menu → Import\nChọn invoice → Upload file .xlsx\nHệ thống tự kiểm tra lỗi"]
+        C2["✍️ Nhập tay\n\nVào: Invoices → New Invoice\nĐiền thông tin → Add Items"]
+        C3["✅ Invoice được tạo\nTrạng thái: DRAFT"]
+    end
+
+    %% ── KIỂM TRA ─────────────────────────────────────────────────────
+    subgraph CHECK["🔍  USER — Kiểm tra trước khi gửi"]
+        E1["Mở invoice → xem bảng JM\n\n• Kiểm tra SKU, số lượng, trọng lượng\n• Dòng nào ghi 'ba sao' sẽ hiện màu đỏ\n• Giá được tính tự động"]
+        E2{Cần\nsửa gì\nkhông?}
+        E3["✏️ Sửa trực tiếp trên bảng\nHệ thống tính lại giá ngay lập tức"]
+        E4["📤 Bấm Submit for Approval\nViết ghi chú nếu cần"]
+    end
+
+    %% ── DUYỆT ────────────────────────────────────────────────────────
+    subgraph MGRAPH["✅  MANAGER — Duyệt invoice"]
+        D1["📊 Vào Dashboard\nXem ô 'Pending Approval: N'\nBấm vào → danh sách chờ duyệt"]
+        D2["Mở invoice → Kiểm tra bảng JM"]
+        D3{Đồng ý\nhay trả lại?}
+        D4["✅ Bấm Approve\nTrạng thái → APPROVED"]
+        D5["↩️ Bấm Return to Draft\nViết lý do → User sẽ nhận được\nvà sửa lại từ đầu"]
+    end
+
+    %% ── INVOICE ──────────────────────────────────────────────────────
+    subgraph LOCK["🔒  ADMIN — Đóng Invoice"]
+        L1["Mở invoice đã APPROVED\nBấm Mark as Invoiced\nXác nhận cảnh báo"]
+        L2(["🔒 INVOICED\nHệ thống tự lưu snapshot\nKhông ai sửa được nữa"])
+    end
+
+    %% ── OUTPUT ───────────────────────────────────────────────────────
+    subgraph OUTPUT["📤  Output — Ai cũng làm được"]
+        O1["📊 Export Excel\nBấm Export → tải file .xlsx về máy"]
+        O2["🖨️ In ấn\nBấm Print → trang in A4 ngang\nCtrl + P để in hoặc lưu PDF"]
+    end
+
+    %% ── CONNECTIONS ──────────────────────────────────────────────────
+    START --> M1
+    M1 --> C0
+    C0 -->|Có| C1
+    C0 -->|Không| C2
+    C1 --> C3
+    C2 --> C3
+    C3 --> E1
+    E1 --> E2
+    E2 -->|Có| E3
+    E3 --> E2
+    E2 -->|Không, OK rồi| E4
+    E4 --> D1
+    D1 --> D2 --> D3
+    D3 -->|Duyệt| D4
+    D3 -->|Trả lại| D5
+    D5 -->|User nhận thông báo| E1
+    D4 --> L1 --> L2
+    L2 --> O1 & O2
+
+    %% ── STYLES ───────────────────────────────────────────────────────
+    class M1 morning
+    class C0,C1,C2,C3 create
+    class E1,E2,E3,E4 check
+    class D1,D2,D3,D4,D5 approve
+    class L1,L2 done
+    class O1,O2 export
