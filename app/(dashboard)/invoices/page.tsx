@@ -9,8 +9,6 @@ import { InvoiceTable } from '@/components/invoice/InvoiceTable'
 import { Pagination } from '@/components/ui/Pagination'
 import type { InvoiceFilters } from '@/types'
 
-export const metadata = { title: 'Invoices — V-Invoice' }
-
 function InvoiceListContent() {
   const { user, canDo } = useUser()
   const router          = useRouter()

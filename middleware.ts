@@ -1,6 +1,14 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextRequest, NextResponse } from 'next/server'
 
+function createServiceClient() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { cookies: { getAll: () => [], setAll: () => {} } }
+  )
+}
+
 const PUBLIC_ROUTES  = ['/login', '/api/auth/login', '/api/export/template']
 const ADMIN_ROUTES   = ['/admin/users', '/admin/pricing-rules', '/admin/products']
 const MANAGER_ROUTES = ['/admin/metal-rates']
@@ -47,7 +55,7 @@ export async function middleware(req: NextRequest) {
     MANAGER_ROUTES.some(r => pathname.startsWith(r))
 
   if (needsRoleCheck) {
-    const { data: profile } = await supabase
+    const { data: profile } = await createServiceClient()
       .from('app_users')
       .select('role, is_active')
       .eq('auth_id', user.id)

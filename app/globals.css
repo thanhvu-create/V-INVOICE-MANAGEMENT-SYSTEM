@@ -1,32 +1,35 @@
-/* ── Design tokens ─────────────────────────────────────────────────────── */
+/* ── HP Jewelry Design Tokens ──────────────────────────────────────────── */
 :root {
-  /* Background */
-  --bg-base:    #F0EBE4;
-  --bg-surface: #FAFAF7;
-  --bg-muted:   #DDD8CF;
-  --bg-hover:   #E8E3DC;
+  /* Fonts */
+  --font-heading: var(--font-heading-loaded, 'Cormorant Garamond', Georgia, serif);
+  --font-body:    var(--font-body-loaded, 'Cardo', Georgia, serif);
+  --font-mono:    'JetBrains Mono', 'Courier New', monospace;
+
+  /* Background layers — warm cream foundation */
+  --bg-base:    #F7F1EB;   /* page foundation */
+  --bg-surface: #FBF7F1;   /* card / panel */
+  --bg-muted:   #EFE8DD;   /* table header / inset / callout */
+  --bg-hover:   #EDE6DC;   /* row hover */
 
   /* Text */
-  --text-primary:   #1A1814;
-  --text-secondary: #6B645C;
-  --text-muted:     #A09890;
-  --text-inverse:   #FAFAF7;
+  --text-primary:   #2A2725;
+  --text-secondary: #4A4540;
+  --text-muted:     #8A8178;
+  --text-inverse:   #FBF7F1;
 
   /* Border */
-  --border-strong: #1A1814;
-  --border-base:   #C8C3BB;
-  --border-light:  #DDD8CF;
+  --border-strong: #2A2725;
+  --border-base:   #D4CFC4;
+  --border-light:  #E5DFD6;
+
+  /* Accent — HP Pink (used ≤ 3× per screen) */
+  --color-accent:  #E91D79;
 
   /* Semantic */
   --color-success: #4A7C59;
   --color-danger:  #9B4040;
   --color-warning: #8C7340;
   --color-info:    #4A6B8C;
-
-  /* Fonts */
-  --font-heading: 'Cormorant Garamond', Georgia, serif;
-  --font-body:    'Jost', Arial, sans-serif;
-  --font-mono:    'JetBrains Mono', 'Courier New', monospace;
 
   /* Type scale */
   --text-xs:   11px;
@@ -40,16 +43,6 @@
   /* V-Invoice specific */
   --sku-highlight-bg: #FEF3C7;
   --gold-weight-bg:   #FFFBEB;
-
-  /* Invoice status */
-  --status-draft-bg:     #F3F4F6;
-  --status-draft-text:   #374151;
-  --status-pending-bg:   #FEF3C7;
-  --status-pending-text: #92400E;
-  --status-approved-bg:  #D1FAE5;
-  --status-approved-text:#065F46;
-  --status-invoiced-bg:  #1A1814;
-  --status-invoiced-text:#FAFAF7;
 }
 
 /* ── Reset ─────────────────────────────────────────────────────────────── */
@@ -62,6 +55,7 @@
 html {
   font-size: 15px;
   -webkit-font-smoothing: antialiased;
+  font-optical-sizing: auto;
 }
 
 body {
@@ -69,7 +63,7 @@ body {
   color:       var(--text-primary);
   font-family: var(--font-body);
   font-size:   var(--text-base);
-  line-height: 1.5;
+  line-height: 1.625;
   min-height:  100vh;
 }
 
@@ -80,47 +74,126 @@ h1, h2, h3, h4 {
   line-height: 1.2;
 }
 
-/* ── Form elements ──────────────────────────────────────────────────────── */
+/* ── Form elements — bottom-border only (HP pattern) ───────────────────── */
 input, select, textarea {
-  font-family: var(--font-body);
-  font-size:   var(--text-sm);
-  color:       var(--text-primary);
-  background:  var(--bg-surface);
-  border:      1px solid var(--border-base);
+  font-family:   var(--font-body);
+  font-size:     var(--text-sm);
+  color:         var(--text-primary);
+  background:    transparent;
+  border:        none;
+  border-bottom: 1px solid var(--border-base);
   border-radius: 0;
-  outline:     none;
+  outline:       none;
+  padding:       6px 2px;
+  width:         100%;
+  transition:    border-color 0.15s;
 }
 
 input:focus, select:focus, textarea:focus {
-  border-color: var(--border-strong);
+  border-bottom: 2px solid var(--color-accent);
+  padding-bottom: 5px; /* compensate 1→2px to avoid jump */
 }
 
+input[readonly], input:disabled, select:disabled, textarea[readonly] {
+  color:         var(--text-muted);
+  border-bottom: 1px solid var(--border-light);
+  opacity:       0.7;
+  cursor:        not-allowed;
+}
+
+/* Box inputs (explicit class for modal/admin forms that need a contained look) */
+input.input-box, select.input-box, textarea.input-box {
+  border:        1px solid var(--border-base);
+  border-radius: 0;
+  padding:       7px 10px;
+  background:    var(--bg-surface);
+}
+input.input-box:focus, select.input-box:focus, textarea.input-box:focus {
+  border-color:  var(--border-strong);
+  border-bottom: 1px solid var(--border-strong);
+  padding-bottom: 7px;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
 button {
   font-family:   var(--font-body);
   border-radius: 0;
   cursor:        pointer;
+  border:        none;
+  transition:    background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+/* Primary: dark → pink on hover */
+.btn-primary {
+  background:    var(--border-strong);
+  color:         var(--text-inverse);
+  border:        1px solid var(--border-strong);
+  padding:       8px 22px;
+  font-size:     var(--text-xs);
+  font-weight:   600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.btn-primary:hover  { background: var(--color-accent); border-color: var(--color-accent); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary:disabled:hover { background: var(--border-strong); border-color: var(--border-strong); }
+
+/* Secondary: outline → charcoal fill on hover */
+.btn-outline {
+  background:    transparent;
+  color:         var(--text-primary);
+  border:        1px solid var(--border-base);
+  padding:       7px 18px;
+  font-size:     var(--text-xs);
+  font-weight:   500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.btn-outline:hover { background: var(--border-strong); color: var(--text-inverse); border-color: var(--border-strong); }
+
+/* Danger: red outline → charcoal on hover (NOT pink) */
+.btn-danger {
+  background:    transparent;
+  color:         var(--color-danger);
+  border:        1px solid var(--color-danger);
+  padding:       7px 18px;
+  font-size:     var(--text-xs);
+  font-weight:   500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.btn-danger:hover { background: var(--border-strong); color: var(--text-inverse); border-color: var(--border-strong); }
+
+/* ── Form label (eyebrow style) ─────────────────────────────────────────── */
+.form-label {
+  display:        block;
+  font-size:      var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color:          var(--text-muted);
+  margin-bottom:  5px;
+  font-weight:    500;
+  font-family:    var(--font-body);
 }
 
 /* ── Table base ─────────────────────────────────────────────────────────── */
-table {
-  border-collapse: collapse;
-  width: 100%;
-}
+table { border-collapse: collapse; width: 100%; }
 
 /* ── Scrollbar ──────────────────────────────────────────────────────────── */
-::-webkit-scrollbar       { width: 6px; height: 6px; }
+::-webkit-scrollbar       { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: var(--bg-base); }
 ::-webkit-scrollbar-thumb { background: var(--border-base); }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
 
 /* ── Utility ────────────────────────────────────────────────────────────── */
 .font-mono { font-family: var(--font-mono); }
-.sr-only   {
+.font-tabular { font-variant-numeric: tabular-nums; }
+.sr-only {
   position: absolute; width: 1px; height: 1px;
   padding: 0; margin: -1px; overflow: hidden;
   clip: rect(0,0,0,0); white-space: nowrap; border: 0;
 }
-.no-print { }
+.no-print {}
 
 /* ── TopNav responsive ──────────────────────────────────────────────────── */
 .topnav-hamburger { display: none; }
@@ -128,43 +201,39 @@ table {
 
 @media (max-width: 767px) {
   .topnav-hamburger {
-    display: flex;
+    display:     flex;
     align-items: center;
-    background: none;
-    border: 1px solid var(--border-base);
-    color: var(--text-primary);
-    padding: 4px 10px;
-    font-size: 16px;
-    cursor: pointer;
+    background:  none;
+    border:      1px solid var(--border-base);
+    color:       var(--text-primary);
+    padding:     4px 10px;
+    font-size:   16px;
+    cursor:      pointer;
   }
   .topnav-row2 {
-    display: none;
-    position: absolute;
-    top: 100%;
-    left: 0;
-    right: 0;
-    background: var(--bg-surface);
-    border-bottom: 1px solid var(--border-base);
-    flex-direction: column;
-    padding: 0;
-    z-index: 200;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    display:         none;
+    position:        absolute;
+    top:             100%;
+    left:            0;
+    right:           0;
+    background:      var(--bg-surface);
+    border-bottom:   1px solid var(--border-base);
+    flex-direction:  column;
+    padding:         0;
+    z-index:         200;
   }
-  .topnav-row2.open {
-    display: flex;
-  }
+  .topnav-row2.open { display: flex; }
   .topnav-row2 a {
-    padding: 14px 1.5rem !important;
+    padding:       14px 1.5rem !important;
     border-bottom: 1px solid var(--border-light) !important;
-    border-bottom-width: 1px !important;
   }
-  .topnav-brand { font-size: 14px !important; }
+  .topnav-brand    { font-size: 15px !important; }
   .topnav-username { display: none; }
 }
 
 /* ── Invoice list: table vs card ────────────────────────────────────────── */
-.invoice-table-wrap  { display: block; }
-.invoice-card-list   { display: none; }
+.invoice-table-wrap { display: block; }
+.invoice-card-list  { display: none; }
 
 @media (max-width: 639px) {
   .invoice-table-wrap { display: none; }
@@ -172,25 +241,26 @@ table {
 }
 
 .invoice-card {
-  display: block;
-  padding: 0.85rem 1rem;
-  border-bottom: 1px solid var(--border-light);
+  display:        block;
+  padding:        0.9rem 1rem;
+  border-bottom:  1px solid var(--border-light);
   text-decoration: none;
-  color: inherit;
-  background: var(--bg-surface);
+  color:          inherit;
+  background:     var(--bg-surface);
+  transition:     background 0.15s;
 }
 .invoice-card:active { background: var(--bg-hover); }
 .invoice-card-row1 {
-  display: flex;
+  display:         flex;
   justify-content: space-between;
-  align-items: center;
-  margin-bottom: 0.3rem;
+  align-items:     center;
+  margin-bottom:   0.3rem;
 }
 .invoice-card-row2 {
   font-size: var(--text-xs);
-  color: var(--text-secondary);
-  display: flex;
-  gap: 0.5rem;
+  color:     var(--text-muted);
+  display:   flex;
+  gap:       0.5rem;
   flex-wrap: wrap;
 }
 
@@ -199,51 +269,46 @@ table {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
 }
-.jm-table {
-  min-width: 900px;
-}
+.jm-table { min-width: 900px; }
+
 .jm-table th:nth-child(1),
 .jm-table td:nth-child(1) {
-  position: sticky;
-  left: 0;
-  min-width: 42px;
-  max-width: 42px;
-  z-index: 2;
+  position:   sticky;
+  left:       0;
+  min-width:  42px;
+  max-width:  42px;
+  z-index:    2;
   background: var(--bg-surface);
   box-shadow: 1px 0 0 var(--border-light);
 }
 .jm-table th:nth-child(2),
 .jm-table td:nth-child(2) {
-  position: sticky;
-  left: 42px;
-  z-index: 2;
+  position:   sticky;
+  left:       42px;
+  z-index:    2;
   background: var(--sku-highlight-bg);
-  box-shadow: 2px 0 4px rgba(0,0,0,0.05);
+  box-shadow: 2px 0 4px rgba(0,0,0,0.04);
 }
 
 /* ── Modal responsive ───────────────────────────────────────────────────── */
 .modal-dialog {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-base);
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
+  background:  var(--bg-surface);
+  border:      1px solid var(--border-base);
+  width:       100%;
+  max-height:  90vh;
+  overflow-y:  auto;
 }
 @media (max-width: 639px) {
   .modal-overlay {
     align-items: flex-end !important;
-    padding: 0 !important;
+    padding:     0 !important;
   }
   .modal-dialog {
-    max-width: 100% !important;
+    max-width:  100% !important;
     max-height: 92vh;
     border-bottom: none;
   }
 }
-
-/* ── Workflow bar print ─────────────────────────────────────────────────── */
-.workflow-bar-wrap { }
-.view-toggle-bar   { }
 
 /* ── Print CSS (A4 Landscape) ───────────────────────────────────────────── */
 @page { size: A4 landscape; margin: 15mm 10mm; }
@@ -256,10 +321,10 @@ table {
   .view-toggle-bar { display: none !important; }
 
   body {
-    font-size: 9pt;
-    font-family: 'Jost', Arial, sans-serif;
-    background: white;
-    color: black;
+    font-size:   9pt;
+    font-family: 'Cardo', Georgia, serif;
+    background:  white;
+    color:       black;
   }
 
   .jm-table { width: 100%; font-size: 8pt; min-width: 0; }
@@ -269,7 +334,7 @@ table {
   .jm-table td:nth-child(1),
   .jm-table th:nth-child(2),
   .jm-table td:nth-child(2) {
-    position: static;
+    position:   static;
     box-shadow: none;
   }
 

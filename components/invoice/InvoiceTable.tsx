@@ -24,41 +24,109 @@ interface Props {
   onDelete: (id: string, po: string) => void
 }
 
+/* Table header cell — uses --bg-muted (HP inset) */
 const th: React.CSSProperties = {
-  padding: '0.55rem 0.75rem', textAlign: 'left', fontFamily: 'var(--font-body)',
-  fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase',
-  color: 'var(--text-secondary)', borderBottom: '2px solid var(--border-base)',
-  background: 'var(--bg-surface)', whiteSpace: 'nowrap',
+  padding:        '0.6rem 1rem',
+  textAlign:      'left',
+  fontFamily:     'var(--font-body)',
+  fontSize:       'var(--text-xs)',
+  fontWeight:     600,
+  letterSpacing:  '0.12em',
+  textTransform:  'uppercase',
+  color:          'var(--text-muted)',
+  borderBottom:   '1px solid var(--border-base)',
+  background:     'var(--bg-muted)',
+  whiteSpace:     'nowrap',
 }
+
 const td: React.CSSProperties = {
-  padding: '0.65rem 0.75rem', borderBottom: '1px solid var(--border-light)',
-  fontSize: 'var(--text-sm)', color: 'var(--text-primary)', verticalAlign: 'middle',
+  padding:      '0.75rem 1rem',
+  borderBottom: '1px solid var(--border-light)',
+  fontSize:     'var(--text-sm)',
+  color:        'var(--text-primary)',
+  verticalAlign: 'middle',
 }
-const actionBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 4, padding: '3px 10px',
-  border: '1px solid var(--border-base)', color: 'var(--text-primary)',
-  textDecoration: 'none', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)',
-  background: 'transparent', borderRadius: 0,
+
+function ActionBtn({
+  href, onClick, danger, children,
+}: {
+  href?:     string
+  onClick?:  () => void
+  danger?:   boolean
+  children:  React.ReactNode
+}) {
+  const base: React.CSSProperties = {
+    display:        'inline-flex',
+    alignItems:     'center',
+    gap:            4,
+    padding:        '4px 12px',
+    border:         danger ? '1px solid var(--color-danger)' : '1px solid var(--border-base)',
+    color:          danger ? 'var(--color-danger)' : 'var(--text-secondary)',
+    textDecoration: 'none',
+    fontSize:       'var(--text-xs)',
+    fontFamily:     'var(--font-body)',
+    letterSpacing:  '0.06em',
+    textTransform:  'uppercase',
+    background:     'transparent',
+    borderRadius:   0,
+    cursor:         'pointer',
+    transition:     'background 0.15s, color 0.15s, border-color 0.15s',
+  }
+
+  function onEnter(e: React.MouseEvent<HTMLElement>) {
+    const el = e.currentTarget as HTMLElement
+    el.style.background  = 'var(--border-strong)'
+    el.style.color       = 'var(--text-inverse)'
+    el.style.borderColor = 'var(--border-strong)'
+  }
+  function onLeave(e: React.MouseEvent<HTMLElement>) {
+    const el = e.currentTarget as HTMLElement
+    el.style.background  = 'transparent'
+    el.style.color       = danger ? 'var(--color-danger)' : 'var(--text-secondary)'
+    el.style.borderColor = danger ? 'var(--color-danger)' : 'var(--border-base)'
+  }
+
+  if (href) {
+    return (
+      <Link href={href} style={base} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+        {children}
+      </Link>
+    )
+  }
+  return (
+    <button onClick={onClick} style={base} onMouseEnter={onEnter} onMouseLeave={onLeave}>
+      {children}
+    </button>
+  )
 }
 
 export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
   if (loading) {
     return (
-      <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+      <div style={{ padding: '4rem', textAlign: 'center', color: 'var(--text-muted)' }}>
         <i className="fa-solid fa-circle-notch fa-spin" style={{ marginRight: 8 }} />
         Loading invoices...
       </div>
     )
   }
   if (!rows.length) {
-    return <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>No invoices found.</div>
+    return (
+      <div style={{ padding: '4rem', textAlign: 'center' }}>
+        <p style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-xl)', color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+          No invoices found
+        </p>
+        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)' }}>
+          Adjust your filters or create a new invoice.
+        </p>
+      </div>
+    )
   }
 
   const canDelete = role === 'admin'
 
   return (
     <>
-      {/* Desktop table (hidden < 640px via CSS) */}
+      {/* Desktop table */}
       <div className="invoice-table-wrap" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
@@ -69,9 +137,8 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
               <th style={th}>Store</th>
               <th style={th}>Rate Date</th>
               <th style={th}>Pricing Rule</th>
-              <th style={th}>Created By</th>
-              <th style={th}>Date</th>
-              <th style={th} />
+              <th style={th}>Created</th>
+              <th style={{ ...th, textAlign: 'right' }} />
             </tr>
           </thead>
           <tbody>
@@ -82,30 +149,49 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
                 onMouseLeave={e => (e.currentTarget.style.background = '')}
               >
                 <td style={td}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{row.po_number}</span>
-                  {row.is_locked && <i className="fa-solid fa-lock" style={{ marginLeft: 6, fontSize: 10, color: 'var(--text-muted)' }} title="Locked" />}
+                  <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 'var(--text-sm)' }}>
+                    {row.po_number}
+                  </span>
+                  {row.is_locked && (
+                    <i
+                      className="fa-solid fa-lock"
+                      style={{ marginLeft: 7, fontSize: 9, color: 'var(--text-muted)' }}
+                      title="Locked"
+                    />
+                  )}
                 </td>
-                <td style={{ ...td, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{row.mr_number || '—'}</td>
-                <td style={td}><StatusBadge status={row.status} /></td>
-                <td style={td}>{row.store || '—'}</td>
-                <td style={{ ...td, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>{row.daily_metal_rates?.rate_date || '—'}</td>
-                <td style={{ ...td, color: 'var(--text-secondary)' }}>{row.pricing_rules?.name || '—'}</td>
-                <td style={{ ...td, color: 'var(--text-secondary)' }}>{row.created_by}</td>
-                <td style={{ ...td, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', whiteSpace: 'nowrap' }}>{row.created_at.slice(0, 10)}</td>
+                <td style={{ ...td, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', fontSize: 'var(--text-xs)' }}>
+                  {row.mr_number || '—'}
+                </td>
+                <td style={td}>
+                  <StatusBadge status={row.status} />
+                </td>
+                <td style={{ ...td, color: 'var(--text-secondary)' }}>
+                  {row.store || '—'}
+                </td>
+                <td style={{ ...td, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
+                  {row.daily_metal_rates?.rate_date || '—'}
+                </td>
+                <td style={{ ...td, color: 'var(--text-secondary)', fontSize: 'var(--text-xs)' }}>
+                  {row.pricing_rules?.name || '—'}
+                </td>
+                <td style={{ ...td, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                  {row.created_at.slice(0, 10)}
+                </td>
                 <td style={{ ...td, whiteSpace: 'nowrap', textAlign: 'right' }}>
                   <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
-                    <Link href={`/invoices/${row.id}`} style={actionBtn}>
-                      <i className="fa-solid fa-eye" style={{ fontSize: 10 }} /> View
-                    </Link>
+                    <ActionBtn href={`/invoices/${row.id}`}>
+                      <i className="fa-regular fa-eye" style={{ fontSize: 10 }} /> View
+                    </ActionBtn>
                     {!row.is_locked && (role === 'admin' || role === 'manager' || (role === 'user' && row.status === 'draft')) && (
-                      <Link href={`/invoices/${row.id}/edit`} style={actionBtn}>
-                        <i className="fa-solid fa-pen" style={{ fontSize: 10 }} /> Edit
-                      </Link>
+                      <ActionBtn href={`/invoices/${row.id}/edit`}>
+                        <i className="fa-regular fa-pen-to-square" style={{ fontSize: 10 }} /> Edit
+                      </ActionBtn>
                     )}
                     {canDelete && !row.is_locked && (
-                      <button onClick={() => onDelete(row.id, row.po_number)} style={{ ...actionBtn, border: '1px solid var(--color-danger)', color: 'var(--color-danger)', cursor: 'pointer' }}>
-                        <i className="fa-solid fa-trash" style={{ fontSize: 10 }} />
-                      </button>
+                      <ActionBtn danger onClick={() => onDelete(row.id, row.po_number)}>
+                        <i className="fa-regular fa-trash-can" style={{ fontSize: 10 }} />
+                      </ActionBtn>
                     )}
                   </div>
                 </td>
@@ -115,13 +201,15 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
         </table>
       </div>
 
-      {/* Mobile card list (hidden >= 640px via CSS) */}
+      {/* Mobile card list */}
       <div className="invoice-card-list">
         {rows.map(row => (
           <Link key={row.id} href={`/invoices/${row.id}`} className="invoice-card">
             <div className="invoice-card-row1">
               <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 'var(--text-sm)' }}>
-                {row.is_locked && <i className="fa-solid fa-lock" style={{ fontSize: 9, marginRight: 5, color: 'var(--text-muted)' }} />}
+                {row.is_locked && (
+                  <i className="fa-solid fa-lock" style={{ fontSize: 9, marginRight: 5, color: 'var(--text-muted)' }} />
+                )}
                 {row.po_number}
               </span>
               <StatusBadge status={row.status} />

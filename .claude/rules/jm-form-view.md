@@ -28,21 +28,23 @@ JM Form View là bảng phẳng (flat table) hiển thị toàn bộ invoice ite
 
 | # | Column Label | DB Field | Width | Notes |
 |---|-------------|---------|-------|-------|
-| 1 | No. | `line_no` | 50px | Sticky |
-| 2 | SKU | `sku_jwmold` | 140px | Sticky, bg `#FEF3C7` |
-| 3 | Description | `description` | 200px | |
-| 4 | Class | `class` | 100px | |
-| 5 | Sub Class | `sub_class` | 100px | |
-| 6 | Qty | `qty_pcs` | 60px | Integer |
-| 7 | Total Weight (g) | `weight_total_gr` | 100px | 4 decimals |
-| 8 | Gold Weight (g) | `weight_gold_actual_gr` | 100px | 4 decimals |
-| 9 | No-Gem Weight (g) | `weight_no_gem_gr` | 110px | Computed, readonly |
-| 10 | Metal Type | `metal_type` | 80px | |
-| 11 | Gold Value (USD) | `gold_value_usd` | 110px | Computed, readonly |
-| 12 | HPUSA | `hpusa` | 110px | Computed, readonly |
-| 13 | CIF Price | `cif_price` | 110px | Computed, readonly |
-| 14 | Tag Price | `tag_price` | 110px | Visible: manager/admin only |
-| 15 | FR Price | `fr_price` | 110px | Visible: manager/admin only |
+| 1 | No. | `line_no` | 50px | Sticky left=0, bg `--bg-surface` |
+| 2 | SKU JWMold | `sku_jwmold` | 140px | Sticky left=50px, ALWAYS bg `#FEF3C7`, font-mono |
+| 3 | Qty Pcs | `qty_pcs` | 60px | Integer |
+| 4 | Description | `description` | 200px | |
+| 5 | Class | `class` | 100px | |
+| 6 | Sub Class | `sub_class` | 100px | |
+| 7 | Notes | `notes` | 150px | Red `#DC2626` if contains "ba sao" (case-insensitive) |
+| 8 | Wt Total gr | `weight_total_gr` | 100px | 4 decimals, font-mono |
+| 9 | Wt Gold gr | `weight_gold_actual_gr` | 100px | 4 decimals, font-mono, bg `#FFFBEB` |
+| 10 | Wt No Gem gr | `weight_no_gem_gr` | 110px | Computed readonly, font-mono |
+| 11 | Metal Type | `metal_type` | 80px | |
+| 12 | Gold Value USD | `gold_value_usd` | 110px | Computed readonly, font-mono |
+| 13 | HPUSA | `hpusa` | 110px | Computed readonly, font-mono, font-weight 600 |
+| 14 | CIF Price | `cif_price` | 110px | Computed readonly, font-mono |
+| 15 | Tag Price | `tag_price` | 110px | Visible: manager/admin only, font-mono |
+
+**Column 15 note:** FR Price (`fr_price`) is NOT shown in the JM Form View table — it is available only in the Detail View and Export. The 15th visible column for manager/admin is Tag Price.
 
 ---
 
@@ -77,24 +79,28 @@ JM Form View là bảng phẳng (flat table) hiển thị toàn bộ invoice ite
 
 ---
 
-## 4. SKU CELL — BA SAO INDICATOR
+## 4. BA SAO INDICATOR — NOTES COLUMN (Col 7)
 
 ```typescript
-// "Ba Sao" = items đặc biệt cần chú ý
-// Detect bằng: sku_jwmold.includes('*') hoặc notes field
-// GAS cũ: Ba Sao text màu đỏ #DC2626
+// "Ba Sao" = items đặc biệt cần chú ý (special attention flag)
+// Detection: notes field contains "ba sao" (case-insensitive)
+// Display: Notes cell text turns red #DC2626 when ba sao detected
 
-// Render:
-function renderSKUCell(item: InvoiceItem): React.ReactNode {
-  const hasBaSao = item.sku_jwmold?.includes('*') || item.notes?.includes('ba sao')
+function renderNotesCell(item: InvoiceItem): React.ReactNode {
+  const isBaSao = item.notes?.toLowerCase().includes('ba sao')
   return (
-    <td style={{ background: '#FEF3C7', position: 'sticky', left: 50 }}>
-      <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-        {item.sku_jwmold}
-      </span>
-      {hasBaSao && (
-        <span style={{ color: '#DC2626', marginLeft: 4, fontWeight: 700 }}>★</span>
-      )}
+    <td style={{ color: isBaSao ? '#DC2626' : 'var(--text-secondary)', fontWeight: isBaSao ? 700 : 400 }}>
+      {item.notes || ''}
+    </td>
+  )
+}
+
+// SKU cell itself does NOT show a red star — the Notes column carries the indicator
+// Gold Weight cell (col 9) uses soft yellow bg #FFFBEB:
+function renderGoldWeightCell(item: InvoiceItem): React.ReactNode {
+  return (
+    <td style={{ background: '#FFFBEB', fontFamily: 'var(--font-mono)', color: '#92400E', textAlign: 'right' }}>
+      {item.weight_gold_actual_gr?.toFixed(4) ?? '—'}
     </td>
   )
 }
@@ -107,15 +113,19 @@ function renderSKUCell(item: InvoiceItem): React.ReactNode {
 ```typescript
 const canSeePrice = role === 'manager' || role === 'admin'
 
-// Columns hidden for 'user' role:
-// - Tag Price (col 14)
-// - FR Price (col 15)
+// Columns hidden for 'user' and 'viewer' roles:
+// - Tag Price (col 15) — manager/admin only
+
+// Columns visible to ALL roles (user, viewer, manager, admin):
+// - HPUSA (col 13)     — cost basis, visible to all
+// - CIF Price (col 14) — visible to all
+// - Gold Value (col 12) — visible to all
 
 // Computed columns (readonly for ALL roles, never editable in JM view):
-// - No-Gem Weight (col 9) = weight_total_gr - Σgem.weight_gr
-// - Gold Value (col 11)   = recalculated server-side
-// - HPUSA (col 12)        = recalculated server-side
-// - CIF Price (col 13)    = recalculated server-side
+// - Wt No Gem gr (col 10) = weight_total_gr - Σgem.weight_gr
+// - Gold Value USD (col 12) = recalculated server-side
+// - HPUSA (col 13)          = recalculated server-side
+// - CIF Price (col 14)      = recalculated server-side
 ```
 
 ---
@@ -249,20 +259,23 @@ const canSeePrice = role === 'manager' || role === 'admin'
 ## 10. TABLE FOOTER (TOTALS)
 
 ```tsx
-// tfoot row hiển thị tổng:
+// tfoot row hiển thị tổng (matches corrected column order):
+// Col:  1(No)  2(SKU)  3(Qty)  4(Desc)  5(Class)  6(SubClass)  7(Notes)
+//       8(WtTotal)  9(WtGold)  10(WtNoGem)  11(Metal)
+//       12(GoldVal)  13(HPUSA)  14(CIF)  [15(Tag) if canSeePrice]
 <tfoot>
   <tr style={{ borderTop: '2px solid var(--border-strong)', fontWeight: 600 }}>
-    <td colSpan={5} style={{ textAlign: 'right', paddingRight: 12 }}>TOTAL</td>
-    <td className="num">{totalQty}</td>
-    <td className="num">{formatWeight(totalWeightGr)}</td>
-    <td className="num">{formatWeight(totalGoldGr)}</td>
-    <td className="num">{formatWeight(totalNoGemGr)}</td>
-    <td></td>
-    <td className="num">{formatUSD(totalGoldValue)}</td>
-    <td className="num">{formatUSD(totalHpusa)}</td>
-    <td className="num">{formatUSD(totalCif)}</td>
-    {canSeePrice && <td className="num">{formatUSD(totalTag)}</td>}
-    {canSeePrice && <td className="num">{formatUSD(totalFr)}</td>}
+    <td colSpan={2} />
+    <td className="num">{totalQty}</td>           {/* Col 3: Qty */}
+    <td colSpan={4} style={{ textAlign: 'right', paddingRight: 12 }}>TOTAL</td>  {/* 4-7 */}
+    <td className="num">{formatWeight(totalWeightGr)}</td>   {/* Col 8 */}
+    <td className="num">{formatWeight(totalGoldGr)}</td>     {/* Col 9 */}
+    <td className="num">{formatWeight(totalNoGemGr)}</td>    {/* Col 10 */}
+    <td />                                                    {/* Col 11: Metal */}
+    <td className="num">{formatUSD(totalGoldValue)}</td>     {/* Col 12 */}
+    <td className="num">{formatUSD(totalHpusa)}</td>         {/* Col 13 */}
+    <td className="num">{formatUSD(totalCif)}</td>           {/* Col 14 */}
+    {canSeePrice && <td className="num">{formatUSD(totalTag)}</td>}  {/* Col 15 */}
   </tr>
 </tfoot>
 ```

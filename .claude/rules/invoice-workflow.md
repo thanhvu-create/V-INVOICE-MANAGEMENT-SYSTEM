@@ -22,6 +22,7 @@ draft ──────────────> pending_approval ────�
 ### ALLOWED_TRANSITIONS Map
 
 ```typescript
+// viewer role has NO transitions — read-only access
 const ALLOWED_TRANSITIONS: Record<string, Record<string, string[]>> = {
   user: {
     draft: ['pending_approval'],
@@ -34,6 +35,7 @@ const ALLOWED_TRANSITIONS: Record<string, Record<string, string[]>> = {
     pending_approval: ['approved', 'draft'],
     approved:         ['invoiced', 'pending_approval'],
   },
+  viewer: {},  // no transitions allowed
 }
 
 function canTransition(role: string, from: string, to: string): boolean {
@@ -45,7 +47,7 @@ function canTransition(role: string, from: string, to: string): boolean {
 
 ## 2. STATUS TRANSITION API
 
-**Endpoint:** `PATCH /api/invoices/[id]/status`
+**Endpoint:** `POST /api/invoices/[id]/status`
 
 ```typescript
 // Request body:
@@ -54,10 +56,11 @@ function canTransition(role: string, from: string, to: string): boolean {
 // Server logic:
 // 1. GET header → check is_locked (403 nếu locked)
 // 2. Lấy current status từ header
-// 3. Lấy role từ session
+// 3. Lấy role từ session (via app_users lookup, NOT JWT claims)
 // 4. canTransition(role, current, to_status) → 422 nếu false
 // 5. UPDATE invoice_headers SET status = to_status, updated_at = now()
-// 6. INSERT audit_logs { from_status, to_status, changed_by, note }
+//    (trigger fires automatically when status → 'invoiced')
+// 6. INSERT audit_logs { action: 'status_change', from_status, to_status, changed_by, note }
 
 // Response: { success: true, data: { status: newStatus } }
 ```
@@ -126,23 +129,26 @@ FOR EACH ROW EXECUTE FUNCTION snapshot_invoice_on_invoiced();
 // Insert sau mỗi status transition:
 await db.from('audit_logs').insert({
   invoice_id:  invoiceId,
+  action:      'status_change',     // required field
   from_status: currentStatus,
   to_status:   newStatus,
-  changed_by:  userId,    // user email hoặc username
+  changed_by:  userId,              // app_users.id (UUID)
   note:        note || null,
-  // changed_at: DEFAULT now()
+  metadata:    null,                // optional extra context
+  // created_at: DEFAULT now()
 })
 ```
 
 **API:** `GET /api/invoices/[id]/audit`
 
 ```typescript
-// Response:
+// Response (joined with app_users):
 [{
-  id, invoice_id, from_status, to_status,
-  changed_by, note, changed_at
+  id, invoice_id, action, from_status, to_status,
+  changed_by, note, metadata, created_at,
+  app_users: { id, full_name, email, role }
 }]
-// ORDER BY changed_at ASC (oldest first — timeline view)
+// ORDER BY created_at ASC (oldest first — timeline view)
 ```
 
 ---
@@ -208,11 +214,12 @@ function getActionLabel(from: string, to: string): string {
 ## 7. STATUS BADGE COMPONENT
 
 ```tsx
+// CORRECTED: approved uses --color-success (green), NOT --color-info (blue)
 const STATUS_CONFIG = {
   draft:            { label: 'Draft',            color: 'var(--text-muted)' },
   pending_approval: { label: 'Pending Approval', color: 'var(--color-warning)' },
-  approved:         { label: 'Approved',         color: 'var(--color-info)' },
-  invoiced:         { label: 'Invoiced',         color: 'var(--color-success)' },
+  approved:         { label: 'Approved',         color: 'var(--color-success)' },
+  invoiced:         { label: 'Invoiced',         color: 'var(--color-success)', filled: true },
 }
 
 // Badge style:
