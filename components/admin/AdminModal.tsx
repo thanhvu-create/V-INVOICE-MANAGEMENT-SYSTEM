@@ -1,5 +1,8 @@
 'use client'
 
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
+
 interface Props {
   title:    string
   onClose:  () => void
@@ -8,22 +11,55 @@ interface Props {
 }
 
 export function AdminModal({ title, onClose, children, width = 520 }: Props) {
-  return (
+  const [mounted, setMounted] = useState(false)
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  /* Mount after hydration (portal needs document.body) */
+  useEffect(() => {
+    setMounted(true)
+    /* Lock body scroll */
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = prev }
+  }, [])
+
+  /* Close on Escape */
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  if (!mounted) return null
+
+  return createPortal(
     <div
-      className="modal-overlay"
+      ref={overlayRef}
       style={{
-        position:       'fixed',
-        inset:          0,
-        background:     'rgba(42,39,37,0.5)',
-        display:        'flex',
-        alignItems:     'center',
-        justifyContent: 'center',
-        zIndex:         300,
-        padding:        '1rem',
+        position:        'fixed',
+        inset:           0,
+        background:      'rgba(42,39,37,0.6)',
+        backdropFilter:  'blur(3px)',
+        WebkitBackdropFilter: 'blur(3px)',
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+        zIndex:          9999,
+        padding:         '1rem',
+        animation:       'fadeIn 0.18s ease-out both',
       }}
-      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+      onClick={e => { if (e.target === overlayRef.current) onClose() }}
     >
-      <div className="modal-dialog modal-enter" style={{ maxWidth: width }}>
+      <div
+        className="modal-dialog"
+        style={{
+          maxWidth:  width,
+          width:     '100%',
+          maxHeight: '90vh',
+          overflowY: 'auto',
+          animation: 'slideUpFade 0.22s ease-out both',
+        }}
+      >
         {/* Modal header */}
         <div style={{
           display:        'flex',
@@ -32,6 +68,9 @@ export function AdminModal({ title, onClose, children, width = 520 }: Props) {
           padding:        '1.25rem 1.75rem',
           borderBottom:   '1px solid var(--border-light)',
           background:     'var(--bg-muted)',
+          position:       'sticky',
+          top:            0,
+          zIndex:         1,
         }}>
           <h2 style={{
             fontFamily: 'var(--font-heading)',
@@ -44,6 +83,7 @@ export function AdminModal({ title, onClose, children, width = 520 }: Props) {
           </h2>
           <button
             onClick={onClose}
+            aria-label="Close"
             style={{
               background: 'none',
               border:     'none',
@@ -51,7 +91,7 @@ export function AdminModal({ title, onClose, children, width = 520 }: Props) {
               color:      'var(--text-muted)',
               fontSize:   16,
               lineHeight: 1,
-              padding:    4,
+              padding:    6,
               transition: 'color 0.15s',
             }}
             onMouseEnter={e => (e.currentTarget.style.color = 'var(--text-primary)')}
@@ -64,11 +104,12 @@ export function AdminModal({ title, onClose, children, width = 520 }: Props) {
         {/* Modal body */}
         <div style={{ padding: '1.75rem' }}>{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
-/* Shared style exports for admin form fields */
+/* ── Shared style exports for admin form fields ─────────────────────────── */
 
 export const fieldStyle: React.CSSProperties = { marginBottom: '1.25rem' }
 
@@ -83,7 +124,6 @@ export const labelStyle: React.CSSProperties = {
   marginBottom:   '5px',
 }
 
-/* Box input for admin forms (contained look in modal context) */
 export const inputStyle: React.CSSProperties = {
   width:        '100%',
   padding:      '7px 10px',

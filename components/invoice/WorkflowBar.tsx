@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { toast } from '@/components/ui/Toast'
 
 const STEPS = ['draft', 'pending_approval', 'approved', 'invoiced'] as const
@@ -34,6 +35,23 @@ export function WorkflowBar({ invoiceId, currentStatus, availableTransitions, on
   const [showNote, setShowNote] = useState(false)
   const [target,   setTarget]   = useState('')
   const [error,    setError]    = useState('')
+  const [mounted,  setMounted]  = useState(false)
+  const overlayRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { setMounted(true) }, [])
+
+  useEffect(() => {
+    if (!showNote) return
+    document.body.style.overflow = 'hidden'
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') { setShowNote(false); setTarget('') }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.body.style.overflow = ''
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [showNote])
 
   const currentIndex = STEPS.indexOf(currentStatus as typeof STEPS[number])
 
@@ -137,19 +155,22 @@ export function WorkflowBar({ invoiceId, currentStatus, availableTransitions, on
       </div>
 
       {/* Confirm modal */}
-      {showNote && (
+      {showNote && mounted && createPortal(
         <div
+          ref={overlayRef}
           style={{
-            position:   'fixed',
-            inset:      0,
-            background: 'rgba(42,39,37,0.5)',
-            display:    'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex:     300,
-            animation:  'fadeIn 0.15s ease-out both',
+            position:            'fixed',
+            inset:               0,
+            background:          'rgba(42,39,37,0.6)',
+            backdropFilter:      'blur(3px)',
+            WebkitBackdropFilter:'blur(3px)',
+            display:             'flex',
+            alignItems:          'center',
+            justifyContent:      'center',
+            zIndex:              9999,
+            animation:           'fadeIn 0.18s ease-out both',
           }}
-          onClick={e => { if (e.target === e.currentTarget) { setShowNote(false); setTarget('') } }}
+          onClick={e => { if (e.target === overlayRef.current) { setShowNote(false); setTarget('') } }}
         >
           <div style={{
             background: 'var(--bg-surface)',
@@ -157,7 +178,7 @@ export function WorkflowBar({ invoiceId, currentStatus, availableTransitions, on
             padding:    '2rem 2.5rem',
             width:      460,
             maxWidth:   '92vw',
-            animation:  'slideUpFade 0.2s ease-out both',
+            animation:  'slideUpFade 0.22s ease-out both',
           }}>
             {/* Header */}
             <h3 style={{
@@ -230,7 +251,8 @@ export function WorkflowBar({ invoiceId, currentStatus, availableTransitions, on
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
