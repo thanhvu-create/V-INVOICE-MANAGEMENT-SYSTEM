@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { AdminModal, fieldStyle, labelStyle, inputStyle, btnPrimary, btnSecondary } from '@/components/admin/AdminModal'
+import { Pagination } from '@/components/ui/Pagination'
 
 interface Rate {
   id: string; rate_date: string
@@ -33,14 +34,15 @@ export default function MetalRatesPage() {
   const [form,    setForm]    = useState<Record<string, string>>(EMPTY_FORM)
   const [error,   setError]   = useState('')
   const [saving,  setSaving]  = useState(false)
-  const [page,    setPage]    = useState(1)
+  const [page,       setPage]       = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [total,      setTotal]      = useState(0)
 
   async function fetchRates(p = page) {
     setLoading(true)
     const res  = await fetch(`/api/metal-rates?page=${p}`)
     const json = await res.json()
-    if (json.success) { setRates(json.data); setTotalPages(json.pagination.totalPages) }
+    if (json.success) { setRates(json.data); setTotalPages(json.pagination.totalPages); setTotal(json.pagination.total) }
     setLoading(false)
   }
 
@@ -117,13 +119,7 @@ export default function MetalRatesPage() {
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', gap: 6, marginTop: '1rem', justifyContent: 'flex-end' }}>
-          <button onClick={() => setPage(p => p - 1)} disabled={page === 1} style={{ ...btnSecondary, padding: '4px 10px' }}>←</button>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', lineHeight: '30px' }}>Page {page} / {totalPages}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page === totalPages} style={{ ...btnSecondary, padding: '4px 10px' }}>→</button>
-        </div>
-      )}
+      <Pagination page={page} totalPages={totalPages} total={total} pageSize={20} onPageChange={setPage} />
 
       {modal && (
         <AdminModal title={modal === 'add' ? 'Add Metal Rate' : `Edit Rate — ${editing?.rate_date}`} onClose={closeModal}>

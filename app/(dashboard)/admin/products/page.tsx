@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { AdminModal, fieldStyle, labelStyle, inputStyle, btnPrimary, btnSecondary } from '@/components/admin/AdminModal'
+import { Pagination } from '@/components/ui/Pagination'
 
 interface Product {
   id: string; sku_jwmold: string; description: string | null
@@ -33,8 +34,9 @@ export default function ProductsPage() {
   const [error,    setError]    = useState('')
   const [saving,   setSaving]   = useState(false)
   const [search,   setSearch]   = useState('')
-  const [page,     setPage]     = useState(1)
+  const [page,       setPage]       = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [total,      setTotal]      = useState(0)
 
   async function fetchProducts(p = page, q = search) {
     setLoading(true)
@@ -42,7 +44,7 @@ export default function ProductsPage() {
     if (q.trim()) params.set('search', q.trim())
     const res  = await fetch(`/api/products?${params}`)
     const json = await res.json()
-    if (json.success) { setProducts(json.data); setTotalPages(json.pagination?.totalPages ?? 1) }
+    if (json.success) { setProducts(json.data); setTotalPages(json.pagination?.totalPages ?? 1); setTotal(json.pagination?.total ?? 0) }
     setLoading(false)
   }
 
@@ -163,13 +165,7 @@ export default function ProductsPage() {
         </table>
       </div>
 
-      {totalPages > 1 && (
-        <div style={{ display: 'flex', gap: 6, marginTop: '1rem', justifyContent: 'flex-end' }}>
-          <button onClick={() => setPage(p => p - 1)} disabled={page === 1} style={{ ...btnSecondary, padding: '4px 10px' }}>←</button>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', lineHeight: '30px' }}>Page {page} / {totalPages}</span>
-          <button onClick={() => setPage(p => p + 1)} disabled={page === totalPages} style={{ ...btnSecondary, padding: '4px 10px' }}>→</button>
-        </div>
-      )}
+      <Pagination page={page} totalPages={totalPages} total={total} pageSize={20} onPageChange={setPage} />
 
       {modal && (
         <AdminModal title={modal === 'add' ? 'Add Product' : `Edit Product — ${editing?.sku_jwmold}`} onClose={closeModal} width={560}>
