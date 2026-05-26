@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { AdminModal, fieldStyle, labelStyle, inputStyle, btnPrimary, btnSecondary } from '@/components/admin/AdminModal'
+import { toast } from '@/components/ui/Toast'
 
 interface Rule {
   id: string; name: string; description: string | null
@@ -64,6 +65,7 @@ export default function PricingRulesPage() {
     const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const json   = await res.json()
     if (!json.success) { setError(json.message); setSaving(false); return }
+    toast(modal === 'edit' ? 'Pricing rule updated.' : 'Pricing rule added.', 'success')
     closeModal(); fetchRules()
     setSaving(false)
   }
@@ -73,8 +75,8 @@ export default function PricingRulesPage() {
     setActivating(r.id)
     const res  = await fetch(`/api/pricing-rules/${r.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'activate' }) })
     const json = await res.json()
-    if (!json.success) alert(json.message)
-    else fetchRules()
+    if (!json.success) toast(json.message || 'Failed to activate rule.', 'error')
+    else { toast(`"${r.name}" is now the active pricing rule.`, 'success'); fetchRules() }
     setActivating(null)
   }
 
@@ -82,8 +84,8 @@ export default function PricingRulesPage() {
     if (!confirm(`Delete rule "${r.name}"?`)) return
     const res  = await fetch(`/api/pricing-rules/${r.id}`, { method: 'DELETE' })
     const json = await res.json()
-    if (!json.success) alert(json.message)
-    else fetchRules()
+    if (!json.success) toast(json.message || 'Failed to delete rule.', 'error')
+    else { toast('Pricing rule deleted.', 'success'); fetchRules() }
   }
 
   return (

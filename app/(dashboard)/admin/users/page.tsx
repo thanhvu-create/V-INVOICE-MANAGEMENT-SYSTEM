@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { AdminModal, fieldStyle, labelStyle, inputStyle, btnPrimary, btnSecondary } from '@/components/admin/AdminModal'
 import { useUser } from '@/contexts/UserContext'
+import { toast } from '@/components/ui/Toast'
 
 interface AppUser {
   id: string; auth_id: string; email: string; full_name: string
@@ -78,6 +79,7 @@ export default function UsersPage() {
     const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const json   = await res.json()
     if (!json.success) { setError(json.message); setSaving(false); return }
+    toast(modal === 'edit' ? 'User updated.' : 'User added.', 'success')
     closeModal(); fetchUsers()
     setSaving(false)
   }
@@ -86,8 +88,8 @@ export default function UsersPage() {
     if (u.email === me?.email) return
     const res  = await fetch(`/api/users/${u.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !u.is_active }) })
     const json = await res.json()
-    if (!json.success) alert(json.message)
-    else fetchUsers()
+    if (!json.success) toast(json.message || 'Failed to update user.', 'error')
+    else { toast(u.is_active ? 'User deactivated.' : 'User activated.', 'success'); fetchUsers() }
   }
 
   async function handleDelete(u: AppUser) {
@@ -95,8 +97,8 @@ export default function UsersPage() {
     if (!confirm(`Delete user "${u.full_name}" (${u.email})? This cannot be undone.`)) return
     const res  = await fetch(`/api/users/${u.id}`, { method: 'DELETE' })
     const json = await res.json()
-    if (!json.success) alert(json.message)
-    else fetchUsers()
+    if (!json.success) toast(json.message || 'Failed to delete user.', 'error')
+    else { toast('User deleted.', 'success'); fetchUsers() }
   }
 
   const isSelf = (u: AppUser) => u.email === me?.email

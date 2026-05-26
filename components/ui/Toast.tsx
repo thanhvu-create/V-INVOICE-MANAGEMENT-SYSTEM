@@ -2,32 +2,36 @@
 
 import { useEffect, useState, useCallback } from 'react'
 
-export type ToastType = 'success' | 'error' | 'warn'
+export type ToastType = 'success' | 'error' | 'warn' | 'info'
 
 interface ToastItem {
-  id:      number
-  message: string
-  type:    ToastType
-  exiting: boolean
+  id:       number
+  message:  string
+  type:     ToastType
+  exiting:  boolean
+  duration: number
 }
 
-let _add: ((msg: string, type?: ToastType) => void) | null = null
+let _add: ((msg: string, type?: ToastType, duration?: number) => void) | null = null
 
 /* Call this anywhere: toast('Invoice approved', 'success') */
-export function toast(message: string, type: ToastType = 'success') {
-  _add?.(message, type)
+/* Pass duration=0 for persistent (no auto-dismiss) */
+export function toast(message: string, type: ToastType = 'success', duration = 3500) {
+  _add?.(message, type, duration)
 }
 
 const ICONS: Record<ToastType, string> = {
   success: 'fa-circle-check',
   error:   'fa-circle-xmark',
   warn:    'fa-triangle-exclamation',
+  info:    'fa-circle-info',
 }
 
 const COLORS: Record<ToastType, string> = {
   success: 'var(--color-success)',
   error:   'var(--color-danger)',
   warn:    'var(--color-warning)',
+  info:    'var(--color-info)',
 }
 
 export function ToastProvider() {
@@ -39,10 +43,10 @@ export function ToastProvider() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 220)
   }, [])
 
-  const add = useCallback((message: string, type: ToastType = 'success') => {
+  const add = useCallback((message: string, type: ToastType = 'success', duration = 3500) => {
     const id = ++counter
-    setToasts(prev => [...prev, { id, message, type, exiting: false }])
-    setTimeout(() => remove(id), 3500)
+    setToasts(prev => [...prev, { id, message, type, exiting: false, duration }])
+    if (duration > 0) setTimeout(() => remove(id), duration)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remove])
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { AdminModal, fieldStyle, labelStyle, inputStyle, btnPrimary, btnSecondary } from '@/components/admin/AdminModal'
 import { Pagination } from '@/components/ui/Pagination'
+import { toast } from '@/components/ui/Toast'
 
 interface Rate {
   id: string; rate_date: string
@@ -69,6 +70,7 @@ export default function MetalRatesPage() {
     const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const json   = await res.json()
     if (!json.success) { setError(json.message); setSaving(false); return }
+    toast(modal === 'edit' ? 'Metal rate updated.' : 'Metal rate added.', 'success')
     closeModal(); fetchRates()
     setSaving(false)
   }
@@ -77,8 +79,8 @@ export default function MetalRatesPage() {
     if (!confirm(`Delete rate for ${r.rate_date}?`)) return
     const res  = await fetch(`/api/metal-rates/${r.id}`, { method: 'DELETE' })
     const json = await res.json()
-    if (!json.success) alert(json.message)
-    else fetchRates()
+    if (!json.success) toast(json.message || 'Failed to delete rate.', 'error')
+    else { toast('Metal rate deleted.', 'success'); fetchRates() }
   }
 
   return (

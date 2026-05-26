@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import { useUser } from '@/contexts/UserContext'
+import { toast } from '@/components/ui/Toast'
 import { FilterBar } from '@/components/invoice/FilterBar'
 import { InvoiceTable } from '@/components/invoice/InvoiceTable'
 import { Pagination } from '@/components/ui/Pagination'
@@ -65,8 +66,12 @@ function InvoiceListContent() {
     if (!confirm(`Delete invoice "${po}"? This cannot be undone.`)) return
     const res = await fetch(`/api/invoices/${id}`, { method: 'DELETE' })
     const json = await res.json()
-    if (json.success) fetchData()
-    else alert(json.message)
+    if (json.success) {
+      toast('Invoice deleted.', 'success')
+      fetchData()
+    } else {
+      toast(json.message || 'Failed to delete invoice.', 'error')
+    }
   }
 
   return (

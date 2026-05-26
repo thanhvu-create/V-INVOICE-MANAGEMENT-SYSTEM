@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import * as XLSX from 'xlsx'
 import { useUser } from '@/contexts/UserContext'
+import { toast } from '@/components/ui/Toast'
 import { DropZone } from '@/components/import/DropZone'
 import { ImportPreview } from '@/components/import/ImportPreview'
 import { ImportErrorTable } from '@/components/import/ImportErrorTable'
@@ -111,7 +112,8 @@ function ImportContent() {
 
   async function handleImport() {
     if (state.stage !== 'preview') return
-    const { valid } = state
+    const { valid, errors } = state
+    const hadErrors = errors.length > 0
     setState({ stage: 'importing', progress: 0, total: valid.length })
 
     const res  = await fetch('/api/import', {
@@ -121,8 +123,19 @@ function ImportContent() {
     })
     const json = await res.json()
 
-    if (!json.success) { setState({ stage: 'error', message: json.message }); return }
-    setState({ stage: 'done', imported: json.data.imported })
+    if (!json.success) {
+      setState({ stage: 'error', message: json.message })
+      toast(json.message || 'Import failed. Please try again.', 'error')
+      return
+    }
+
+    const imported = json.data.imported
+    setState({ stage: 'done', imported })
+    if (hadErrors) {
+      toast(`${imported} item${imported !== 1 ? 's' : ''} imported. ${errors.length} row${errors.length !== 1 ? 's' : ''} skipped.`, 'warn', 5000)
+    } else {
+      toast(`${imported} item${imported !== 1 ? 's' : ''} imported successfully.`, 'success')
+    }
   }
 
   if (!canDo('import')) {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { AdminModal, fieldStyle, labelStyle, inputStyle, btnPrimary, btnSecondary } from '@/components/admin/AdminModal'
 import { Pagination } from '@/components/ui/Pagination'
+import { toast } from '@/components/ui/Toast'
 
 interface Product {
   id: string; sku_jwmold: string; description: string | null
@@ -83,6 +84,7 @@ export default function ProductsPage() {
     const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const json   = await res.json()
     if (!json.success) { setError(json.message); setSaving(false); return }
+    toast(modal === 'edit' ? 'Product updated.' : 'Product added.', 'success')
     closeModal(); fetchProducts()
     setSaving(false)
   }
@@ -90,16 +92,16 @@ export default function ProductsPage() {
   async function handleToggleActive(p: Product) {
     const res  = await fetch(`/api/products/${p.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_active: !p.is_active }) })
     const json = await res.json()
-    if (!json.success) alert(json.message)
-    else fetchProducts()
+    if (!json.success) toast(json.message || 'Failed to update product.', 'error')
+    else { toast(p.is_active ? 'Product deactivated.' : 'Product activated.', 'success'); fetchProducts() }
   }
 
   async function handleDelete(p: Product) {
     if (!confirm(`Delete product "${p.sku_jwmold}"? This cannot be undone.`)) return
     const res  = await fetch(`/api/products/${p.id}`, { method: 'DELETE' })
     const json = await res.json()
-    if (!json.success) alert(json.message)
-    else fetchProducts()
+    if (!json.success) toast(json.message || 'Failed to delete product.', 'error')
+    else { toast('Product deleted.', 'success'); fetchProducts() }
   }
 
   return (
