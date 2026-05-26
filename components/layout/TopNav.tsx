@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
+import { HelpModal } from '@/components/ui/HelpModal'
 import type { Role } from '@/types'
 
 interface NavItem {
@@ -33,7 +34,8 @@ export function TopNav() {
   const { user, loaded } = useUser()
   const pathname         = usePathname()
   const router           = useRouter()
-  const [menuOpen, setMenuOpen] = useState(false)
+  const [menuOpen,  setMenuOpen]  = useState(false)
+  const [showHelp,  setShowHelp]  = useState(false)
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
@@ -104,6 +106,38 @@ export function TopNav() {
               >
                 {user.fullName}
               </span>
+
+              {/* Help */}
+              <button
+                onClick={() => setShowHelp(true)}
+                title="Hướng dẫn sử dụng"
+                style={{
+                  padding:      '4px 10px',
+                  border:       '1px solid var(--border-base)',
+                  background:   'transparent',
+                  color:        'var(--text-muted)',
+                  fontFamily:   'var(--font-body)',
+                  fontSize:     '11px',
+                  letterSpacing:'0.08em',
+                  cursor:       'pointer',
+                  borderRadius: 0,
+                  transition:   'background 0.15s, color 0.15s',
+                  display:      'inline-flex',
+                  alignItems:   'center',
+                  gap:          5,
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'var(--border-strong)'
+                  e.currentTarget.style.color      = 'var(--text-inverse)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color      = 'var(--text-muted)'
+                }}
+              >
+                <i className="fa-regular fa-circle-question" style={{ fontSize: 13 }} />
+                <span className="topnav-username">Hướng dẫn</span>
+              </button>
 
               {/* Logout */}
               <button
@@ -192,6 +226,8 @@ export function TopNav() {
           )
         })}
       </nav>
+
+      {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
     </header>
   )
 }
