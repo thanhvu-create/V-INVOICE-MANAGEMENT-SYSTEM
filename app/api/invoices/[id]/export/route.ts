@@ -6,7 +6,7 @@ import { getAuthContext } from '@/lib/auth/getRole'
 function fmt2(n: unknown): string {
   if (n == null || n === '') return ''
   const v = parseFloat(String(n))
-  return isNaN(v) ? '' : v.toFixed(2)
+  return isNaN(v) ? '' : `$${v.toFixed(2)}`
 }
 function fmt4(n: unknown): string {
   if (n == null || n === '') return ''
@@ -14,6 +14,11 @@ function fmt4(n: unknown): string {
   return isNaN(v) ? '' : v.toFixed(4)
 }
 
+// ──────────────────────────────────────────────────────────────────────────────
+// GET /api/invoices/[id]/export
+// Produces a single-sheet XLSX with Master rows (invoice items) merged across
+// Detail sub-rows (gem details), matching the on-screen Master-Detail layout.
+// ──────────────────────────────────────────────────────────────────────────────
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const ctx = await getAuthContext()
@@ -37,83 +42,183 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 
     const wb = XLSX.utils.book_new()
 
-    // Sheet 1: Items
-    const itemRows = (items ?? []).map(item => {
-      const base: Record<string, unknown> = {
-        'No.':               item.line_no,
-        'Store':             item.store             ?? '',
-        'Location':          item.location_store    ?? '',
-        'SKU':               item.sku_jwmold,
-        'SO/MO':             item.so_mo_code        ?? '',
-        'Vendor Model':      item.vendor_model      ?? '',
-        'Description':       item.description       ?? '',
-        'Class':             item.class             ?? '',
-        'Sub Class':         item.sub_class         ?? '',
-        'Metal Type':        item.metal_type        ?? '',
-        'Qty':               item.qty_pcs,
-        'Total Weight (g)':  fmt4(item.weight_total_gr),
-        'Gold Weight (g)':   fmt4(item.weight_gold_actual_gr),
-        'No-Gem Weight (g)': fmt4(item.weight_no_gem_gr),
-        'Labor Fee':         fmt2(item.labor_fee),
-        'Casting Fee':       fmt2(item.casting_fee),
-        'Design Fee':        fmt2(item.design_fee),
-        'Resin Fee':         fmt2(item.resin_fee),
-        'Misc Fee':          fmt2(item.misc_fee),
-        'Sell Price':        fmt2(item.sell_price),
-        'After Discount':    fmt2(item.after_discount_price),
+    // ── Sheet 1: Master-Detail Invoice ───────────────────────────────────────
+    //
+    // Column layout:
+    //   MASTER (A–L always, M–Q if canSeePrice) | blank (R) | DETAIL gems (S–AE)
+    //
+    // When an item has N gems → N rows, master columns MERGED vertically for N rows.
+    // When an item has 0 gems → 1 row, no merge, gem columns empty.
+
+    const masterHeaders = [
+      'No.',         // A
+      'SKU JWMold',  // B
+      'SO/MO',       // C
+      'Description', // D
+      'Class',       // E
+      'Sub Class',   // F
+      'Size',        // G
+      'Metal',       // H
+      'Qty (pcs)',   // I
+      'Total Wt (g)',// J
+      'Gold Wt (g)', // K
+      'No-Gem Wt (g)',// L
+      ...(canSeePrice
+        ? ['Gold Value', 'HPUSA', 'CIF', 'Tag', 'FR'] // M–Q
+        : []),
+    ]
+    const masterCount = masterHeaders.length // 12 or 17
+
+    const gemHeaders = [
+      '',              // separator col R
+      'Gem Type',      // S
+      'Quality',       // T  ← P.chất (VVS1, VS1, LG…)
+      'Shape',         // U
+      'Size (mm)',     // V
+      'Qty',           // W
+      'Wt After (ct)', // X
+      'Wt (g)',        // Y  ← GENERATED
+      '$/ct',          // Z
+      'T.Giá Xoàn',   // AA ← GENERATED total_price
+      'Setting',       // AB
+      'Fee/pc',        // AC
+      'Total Fee',     // AD ← GENERATED total_setting_fee
+    ]
+
+    const wsData: (string | number)[][] = []
+    const merges: XLSX.Range[] = []
+
+    // Header row (row 0)
+    wsData.push([...masterHeaders, ...gemHeaders])
+
+    let rowIdx = 1 // 0-based; row 0 = header
+
+    for (const item of items ?? []) {
+      const gems    = (item.item_gem_details ?? []) as any[]
+      const numRows = Math.max(gems.length, 1)
+
+      for (let g = 0; g < numRows; g++) {
+        const gem       = gems[g]
+        const isFirst   = g === 0
+
+        // Master columns — only populate on first sub-row; blank on subsequent
+        const masterData: (string | number)[] = isFirst ? [
+          item.line_no,
+          item.sku_jwmold         ?? '',
+          item.so_mo_code         ?? '',
+          item.description        ?? '',
+          item.class              ?? '',
+          item.sub_class          ?? '',
+          item.size               ?? '',
+          item.metal_type         ?? '',
+          item.qty_pcs            ?? 0,
+          fmt4(item.weight_total_gr),
+          fmt4(item.weight_gold_actual_gr),
+          fmt4(item.weight_no_gem_gr),
+          ...(canSeePrice ? [
+            fmt2(item.gold_value_usd),
+            fmt2(item.hpusa),
+            fmt2(item.cif_price),
+            fmt2(item.tag_price),
+            fmt2(item.fr_price),
+          ] : []),
+        ] : Array(masterCount).fill('')
+
+        // Gem columns — blank when no gem for this row
+        const gemData: (string | number)[] = gem ? [
+          '',                                      // separator
+          gem.gem_type              ?? '',
+          gem.quality               ?? '',          // P.chất
+          gem.shape                 ?? '',
+          gem.size_mm               ?? '',
+          gem.qty_pcs               ?? '',
+          fmt4(gem.weight_ct_after),               // Wt After (ct)
+          fmt4(gem.weight_gr),                     // Wt (g) GENERATED
+          fmt2(gem.unit_price_per_ct),             // $/ct
+          fmt2(gem.total_price),                   // T.Giá Xoàn GENERATED
+          gem.setting_type          ?? '',
+          fmt2(gem.setting_fee_per_pcs),           // Fee/pc
+          fmt2(gem.total_setting_fee),             // Total Fee GENERATED
+        ] : Array(gemHeaders.length).fill('')
+
+        wsData.push([...masterData, ...gemData])
       }
-      if (canSeePrice) {
-        base['Gold Value (USD)'] = fmt2(item.gold_value_usd)
-        base['HPUSA']            = fmt2(item.hpusa)
-        base['CIF Price']        = fmt2(item.cif_price)
-        base['Tag Price']        = fmt2(item.tag_price)
-        base['FR Price']         = fmt2(item.fr_price)
+
+      // Merge master columns vertically when item has multiple gem rows
+      if (numRows > 1) {
+        for (let c = 0; c < masterCount; c++) {
+          merges.push({
+            s: { r: rowIdx,              c },
+            e: { r: rowIdx + numRows - 1, c },
+          })
+        }
       }
-      return base
-    })
 
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(itemRows), 'Items')
+      rowIdx += numRows
+    }
 
-    // Sheet 2: Gems (only if any)
-    const gemRows: Record<string, unknown>[] = []
-    ;(items ?? []).forEach(item => {
-      ;(item.item_gem_details ?? []).forEach((g: any) => {
-        gemRows.push({
-          'Line No':           item.line_no,
-          'SKU':               item.sku_jwmold,
-          'Gem Type':          g.gem_type            ?? '',
-          'Shape':             g.shape               ?? '',
-          'Size (mm)':         g.size_mm             ?? '',
-          'Qty':               g.qty_pcs,
-          'Weight (g)':        fmt4(g.weight_gr),
-          'Price/Carat':       fmt2(g.price_per_carat),
-          'Total Price':       fmt2(g.total_price),
-          'Setting Type':      g.setting_type        ?? '',
-          'Setting Fee/pcs':   fmt2(g.setting_fee_per_pcs),
-          'Total Setting Fee': fmt2(g.total_setting_fee),
-        })
-      })
-    })
-    if (gemRows.length > 0) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(gemRows), 'Gems')
+    const ws            = XLSX.utils.aoa_to_sheet(wsData)
+    ws['!merges']       = merges
 
-    // Sheet 3: Info
+    // Column widths
+    const masterWidths = [
+      { wch: 5  }, // No.
+      { wch: 14 }, // SKU
+      { wch: 18 }, // SO/MO
+      { wch: 28 }, // Description
+      { wch: 10 }, // Class
+      { wch: 10 }, // Sub Class
+      { wch: 8  }, // Size
+      { wch: 8  }, // Metal
+      { wch: 7  }, // Qty
+      { wch: 12 }, // Total Wt
+      { wch: 12 }, // Gold Wt
+      { wch: 12 }, // No-Gem Wt
+      ...(canSeePrice
+        ? [{ wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }, { wch: 12 }]
+        : []),
+    ]
+    const gemWidths = [
+      { wch: 2  }, // separator
+      { wch: 10 }, // Gem Type
+      { wch: 8  }, // Quality
+      { wch: 10 }, // Shape
+      { wch: 10 }, // Size mm
+      { wch: 6  }, // Qty
+      { wch: 12 }, // Wt After ct
+      { wch: 10 }, // Wt g
+      { wch: 10 }, // $/ct
+      { wch: 12 }, // T.Giá Xoàn
+      { wch: 10 }, // Setting
+      { wch: 10 }, // Fee/pc
+      { wch: 12 }, // Total Fee
+    ]
+    ws['!cols'] = [...masterWidths, ...gemWidths]
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Invoice')
+
+    // ── Sheet 2: Info ────────────────────────────────────────────────────────
     const rate = (invoice as any).daily_metal_rates
     const rule = (invoice as any).pricing_rules
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{
-      'PO Number':      invoice.po_number,
-      'MR Number':      invoice.mr_number    ?? '',
-      'Customer':       invoice.store        ?? '',
-      'Invoice Date':   invoice.created_at?.slice(0, 10) ?? '',
-      'Status':         invoice.status,
-      'Metal Rate Date':rate?.rate_date      ?? '',
-      'Pricing Rule':   rule?.name           ?? '',
-      'CIF Multiplier': canSeePrice ? (rule?.cif_multiplier ?? '') : '',
-      'Tag Multiplier': canSeePrice ? (rule?.tag_multiplier ?? '') : '',
-      'FR Multiplier':  canSeePrice ? (rule?.fr_multiplier  ?? '') : '',
-    }]), 'Info')
+    const infoData: Record<string, unknown> = {
+      'PO Number':    invoice.po_number,
+      'MR Number':    invoice.mr_number       ?? '',
+      'Customer':     invoice.customer_name   ?? '',
+      'Invoice Date': invoice.invoice_date    ?? invoice.created_at?.slice(0, 10) ?? '',
+      'Status':       invoice.status,
+      'Rate Date':    rate?.rate_date         ?? '',
+      'Pricing Rule': rule?.name              ?? '',
+    }
+    if (canSeePrice) {
+      infoData['CIF Multiplier'] = rule?.cif_multiplier ?? ''
+      infoData['Tag Multiplier'] = rule?.tag_multiplier ?? ''
+      infoData['FR Multiplier']  = rule?.fr_multiplier  ?? ''
+    }
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([infoData]), 'Info')
 
+    // ── Response ─────────────────────────────────────────────────────────────
     const buffer   = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
-    const filename = `invoice-${invoice.po_number}.xlsx`
+    const filename = `invoice-${invoice.po_number ?? params.id}.xlsx`
 
     return new NextResponse(buffer, {
       headers: {

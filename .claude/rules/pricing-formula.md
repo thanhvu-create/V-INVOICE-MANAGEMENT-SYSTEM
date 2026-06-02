@@ -12,17 +12,34 @@ Step 1: weight_no_gem_gr = weight_total_gr - Σ(gem.weight_gr)
          ↑ gem.weight_gr là GENERATED col = weight_ct_after × 0.2
 
 Step 2: gold_value_usd = weight_gold_actual_gr × metal_rate × (1 + casting_loss_pct/100)
+         ↑ metal_rate = daily_metal_rates[metal_type_key]
+         ↑ casting_loss_pct từ pricing_rules (VD: 5%)
+         ↑ [THAM KHẢO] §3: "Tiền vàng = vàng thực tế × giá theo ngày × (1 + % Hao hụt đúc)"
 
-Step 3: hpusa = gold_value_usd + Σgem.total_price + Σgem.total_setting_fee
-                + labor_fee + casting_fee + design_fee + resin_fee + misc_fee
-         ↑ gem.total_price, gem.total_setting_fee là GENERATED cols
+Step 3: hpusa = gold_value_usd
+              + Σgem.total_price          ← Tổng T.Giá Xoàn (GENERATED)
+              + Σgem.total_setting_fee    ← Tổng T.Phí nhận hột (GENERATED)
+              + labor_fee + casting_fee + design_fee + resin_fee + misc_fee
+         ↑ gem.total_price, gem.total_setting_fee là GENERATED cols — KHÔNG compute trong TS
 
-Step 4: cif_price = hpusa × cif_multiplier
+Step 4: cif_price = hpusa × cif_multiplier      (Hệ số A)
 
-Step 5: tag_price = cif_price × tag_multiplier
+Step 5: tag_price = cif_price × tag_multiplier  (Hệ số B)
 
-Step 6: fr_price  = cif_price × fr_multiplier
+Step 6: fr_price  = cif_price × fr_multiplier   (Hệ số C)
 ```
+
+**Naming convention — "FB" vs "FR":**
+> [THAM KHẢO] §3 dùng "HP for FB price" (Hệ số C). Hệ thống dùng tên **`fr_price`** (FR = Free Retail).
+> Đây là cùng 1 giá trị — KHÔNG đổi tên column DB.
+
+**Sub-total per item ([THAM KHẢO] §3-B):**
+Trước khi tính HPUSA, hệ thống phải có thể hiển thị sub-total của từng sản phẩm:
+```
+Sub-total gems   = Σgem.total_price        (Tổng T.Giá Xoàn)
+Sub-total setting = Σgem.total_setting_fee  (Tổng T.Phí nhận hột)
+```
+→ Xem `invoice-detail-inline-edit.md` §10 cho UI spec của sub-total row.
 
 ---
 

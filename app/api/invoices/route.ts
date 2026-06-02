@@ -84,15 +84,16 @@ export async function POST(req: NextRequest) {
     const { data, error } = await db
       .from('invoice_headers')
       .insert({
-        po_number:       po_number.trim(),
-        mr_number:       mr_number?.trim() || null,
+        po_number:          po_number.trim(),
+        mr_number:          mr_number?.trim() || null,
         metal_rate_id,
-        pricing_rule_id: pricing_rule_id || null,
-        store:           store?.trim() || null,
-        notes:           notes?.trim() || null,
-        created_by:      ctx.fullName,
-        status:          'draft',
-        is_locked:       false,
+        pricing_rule_id:    pricing_rule_id || null,
+        store:              store?.trim() || null,
+        notes:              notes?.trim() || null,
+        created_by:         ctx.fullName,       // denormalized display name
+        created_by_user_id: ctx.userId,         // UUID FK for editGuard ownership check
+        status:             'draft',
+        is_locked:          false,
       })
       .select()
       .single()

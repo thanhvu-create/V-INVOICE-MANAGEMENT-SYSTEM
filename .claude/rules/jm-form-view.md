@@ -34,7 +34,7 @@ JM Form View là bảng phẳng (flat table) hiển thị toàn bộ invoice ite
 | 4 | Description | `description` | 200px | |
 | 5 | Class | `class` | 100px | |
 | 6 | Sub Class | `sub_class` | 100px | |
-| 7 | Notes | `notes` | 150px | Red `#DC2626` if contains "ba sao" (case-insensitive) |
+| 7 | Notes | `notes` | 150px | Ba Sao → **Bold Đỏ** `#DC2626 fontWeight:700`; có giá trị khác → `var(--text-secondary)`; rỗng → `—` |
 | 8 | Wt Total gr | `weight_total_gr` | 100px | 4 decimals, font-mono |
 | 9 | Wt Gold gr | `weight_gold_actual_gr` | 100px | 4 decimals, font-mono, bg `#FFFBEB` |
 | 10 | Wt No Gem gr | `weight_no_gem_gr` | 110px | Computed readonly, font-mono |
@@ -45,6 +45,11 @@ JM Form View là bảng phẳng (flat table) hiển thị toàn bộ invoice ite
 | 15 | Tag Price | `tag_price` | 110px | Visible: manager/admin only, font-mono |
 
 **Column 15 note:** FR Price (`fr_price`) is NOT shown in the JM Form View table — it is available only in the Detail View and Export. The 15th visible column for manager/admin is Tag Price.
+
+**"FB price" vs "FR price" naming:**
+> [THAM KHẢO] §3 dùng tên "HP for FB price". Trong hệ thống này dùng tên **FR price** (`fr_price`).
+> "FR" = Free Retail / Final Retail. Đây là cùng 1 giá trị, khác tên gọi.
+> Khi hiển thị trong UI có thể dùng "FR" hoặc "FR Price" — KHÔNG đổi tên cột DB.
 
 ---
 
@@ -84,13 +89,19 @@ JM Form View là bảng phẳng (flat table) hiển thị toàn bộ invoice ite
 ```typescript
 // "Ba Sao" = items đặc biệt cần chú ý (special attention flag)
 // Detection: notes field contains "ba sao" (case-insensitive)
-// Display: Notes cell text turns red #DC2626 when ba sao detected
+// [THAM KHẢO] §3: "chuyển màu font chữ sang Bold Đỏ"
+// Non-ba-sao notes: "font màu xanh dương hoặc đen mặc định"
+//   → Dùng var(--text-secondary) (#6B645C dark warm gray) — consistent với design system
+//   → KHÔNG dùng xanh dương — không phù hợp luxury editorial aesthetic
 
 function renderNotesCell(item: InvoiceItem): React.ReactNode {
   const isBaSao = item.notes?.toLowerCase().includes('ba sao')
   return (
-    <td style={{ color: isBaSao ? '#DC2626' : 'var(--text-secondary)', fontWeight: isBaSao ? 700 : 400 }}>
-      {item.notes || ''}
+    <td style={{
+      color:      isBaSao ? '#DC2626' : (item.notes ? 'var(--text-secondary)' : 'var(--text-muted)'),
+      fontWeight: isBaSao ? 700 : 400,
+    }}>
+      {item.notes || '—'}
     </td>
   )
 }
@@ -258,26 +269,96 @@ const canSeePrice = role === 'manager' || role === 'admin'
 
 ## 10. TABLE FOOTER (TOTALS)
 
+> **Nguồn:** [THAM KHẢO] §4 — 6 totals bắt buộc, "tự động tính toán chính xác theo thời gian thực khi có bất kỳ sự thay đổi nào ở trạng thái Draft"
+
+### 6 Totals bắt buộc từ [THAM KHẢO] §4
+
+| # | Tên | Formula | Sample |
+|---|-----|---------|--------|
+| 1 | Total_Qty | Σ `qty_pcs` | 36 |
+| 2 | Total_Weight | Σ `weight_total_gr` | 251.38 g |
+| 3 | **Total_Stone_Weight** | Σ `item_gem_details.weight_gr` | 6.55 g |
+| 4 | Total_Gold_Amount | Σ `gold_value_usd` | $33,289 |
+| 5 | Total_HPUSA | Σ `hpusa` | $39,926 |
+| 6 | Total_CIF | Σ `cif_price` | $42,708 |
+
+### Tính toán
+
+```typescript
+// items đã bao gồm item_gem_details (loaded từ GET /api/invoices/[id])
+// invoice_items.select('*, item_gem_details(*)')
+
+const totQty    = items.reduce((s, i) => s + (i.qty_pcs ?? 0), 0)
+const totWt     = items.reduce((s, i) => s + (i.weight_total_gr ?? 0), 0)
+const totGold   = items.reduce((s, i) => s + (i.weight_gold_actual_gr ?? 0), 0)
+const totNoGem  = items.reduce((s, i) => s + (i.weight_no_gem_gr ?? 0), 0)
+const totGoldV  = items.reduce((s, i) => s + (i.gold_value_usd ?? 0), 0)
+const totHpusa  = items.reduce((s, i) => s + (i.hpusa ?? 0), 0)
+const totCif    = items.reduce((s, i) => s + (i.cif_price ?? 0), 0)
+const totTag    = items.reduce((s, i) => s + (i.tag_price ?? 0), 0)
+
+// Total_Stone_Weight — Σ actual gem weights từ GENERATED col:
+// PHẢI dùng item.item_gem_details, KHÔNG tính gián tiếp (totWt - totNoGem)
+// Lý do: totWt - totNoGem phụ thuộc recalc đã chạy xong; gem data là source of truth
+const totGemWt  = items.reduce((s, i) =>
+  s + (i.item_gem_details ?? []).reduce((gs: number, g: any) => gs + (g.weight_gr ?? 0), 0),
+  0
+)
+```
+
+### Render tfoot
+
 ```tsx
-// tfoot row hiển thị tổng (matches corrected column order):
-// Col:  1(No)  2(SKU)  3(Qty)  4(Desc)  5(Class)  6(SubClass)  7(Notes)
-//       8(WtTotal)  9(WtGold)  10(WtNoGem)  11(Metal)
-//       12(GoldVal)  13(HPUSA)  14(CIF)  [15(Tag) if canSeePrice]
+// Column order khớp với JM_COLS trong JMFormView.tsx:
+// 1(No) 2(SKU) 3(Qty) 4(Desc) 5(Class) 6(SubClass) 7(Metal) 8(Notes)
+// 9(WtTotal) 10(WtGold) 11(WtNoGem) 12(GoldVal) 13(HPUSA) 14(CIF) [15(Tag)]
 <tfoot>
-  <tr style={{ borderTop: '2px solid var(--border-strong)', fontWeight: 600 }}>
+  <tr style={{ borderTop: '2px solid var(--border-strong)', fontWeight: 600, background: 'var(--bg-base)' }}>
     <td colSpan={2} />
-    <td className="num">{totalQty}</td>           {/* Col 3: Qty */}
-    <td colSpan={4} style={{ textAlign: 'right', paddingRight: 12 }}>TOTAL</td>  {/* 4-7 */}
-    <td className="num">{formatWeight(totalWeightGr)}</td>   {/* Col 8 */}
-    <td className="num">{formatWeight(totalGoldGr)}</td>     {/* Col 9 */}
-    <td className="num">{formatWeight(totalNoGemGr)}</td>    {/* Col 10 */}
-    <td />                                                    {/* Col 11: Metal */}
-    <td className="num">{formatUSD(totalGoldValue)}</td>     {/* Col 12 */}
-    <td className="num">{formatUSD(totalHpusa)}</td>         {/* Col 13 */}
-    <td className="num">{formatUSD(totalCif)}</td>           {/* Col 14 */}
-    {canSeePrice && <td className="num">{formatUSD(totalTag)}</td>}  {/* Col 15 */}
+    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{totQty}</td>       {/* Total_Qty */}
+    <td colSpan={4} style={{ textAlign: 'right', fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--text-secondary)' }}>
+      TOTAL
+    </td>
+    <td />                                                                                   {/* Notes */}
+    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmt4(totWt)}</td>  {/* Total_Weight */}
+    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmt4(totGold)}</td>
+    <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmt4(totNoGem)}</td>
+    {canSeePrice && <>
+      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmt2(totGoldV)}</td>     {/* Total_Gold_Amount */}
+      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 700 }}>{fmt2(totHpusa)}</td> {/* Total_HPUSA */}
+      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmt2(totCif)}</td>        {/* Total_CIF */}
+      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmt2(totTag)}</td>
+    </>}
+    {canEdit && !isLocked && <td />}
   </tr>
+
+  {/* Total_Stone_Weight row — tách dòng riêng vì không map vào cột nào */}
+  {totGemWt > 0 && (
+    <tr style={{ background: 'var(--bg-base)' }}>
+      <td colSpan={2} />
+      <td colSpan={6} style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'right' }}>
+        Σ TL Xoàn (gr):
+      </td>
+      <td style={{ textAlign: 'right', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+        {fmt4(totGemWt)}
+      </td>
+      <td colSpan={99} />
+    </tr>
+  )}
 </tfoot>
+```
+
+### Real-time sync rule
+
+```
+Totals cập nhật SAU mỗi mutation (PATCH/POST/DELETE item hoặc gem):
+  → onRefresh() → re-fetch items với item_gem_details → re-render tfoot
+  → Không cần Supabase Realtime subscription cho single-user scenario
+
+Trigger conditions ([THAM KHẢO] §4: "khi có bất kỳ sự thay đổi nào ở trạng thái Draft"):
+  → Draft: full update (items có thể thay đổi)
+  → Pending/Approved/Invoiced: totals hiển thị nhưng không thay đổi (read-only)
+  → Tổng luôn được tính từ current items data — không cache riêng
 ```
 
 ---

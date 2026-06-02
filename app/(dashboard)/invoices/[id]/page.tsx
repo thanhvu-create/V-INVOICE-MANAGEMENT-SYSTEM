@@ -29,9 +29,14 @@ export default function InvoiceDetailPage() {
   const [addItemOpen,  setAddItemOpen]  = useState(false)
 
   const canSeePrice = canDo('see_prices')
-  const canEdit     = canDo('edit')
   const isLocked    = data?.header?.is_locked ?? false
-  const availTrans  = ALLOWED_TRANSITIONS[user.role]?.[data?.header?.status ?? ''] ?? []
+  const status      = data?.header?.status ?? ''
+  const canEdit     = canDo('edit')
+    && !isLocked
+    && status !== 'approved'
+    && !(status === 'pending_approval' && user.role === 'user')
+    && !(status === 'draft' && user.role === 'user' && data?.header?.created_by_user_id !== user.id)
+  const availTrans  = ALLOWED_TRANSITIONS[user.role]?.[status] ?? []
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -42,6 +47,19 @@ export default function InvoiceDetailPage() {
       else router.push('/invoices')
     } finally { setLoading(false) }
   }, [id])
+
+  // Local state update after PATCH — avoids full re-fetch for instant UI response
+  const updateItemInState = useCallback((itemId: string, updatedItem: any) => {
+    setData(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        items: prev.items.map(item =>
+          item.id === itemId ? { ...item, ...updatedItem } : item
+        ),
+      }
+    })
+  }, [])
 
   useEffect(() => { fetchData() }, [fetchData])
 
@@ -56,11 +74,23 @@ export default function InvoiceDetailPage() {
 
   return (
     <div>
-      {/* Locked banner */}
+      {/* Status banners — order: invoiced > approved > pending */}
       {header.is_locked && (
         <div style={{ background: '#1A1814', color: '#FAFAF7', padding: '8px 16px', textAlign: 'center', fontSize: 'var(--text-xs)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '1rem' }}>
           <i className="fa-solid fa-lock" style={{ marginRight: 6 }} />
           Invoiced — This invoice is locked and cannot be modified
+        </div>
+      )}
+      {!header.is_locked && header.status === 'approved' && (
+        <div style={{ background: 'var(--color-success)', color: '#fff', padding: '6px 16px', textAlign: 'center', fontSize: 'var(--text-xs)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '1rem' }}>
+          <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />
+          Approved — Read only · Print and Export available
+        </div>
+      )}
+      {header.status === 'pending_approval' && user.role === 'user' && (
+        <div style={{ background: 'var(--color-warning)', color: '#fff', padding: '6px 16px', textAlign: 'center', fontSize: 'var(--text-xs)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '1rem' }}>
+          <i className="fa-solid fa-clock" style={{ marginRight: 6 }} />
+          Pending Approval — Awaiting manager review · No changes allowed
         </div>
       )}
 
@@ -141,6 +171,7 @@ export default function InvoiceDetailPage() {
           canEdit={canEdit}
           isLocked={isLocked}
           onRefresh={fetchData}
+          onItemUpdate={updateItemInState}
         />
       ) : (
         <DetailView
@@ -150,6 +181,7 @@ export default function InvoiceDetailPage() {
           canEdit={canEdit}
           isLocked={isLocked}
           onRefresh={fetchData}
+          onItemUpdate={updateItemInState}
         />
       )}
 

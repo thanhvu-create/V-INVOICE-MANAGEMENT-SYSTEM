@@ -1,6 +1,15 @@
 # Database Schema — V-Invoice (Supabase PostgreSQL)
 > **9 tables + RLS + PostgreSQL triggers + Realtime subscriptions**
-> **Cập nhật lần cuối:** 2026-05-25 — đồng bộ với PDF requirements + DOCS/modules/
+> **Cập nhật lần cuối:** 2026-05-29
+
+---
+
+> **[THAM KHẢO] DEV GUIDELINES — Xác nhận schema khớp 100%:**
+> - `invoice_headers` ↔ `Invoice_Header` ✅
+> - `invoice_items` ↔ `Invoice_Items` ✅
+> - `item_gem_details` ↔ `Invoice_Item_Details` ✅
+> - PostgreSQL trigger `trg_snapshot_invoice` ↔ "Trigger khi Invoiced → copy to Snapshot_Log + Is_Locked=true" ✅
+> - `invoice_snapshots` table ↔ `Invoice_Snapshot_Log` ✅
 
 ---
 
@@ -197,14 +206,16 @@ CREATE INDEX ON invoice_items(sku_jwmold);
 CREATE TABLE item_gem_details (
   id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   invoice_item_id      UUID NOT NULL REFERENCES invoice_items(id) ON DELETE CASCADE,
-  gem_type             TEXT,              -- 'Diamond', 'Ruby', 'Sapphire', ...
-  shape                TEXT,              -- 'Round', 'Oval', 'Princess', ...
+  gem_type             TEXT,              -- 'Diamond', 'Ruby', 'Sapphire', 'Emerald', ...
+  quality              TEXT,              -- Phẩm chất/Độ sạch: 'VVS1','VS1','SI1','LG','F','VF',...
+                                         -- LG = Lab Grown. Bắt buộc theo [THAM KHẢO] §3 col "P.chất"
+  shape                TEXT,              -- 'Round', 'Oval', 'Princess', 'Cushion', ...
   size_mm              TEXT,              -- e.g. '1.5mm', '3x4mm'
   qty_pcs              INTEGER DEFAULT 1,
-  weight_ct_before     NUMERIC(8,4),      -- carat trước
-  weight_ct_after      NUMERIC(8,4),      -- carat sau — dùng để tính GENERATED cols
+  weight_ct_before     NUMERIC(8,4),      -- carat trước xử lý
+  weight_ct_after      NUMERIC(8,4),      -- carat sau xử lý — dùng để tính GENERATED cols
   unit_price_per_ct    NUMERIC(10,2),     -- USD/carat
-  setting_type         TEXT,              -- 'Prong', 'Bezel', 'Pave', ...
+  setting_type         TEXT,              -- 'Prong', 'Bezel', 'Pave', 'Channel', ...
   setting_fee_per_pcs  NUMERIC(10,2),     -- USD/viên setting
   sort_order           INTEGER DEFAULT 0, -- display order within item
 
@@ -220,6 +231,9 @@ CREATE TABLE item_gem_details (
   updated_at           TIMESTAMPTZ DEFAULT now()
 );
 CREATE INDEX ON item_gem_details(invoice_item_id);
+
+-- Migration cho DB đã tồn tại:
+-- ALTER TABLE item_gem_details ADD COLUMN quality TEXT;
 
 
 -- ============================================================
@@ -392,23 +406,118 @@ CREATE POLICY "Users can read own profile" ON app_users
 
 ## 5. SUPABASE REALTIME
 
-```sql
--- Enable Realtime for Detail View sync
--- (In Supabase Dashboard → Database → Replication → Tables)
--- Tables to enable:
---   - invoice_items      (line item changes)
---   - item_gem_details   (gem changes)
+> **Nguồn:** [THAM KHẢO] DEV GUIDELINES — "Khi user chỉnh sửa số lượng đá tấm ở bảng Detail, các hàm tính toán Sub-total → HPUSA → HP for CIF price phải lập tức thay đổi trên màn hình **mà không cần Reload lại trang**."
 
--- TypeScript channel pattern:
--- supabase.channel(`invoice:${invoiceId}`)
---   .on('postgres_changes', {
---       event: '*', schema: 'public', table: 'invoice_items',
---       filter: `invoice_id=eq.${invoiceId}`
---   }, handler)
---   .on('postgres_changes', {
---       event: '*', schema: 'public', table: 'item_gem_details'
---   }, handler)
---   .subscribe()
+### 5a. LOCAL STATE UPDATE — Sync đơn giản (Priority 1)
+
+**Cách đạt "lập tức thay đổi" mà không cần Supabase Realtime:**
+
+Sau khi PATCH item hoặc gem:
+- API trả về item đã recalculated (bao gồm hpusa, cif_price, tag_price, fr_price)
+- Cập nhật CHỈ item đó trong local state — KHÔNG gọi `onRefresh()` (full re-fetch)
+- JM Form View và Detail View cùng đọc từ `data.items` state → cả 2 views update ngay
+
+```typescript
+// Pattern trong invoices/[id]/page.tsx:
+const [data, setData] = useState<{ header: any; items: any[] } | null>(null)
+
+// Sau khi PATCH item → update local state thay vì onRefresh():
+function updateItemInState(itemId: string, updatedFields: Record<string, any>) {
+  setData(prev => {
+    if (!prev) return prev
+    return {
+      ...prev,
+      items: prev.items.map(item =>
+        item.id === itemId
+          ? { ...item, ...updatedFields }
+          : item
+      ),
+    }
+  })
+}
+
+// Sau khi PATCH gem → cần re-fetch item đó (vì computed cols thay đổi):
+async function refreshItem(itemId: string) {
+  const res  = await fetch(`/api/invoices/${invoiceId}/items/${itemId}`)
+  const json = await res.json()
+  if (json.success) updateItemInState(itemId, json.data)
+}
+```
+
+**Flow khi edit gem:**
+```
+User edits gem → PATCH /gems/[gemId]
+  → Server recalculates: weight_gr, total_price, total_setting_fee, weight_no_gem_gr, hpusa, cif_price
+  → API returns updated item + gems
+  → updateItemInState(itemId, { hpusa, cif_price, weight_no_gem_gr, item_gem_details: [...] })
+  → JM Form: CIF cell re-renders → user sees new CIF instantly
+  → Detail View: HPUSA breakdown re-renders → user sees new HPUSA instantly
+  ✓ "lập tức thay đổi mà không cần Reload"
+```
+
+### 5b. SUPABASE REALTIME — Multi-user collaboration (Priority 2)
+
+Khi cần sync giữa nhiều user đang xem cùng 1 invoice:
+
+```sql
+-- Enable trong Supabase Dashboard → Database → Replication → Tables:
+-- invoice_items      ← line item changes
+-- item_gem_details   ← gem changes
+```
+
+```typescript
+// hooks/useInvoiceRealtime.ts
+import { createClient } from '@/lib/supabase/client'
+
+export function useInvoiceRealtime(
+  invoiceId: string,
+  onItemChange: (itemId: string) => void,
+) {
+  useEffect(() => {
+    const supabase = createClient()
+    const channel = supabase
+      .channel(`invoice:${invoiceId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'invoice_items',
+        filter: `invoice_id=eq.${invoiceId}`,
+      }, (payload) => {
+        // Khi item thay đổi (bởi user khác):
+        const itemId = payload.new?.id ?? payload.old?.id
+        if (itemId) onItemChange(itemId)
+      })
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'item_gem_details',
+      }, (payload) => {
+        // Khi gem thay đổi → refresh item cha:
+        const itemId = payload.new?.invoice_item_id ?? payload.old?.invoice_item_id
+        if (itemId) onItemChange(itemId)
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [invoiceId])
+}
+
+// Dùng trong invoices/[id]/page.tsx (chỉ khi status = 'draft'):
+useInvoiceRealtime(id, (itemId) => refreshItem(itemId))
+```
+
+### 5c. THỨ TỰ TRIỂN KHAI
+
+```
+Phase 1 (bắt buộc):
+  → updateItemInState() trong page.tsx
+  → JMFormView + DetailView dùng updateItemInState callback thay vì onRefresh()
+  → Đáp ứng "lập tức thay đổi" yêu cầu
+
+Phase 2 (nice-to-have):
+  → useInvoiceRealtime hook
+  → Enable Realtime trên Supabase Dashboard
+  → Chỉ cần khi nhiều user cùng edit invoice
 ```
 
 ---

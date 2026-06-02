@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getAuthContext, requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
+import { checkEditPermission } from '@/lib/auth/editGuard'
+import { recalcItem } from '@/lib/formulas/pricing'
 
 type Params = { params: { id: string } }
 
@@ -46,10 +48,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const ctx = await requireRole('user')
     const db  = createServiceClient()
 
-    // Lock guard
-    const { data: inv } = await db.from('invoice_headers').select('is_locked, status').eq('id', params.id).single()
+    const { data: inv } = await db
+      .from('invoice_headers')
+      .select('is_locked, status, created_by_user_id')
+      .eq('id', params.id)
+      .single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
-    if (inv.is_locked) return NextResponse.json({ success: false, message: 'Invoice is locked' }, { status: 403 })
+    const editError = checkEditPermission({ isLocked: inv.is_locked, status: inv.status, role: ctx.role, createdBy: inv.created_by_user_id, userId: ctx.userId })
+    if (editError) return NextResponse.json({ success: false, message: editError }, { status: 403 })
 
     const body = await req.json()
     const allowed = ['po_number', 'mr_number', 'store', 'notes', 'metal_rate_id', 'pricing_rule_id']
@@ -68,6 +74,29 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (error) throw error
 
     writeAuditLog({ invoiceId: params.id, userId: ctx.userId, action: 'updated', metadata: { fields: Object.keys(updates).filter(k => k !== 'updated_at') } })
+
+    // Bulk recalc all items when rate or rule changes — prices would be stale otherwise
+    const rateChanged = 'metal_rate_id' in updates || 'pricing_rule_id' in updates
+    if (rateChanged) {
+      const [{ data: newHeader }, { data: items }] = await Promise.all([
+        db.from('invoice_headers').select('daily_metal_rates(*), pricing_rules(*)').eq('id', params.id).single(),
+        db.from('invoice_items').select('id').eq('invoice_id', params.id),
+      ])
+      const rate = (newHeader as any)?.daily_metal_rates
+      const rule = (newHeader as any)?.pricing_rules
+      if (rate && rule && items?.length) {
+        await Promise.all(items.map(async (item) => {
+          const [{ data: fullItem }, { data: gems }] = await Promise.all([
+            db.from('invoice_items').select('*').eq('id', item.id).single(),
+            db.from('item_gem_details').select('*').eq('invoice_item_id', item.id),
+          ])
+          if (fullItem) {
+            const recalc = recalcItem(fullItem, gems ?? [], rate, rule)
+            await db.from('invoice_items').update(recalc).eq('id', item.id)
+          }
+        }))
+      }
+    }
 
     return NextResponse.json({ success: true, data })
   } catch (err: any) {

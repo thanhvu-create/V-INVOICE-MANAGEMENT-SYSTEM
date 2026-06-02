@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { recalcItem } from '@/lib/formulas/pricing'
+import { checkEditPermission } from '@/lib/auth/editGuard'
 
 type Params = { params: { id: string; itemId: string } }
 
@@ -15,21 +16,31 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const { data: invoice } = await db
       .from('invoice_headers')
-      .select('is_locked, daily_metal_rates(*), pricing_rules(*)')
+      .select('is_locked, status, created_by_user_id, daily_metal_rates(*), pricing_rules(*)')
       .eq('id', params.id)
       .single()
 
     if (!invoice) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
-    if (invoice.is_locked) return NextResponse.json({ success: false, message: 'Invoice is locked' }, { status: 403 })
+    const editErrorPatch = checkEditPermission({ isLocked: invoice.is_locked, status: invoice.status, role: ctx.role, createdBy: (invoice as any).created_by_user_id, userId: ctx.userId })
+    if (editErrorPatch) return NextResponse.json({ success: false, message: editErrorPatch }, { status: 403 })
 
     const EDITABLE = [
       'description', 'store', 'location_store', 'so_mo_code', 'vendor_model',
       'qty_pcs', 'weight_total_gr', 'weight_gold_actual_gr', 'metal_type',
       'class', 'sub_class', 'labor_fee', 'casting_fee', 'design_fee',
-      'resin_fee', 'misc_fee', 'sell_price', 'after_discount_price',
+      'resin_fee', 'misc_fee', 'sell_price', 'discount_pct',
+      'notes', 'ship_date', 'tracking_no', 'vinvoice_no', 'size', 'customer_name',
     ]
     const updates: Record<string, unknown> = {}
     for (const k of EDITABLE) { if (k in body) updates[k] = body[k] }
+
+    // Compute after_discount_price server-side when sell_price or discount_pct changes
+    if ('sell_price' in updates || 'discount_pct' in updates) {
+      const { data: cur } = await db.from('invoice_items').select('sell_price, discount_pct').eq('id', params.itemId).single()
+      const sp  = ('sell_price'   in updates ? updates.sell_price   : cur?.sell_price)   as number | null
+      const pct = ('discount_pct' in updates ? updates.discount_pct : cur?.discount_pct) as number | null
+      updates.after_discount_price = (sp != null && pct != null) ? sp * (1 - pct / 100) : sp ?? null
+    }
 
     const { data: item, error } = await db
       .from('invoice_items')
@@ -41,7 +52,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     if (error) throw error
 
-    // Refetch gems for recalc
+    // Recalculate pricing fields
     const { data: gems } = await db.from('item_gem_details').select('*').eq('invoice_item_id', params.itemId)
     const rate = (invoice as any).daily_metal_rates
     const rule = (invoice as any).pricing_rules
@@ -52,7 +63,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     writeAuditLog({ invoiceId: params.id, userId: ctx.userId, action: 'item_updated', metadata: { line_no: item.line_no, sku: item.sku_jwmold } })
 
-    return NextResponse.json({ success: true, data: item })
+    // Re-fetch the item WITH recalculated values + gems for client-side local state update
+    const { data: updatedItem } = await db
+      .from('invoice_items')
+      .select('*, item_gem_details(*)')
+      .eq('id', params.itemId)
+      .single()
+
+    return NextResponse.json({ success: true, data: updatedItem })
   } catch (err: any) {
     if (err?.status) return NextResponse.json({ success: false, message: err.message }, { status: err.status })
     return NextResponse.json({ success: false, message: String(err) }, { status: 500 })
@@ -67,12 +85,13 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
     const { data: invoice } = await db
       .from('invoice_headers')
-      .select('is_locked')
+      .select('is_locked, status, created_by_user_id')
       .eq('id', params.id)
       .single()
 
     if (!invoice) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
-    if (invoice.is_locked) return NextResponse.json({ success: false, message: 'Invoice is locked' }, { status: 403 })
+    const editErrorDel = checkEditPermission({ isLocked: invoice.is_locked, status: invoice.status, role: ctx.role, createdBy: (invoice as any).created_by_user_id, userId: ctx.userId })
+    if (editErrorDel) return NextResponse.json({ success: false, message: editErrorDel }, { status: 403 })
 
     const { data: item } = await db.from('invoice_items').select('line_no, sku_jwmold').eq('id', params.itemId).single()
     const { error } = await db.from('invoice_items').delete().eq('id', params.itemId).eq('invoice_id', params.id)

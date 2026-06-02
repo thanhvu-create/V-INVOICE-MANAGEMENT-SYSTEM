@@ -321,9 +321,29 @@ export function createAdminClient() { ... }  // chỉ dùng cho user management
 ✓ Delete daily_metal_rates → check FK invoice_headers.metal_rate_id → 409 nếu có ref
 ✓ Chỉ 1 pricing_rule is_active = true tại một thời điểm
 ✓ Recalculate chain chạy server-side sau mỗi field change
-✓ Print: window.open('/invoices/[id]/print') — Server Component render tĩnh
+✓ Print: window.open('/invoices/[id]/print') — mở tab mới, auto-print
 ✓ Role lấy từ app_users table (không từ JWT) — query fresh mỗi request
 ✓ viewer role: zero write access — tất cả mutations trả 403
+
+STATUS-BASED EDIT GUARD (từ [THAM KHẢO] §1 — xem invoice-workflow.md §3b):
+✓ draft       → user/manager/admin có thể edit
+✓ pending_approval → CHỈ manager/admin được edit; user thường → 403
+✓ approved    → KHÔNG AI được edit (kể cả admin) → 403; chỉ Print/Export
+✓ invoiced    → is_locked=true → 403 mọi write
+
+GEM QUALITY FIELD (từ [THAM KHẢO] §3):
+✓ item_gem_details có cột `quality` TEXT — P. chất đá (VVS1, VS1, LG...)
+✓ GemModal phải có field quality; gem table phải hiển thị cột Quality
+✓ Migration: ALTER TABLE item_gem_details ADD COLUMN quality TEXT
+
+BOM INTEGRATION (từ [THAM KHẢO] §2.2, §3):
+✓ image_url copy từ bom_products → invoice_items khi add item / import
+✓ ItemCard hiển thị thumbnail ảnh sản phẩm (44×44px, graceful fallback)
+✓ Xem .claude/rules/bom-integration.md
+
+PRINT (từ [THAM KHẢO] §5 — xem print-layout.md):
+✓ Phải có logo công ty (hoặc text fallback)
+✓ Phải có signature block 3 cột: Prepared by / Approved by / Customer
 ```
 
 ---

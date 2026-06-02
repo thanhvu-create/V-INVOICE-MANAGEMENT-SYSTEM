@@ -62,15 +62,16 @@ function getDisplayValue(col: Col, item: any): string {
 }
 
 interface Props {
-  invoiceId:   string
-  items:       any[]
-  canSeePrice: boolean
-  canEdit:     boolean
-  isLocked:    boolean
-  onRefresh:   () => void
+  invoiceId:    string
+  items:        any[]
+  canSeePrice:  boolean
+  canEdit:      boolean
+  isLocked:     boolean
+  onRefresh:    () => void
+  onItemUpdate: (itemId: string, updatedItem: any) => void
 }
 
-export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, onRefresh }: Props) {
+export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, onRefresh, onItemUpdate }: Props) {
   const [editCell,   setEditCell]   = useState<{ itemId: string; field: string; value: string } | null>(null)
   const [savingCell, setSavingCell] = useState<string | null>(null)  // 'itemId:field'
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
@@ -91,7 +92,7 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, o
     setEditCell(null)
 
     const payload = { [editCell.field]: parseFieldValue(editCell.field, editCell.value) }
-    const data = await apiCall(
+    const data = await apiCall<any>(
       () => fetch(`/api/invoices/${invoiceId}/items/${editCell.itemId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -100,7 +101,8 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, o
       { successMsg: 'Item saved.' }
     )
     setSavingCell(null)
-    if (data) onRefresh()
+    // Update only this item in local state — no full page re-fetch
+    if (data) onItemUpdate(editCell.itemId, data)
   }
 
   function cancelEdit() { setEditCell(null) }
@@ -138,6 +140,10 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, o
   const totHpusa  = items.reduce((s, i) => s + (i.hpusa ?? 0), 0)
   const totCif    = items.reduce((s, i) => s + (i.cif_price ?? 0), 0)
   const totTag    = items.reduce((s, i) => s + (i.tag_price ?? 0), 0)
+  // Total stone weight — sum GENERATED weight_gr from DB, never compute (totWt - totNoGem)
+  const totGemWt  = items.reduce((s, i) =>
+    s + (i.item_gem_details ?? []).reduce((gs: number, g: any) => gs + (g.weight_gr ?? 0), 0), 0
+  )
 
   return (
     <>
@@ -285,6 +291,15 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, o
                 {canSeePrice && <td style={{ ...td, fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{fmt2(totTag)}</td>}
                 {canEdit && !isLocked && <td />}
               </tr>
+              {totGemWt > 0 && (
+                <tr style={{ background: 'var(--bg-base)' }}>
+                  <td style={td} />
+                  <td style={td} />
+                  <td colSpan={6} style={{ ...td, fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontStyle: 'italic', textAlign: 'right' }}>Σ TL Xoàn (gr):</td>
+                  <td style={{ ...td, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textAlign: 'right' }}>{fmt4(totGemWt)}</td>
+                  <td colSpan={99} style={td} />
+                </tr>
+              )}
             </tfoot>
           )}
         </table>

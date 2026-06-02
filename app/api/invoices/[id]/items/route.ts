@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { recalcItem } from '@/lib/formulas/pricing'
+import { checkEditPermission } from '@/lib/auth/editGuard'
 
 type Params = { params: { id: string } }
 
@@ -15,12 +16,13 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const { data: invoice } = await db
       .from('invoice_headers')
-      .select('is_locked, daily_metal_rates(*), pricing_rules(*)')
+      .select('is_locked, status, created_by_user_id, daily_metal_rates(*), pricing_rules(*)')
       .eq('id', params.id)
       .single()
 
     if (!invoice) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
-    if (invoice.is_locked) return NextResponse.json({ success: false, message: 'Invoice is locked' }, { status: 403 })
+    const editError = checkEditPermission({ isLocked: invoice.is_locked, status: invoice.status, role: ctx.role, createdBy: (invoice as any).created_by_user_id, userId: ctx.userId })
+    if (editError) return NextResponse.json({ success: false, message: editError }, { status: 403 })
 
     // Get next line_no
     const { data: maxRow } = await db
@@ -38,7 +40,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (body.sku_jwmold) {
       const { data: prod } = await db
         .from('bom_products')
-        .select('description, class, sub_class, metal_type, labor_fee, casting_fee, design_fee, resin_fee, misc_fee')
+        .select('description, class, sub_class, metal_type, labor_fee, casting_fee, design_fee, resin_fee, misc_fee, image_url')
         .eq('sku_jwmold', body.sku_jwmold)
         .eq('is_active', true)
         .single()
@@ -67,13 +69,14 @@ export async function POST(req: NextRequest, { params }: Params) {
         design_fee:            body.design_fee            ?? productDefaults.design_fee   ?? 0,
         resin_fee:             body.resin_fee             ?? productDefaults.resin_fee    ?? 0,
         misc_fee:              body.misc_fee              ?? productDefaults.misc_fee     ?? 0,
+        image_url:             body.image_url             ?? (productDefaults as any).image_url ?? null,
       })
       .select()
       .single()
 
     if (error) throw error
 
-    // Recalculate
+    // Recalculate then return updated item (not stale insert result)
     const rate = (invoice as any).daily_metal_rates
     const rule = (invoice as any).pricing_rules
     if (rate && rule) {
@@ -83,7 +86,13 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     writeAuditLog({ invoiceId: params.id, userId: ctx.userId, action: 'item_added', metadata: { line_no: lineNo, sku: body.sku_jwmold } })
 
-    return NextResponse.json({ success: true, data: item })
+    const { data: updatedItem } = await db
+      .from('invoice_items')
+      .select('*, item_gem_details(*)')
+      .eq('id', item.id)
+      .single()
+
+    return NextResponse.json({ success: true, data: updatedItem ?? item })
   } catch (err: any) {
     if (err?.status) return NextResponse.json({ success: false, message: err.message }, { status: err.status })
     return NextResponse.json({ success: false, message: String(err) }, { status: 500 })

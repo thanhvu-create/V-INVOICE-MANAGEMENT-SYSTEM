@@ -26,15 +26,16 @@ const roStyle: React.CSSProperties = {
 }
 
 interface Props {
-  invoiceId:   string
-  item:        any
-  canSeePrice: boolean
-  canEdit:     boolean
-  isLocked:    boolean
-  onRefresh:   () => void
+  invoiceId:    string
+  item:         any
+  canSeePrice:  boolean
+  canEdit:      boolean
+  isLocked:     boolean
+  onRefresh:    () => void
+  onItemUpdate: (itemId: string, updatedItem: any) => void
 }
 
-export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRefresh }: Props) {
+export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRefresh, onItemUpdate }: Props) {
   const [editMode, setEditMode] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -85,14 +86,18 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
     for (const [k, v] of Object.entries(form)) {
       payload[k] = nums.includes(k) ? (parseFloat(v) || null) : (v.trim() || null)
     }
-    const data = await apiCall(
+    const data = await apiCall<any>(
       () => fetch(`/api/invoices/${invoiceId}/items/${item.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
       }),
       { successMsg: 'Item saved.' }
     )
     setSaving(false)
-    if (data !== null) { setEditMode(false); onRefresh() }
+    if (data !== null) {
+      setEditMode(false)
+      // Update only this item in local state — instant update, no full page re-fetch
+      onItemUpdate(item.id, data)
+    }
   }
 
   async function handleDelete() {
@@ -109,13 +114,18 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
   async function handleDeleteGem() {
     if (!confirmDeleteGem) return
     setDeletingGem(true)
-    const ok = await apiCall(
+    const updatedItem = await apiCall<any>(
       () => fetch(`/api/invoices/${invoiceId}/items/${item.id}/gems/${confirmDeleteGem.id}`, { method: 'DELETE' }),
       { successMsg: 'Gem deleted.' }
     )
     setDeletingGem(false)
     setConfirmDeleteGem(null)
-    if (ok !== null) onRefresh()
+    if (updatedItem !== null) onItemUpdate(item.id, updatedItem)
+  }
+
+  // Gem mutations return the updated parent item — use local state update
+  function handleGemSaved(updatedItem: any) {
+    onItemUpdate(item.id, updatedItem)
   }
 
   const isBaSao = item.notes?.toLowerCase().includes('ba sao')
@@ -125,6 +135,13 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
       {/* Card header */}
       <div style={{ padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', background: 'var(--bg-base)' }}>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          {item.image_url && (
+            <div style={{ width: 44, height: 44, flexShrink: 0, border: '1px solid var(--border-light)', overflow: 'hidden', background: 'var(--bg-muted)' }}>
+              <img src={item.image_url} alt={item.sku_jwmold}
+                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }} />
+            </div>
+          )}
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>#{item.line_no}</span>
           <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, background: 'var(--sku-highlight-bg)', padding: '1px 8px', color: '#92400E', fontSize: 'var(--text-sm)' }}>{item.sku_jwmold}</span>
           {item.description && <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{item.description}</span>}
@@ -171,6 +188,23 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
               <div style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', color: String(label) === 'Notes' && isBaSao ? '#DC2626' : 'inherit', fontWeight: String(label) === 'Notes' && isBaSao ? 700 : 400 }}>{val ?? '—'}</div>
             </div>
           ))}
+          {/* HPUSA breakdown — admin/manager only, only when there are gems */}
+          {canSeePrice && gems.length > 0 && (
+            <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--border-light)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>HPUSA Breakdown</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)' }}>
+                <span>Gold: {fmt2(item.gold_value_usd)}</span>
+                <span style={{ color: 'var(--text-muted)' }}>+</span>
+                <span>Gems: {fmt2(gems.reduce((s: number, g: any) => s + (g.total_price ?? 0), 0))}</span>
+                <span style={{ color: 'var(--text-muted)' }}>+</span>
+                <span>Setting: {fmt2(gems.reduce((s: number, g: any) => s + (g.total_setting_fee ?? 0), 0))}</span>
+                <span style={{ color: 'var(--text-muted)' }}>+</span>
+                <span>Fees: {fmt2((item.labor_fee ?? 0) + (item.casting_fee ?? 0) + (item.design_fee ?? 0) + (item.resin_fee ?? 0) + (item.misc_fee ?? 0))}</span>
+                <span style={{ color: 'var(--text-muted)' }}>=</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>HPUSA: {fmt2(item.hpusa)}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -281,7 +315,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
           <div style={{ overflowX: 'auto' }}>
             <table style={{ borderCollapse: 'collapse', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', width: '100%' }}>
               <thead>
-                <tr>{['Type', 'Shape', 'Size', 'Qty', 'Wt After (ct)', 'Wt (g)', '$/ct', 'Total', 'Setting', 'Fee/pc', 'Total Fee', ''].map(h => (
+                <tr>{['Type', 'Quality', 'Shape', 'Size', 'Qty', 'Wt After (ct)', 'Wt (g)', '$/ct', 'Total', 'Setting', 'Fee/pc', 'Total Fee', ''].map(h => (
                   <th key={h} style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--bg-base)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}</tr>
               </thead>
@@ -289,12 +323,13 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
                 {gems.map((g: any) => (
                   <tr key={g.id} onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
                     <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.gem_type ?? '—'}</td>
+                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.quality ?? '—'}</td>
                     <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.shape ?? '—'}</td>
                     <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.size_mm ?? '—'}</td>
                     <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.qty_pcs}</td>
                     <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.weight_ct_after?.toFixed(4) ?? '—'}</td>
                     <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt4(g.weight_gr)}</td>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt2(g.price_per_carat)}</td>
+                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt2(g.unit_price_per_ct)}</td>
                     <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{fmt2(g.total_price)}</td>
                     <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.setting_type ?? '—'}</td>
                     <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt2(g.setting_fee_per_pcs)}</td>
@@ -310,6 +345,25 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr style={{ background: 'var(--bg-base)', borderTop: '1px solid var(--border-base)' }}>
+                  <td colSpan={5} style={{ padding: '3px 8px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Subtotal</td>
+                  <td style={{ padding: '3px 8px' }} />{/* Wt After */}
+                  <td style={{ padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>
+                    {gems.reduce((s: number, g: any) => s + (g.weight_gr ?? 0), 0).toFixed(4)}
+                  </td>
+                  <td />{/* $/ct */}
+                  <td style={{ padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 700 }}>
+                    {fmt2(gems.reduce((s: number, g: any) => s + (g.total_price ?? 0), 0))}
+                  </td>
+                  <td />{/* Setting type */}
+                  <td />{/* Fee/pc */}
+                  <td style={{ padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 700 }}>
+                    {fmt2(gems.reduce((s: number, g: any) => s + (g.total_setting_fee ?? 0), 0))}
+                  </td>
+                  <td />{/* Actions */}
+                </tr>
+              </tfoot>
             </table>
           </div>
         )}
@@ -318,7 +372,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
       {/* Dialogs */}
       <ConfirmDialog open={confirmDelete} title="Delete Item" message={`Delete item "${item.sku_jwmold}" (line ${item.line_no})?`} okText={deleting ? 'Deleting…' : 'Delete'} danger onOk={handleDelete} onCancel={() => setConfirmDelete(false)} />
       <ConfirmDialog open={!!confirmDeleteGem} title="Delete Gem" message={`Delete this ${confirmDeleteGem?.gem_type ?? 'gem'}?`} okText={deletingGem ? 'Deleting…' : 'Delete'} danger onOk={handleDeleteGem} onCancel={() => setConfirmDeleteGem(null)} />
-      <GemModal open={gemModal.open} invoiceId={invoiceId} itemId={item.id} gem={gemModal.gem} onClose={() => setGemModal({ open: false })} onSaved={onRefresh} />
+      <GemModal open={gemModal.open} invoiceId={invoiceId} itemId={item.id} gem={gemModal.gem} onClose={() => setGemModal({ open: false })} onSaved={handleGemSaved} />
     </div>
   )
 }

@@ -17,37 +17,59 @@
 -- Xóa dữ liệu cũ nếu cần re-seed
 TRUNCATE pricing_rules RESTART IDENTITY CASCADE;
 
+-- casting_loss_pct = 0: Hao hụt (loss%) đã được tính sẵn vào daily_metal_rates.
+-- Công thức: gold_18kw = spot_24k_per_gram × (18/24) × (1 + 0.06) — do user tính trước khi nhập.
+-- recalcItem() KHÔNG nhân thêm (1+casting_loss_pct) nữa.
+-- Xem: lib/formulas/pricing.ts + xlsx-realworld-analysis.md §3
 INSERT INTO pricing_rules
   (name, cif_multiplier, tag_multiplier, fr_multiplier, casting_loss_pct, is_active)
 VALUES
-  -- Rule đang active
-  ('Standard 2026',   1.10, 1.25, 1.08, 5.0, true),
-  -- Rule dự phòng
-  ('Wholesale 2026',  1.06, 1.15, 1.05, 5.0, false),
-  ('US Export 2026',  1.12, 1.28, 1.10, 5.5, false),
-  ('VN Market 2026',  1.08, 1.20, 1.06, 5.0, false);
+  -- Rule đang active — CIF 10% từ file thực tế (JM FORM F8 = 0.10)
+  ('Standard CH1',    1.10, 1.25, 1.08, 0.0, true),
+  -- Rules dự phòng
+  ('Wholesale',       1.06, 1.15, 1.05, 0.0, false),
+  ('US Export',       1.12, 1.28, 1.10, 0.0, false),
+  ('VN Market',       1.08, 1.20, 1.06, 0.0, false);
 
 
 -- =============================================================
--- SECTION 2 — DAILY METAL RATES (Tỷ giá 5 ngày gần nhất)
--- Giá tham khảo tháng 5/2026 (USD/gram)
--- Gold 24K ≈ $3,000/troy oz → $96.45/g
--- Platinum ≈ $1,050/troy oz → $33.76/g
--- Silver   ≈ $32/troy oz   → $1.03/g
--- Palladium ≈ $1,100/troy oz → $35.38/g
+-- SECTION 2 — DAILY METAL RATES (Giá kim loại theo ngày)
+-- ⚠️  GIÁ LƯU = DERIVED RATE (ĐÃ TÍNH HẠO HỤT) — không phải spot price!
+--
+-- Công thức (từ file Excel SUMMARY col C7):
+--   gold_18kw = spot_24k_per_gram × (18/24) × (1 + loss_gold%)
+--   gold_14ky = spot_24k_per_gram × (14/24) × (1 + loss_gold%)
+--   platinum  = pt_spot_per_gram × (1 + loss_pt%)
+--   gold_24k  = spot_24k_per_gram  (pure 24K — không có hao hụt)
+--
+-- Giá mẫu: spot 24K ≈ $3,000/oz = 96.45 $/gr, loss_gold = 6%, loss_PT = 17%
+-- → gold_18kw = 96.45 × 0.75 × 1.06 = 76.68 $/gr
+-- → gold_14ky = 96.45 × 0.5833 × 1.06 = 59.66 $/gr
+-- → platinum  = 33.76 × 1.17 = 39.50 $/gr
+--
+-- Khi admin nhập Metal Rates: copy giá từ SUMMARY col C7/C8/C9/C11 của file Excel
 -- =============================================================
 TRUNCATE daily_metal_rates RESTART IDENTITY CASCADE;
 
 INSERT INTO daily_metal_rates
-  (rate_date, gold_24k, gold_18kw, gold_18ky, gold_14ky, platinum, silver, palladium)
+  (rate_date, gold_24k, gold_18kw, gold_18ky, gold_14ky, platinum, silver, palladium, created_by)
 VALUES
-  ('2026-05-25', 96.45, 72.34, 72.34, 56.42, 33.76, 1.03, 35.38),
-  ('2026-05-24', 95.80, 71.85, 71.85, 56.04, 33.55, 1.02, 35.10),
-  ('2026-05-23', 96.12, 72.09, 72.09, 56.23, 33.68, 1.03, 35.25),
-  ('2026-05-22', 94.90, 71.18, 71.18, 55.52, 33.20, 1.01, 34.85),
-  ('2026-05-21', 95.50, 71.63, 71.63, 55.87, 33.42, 1.02, 35.00),
-  ('2026-05-20', 94.20, 70.65, 70.65, 55.11, 33.10, 1.01, 34.60),
-  ('2026-05-19', 93.80, 70.35, 70.35, 54.87, 32.95, 1.00, 34.40);
+  -- Giá derived (đã tính hao hụt): gold_24k=spot, gold_18k=spot×0.75×1.06, pt=pt_spot×1.17
+  ('2026-05-25', 96.45, 76.68, 76.68, 59.66, 39.50, 1.09, 37.50, 'seed'),
+  ('2026-05-24', 95.80, 76.18, 76.18, 59.27, 39.30, 1.09, 37.30, 'seed'),
+  ('2026-05-23', 96.12, 76.43, 76.43, 59.47, 39.41, 1.09, 37.42, 'seed'),
+  ('2026-05-22', 94.90, 75.46, 75.46, 58.71, 38.91, 1.07, 36.92, 'seed'),
+  ('2026-05-21', 95.50, 75.94, 75.94, 59.08, 39.11, 1.08, 37.12, 'seed'),
+  ('2026-05-20', 94.20, 74.91, 74.91, 58.28, 38.72, 1.07, 36.72, 'seed'),
+  ('2026-05-19', 93.80, 74.59, 74.59, 58.03, 38.56, 1.06, 36.54, 'seed');
+
+-- ⚠️  GHI CHÚ CHO ADMIN khi nhập giá thực hàng ngày:
+-- 1. Tra giá spot 24K từ https://www.kitco.com ($/oz)
+-- 2. Chia 31.103 → $/gram (gold_24k)
+-- 3. gold_18kw = gold_24k × (18/24) × 1.06
+-- 4. gold_14ky = gold_24k × (14/24) × 1.06
+-- 5. platinum  = pt_spot_oz / 31.103 × 1.17
+-- Hoặc copy thẳng từ SUMMARY col C7/C8/C9/C11 của file Excel CH1.
 
 
 -- =============================================================

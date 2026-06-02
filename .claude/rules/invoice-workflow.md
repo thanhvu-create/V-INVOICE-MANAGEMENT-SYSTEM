@@ -80,7 +80,7 @@ function canTransition(role: string, from: string, to: string): boolean {
 
 ```typescript
 // PHẢI check TRƯỚC MỌI write operation (items, gems, header update):
-const { data: header } = await db.from('invoice_headers').select('is_locked').eq('id', invoiceId).single()
+const { data: header } = await db.from('invoice_headers').select('is_locked, status').eq('id', invoiceId).single()
 if (header?.is_locked) {
   return NextResponse.json({ success: false, message: 'Invoice is locked (invoiced status).' }, { status: 403 })
 }
@@ -95,6 +95,167 @@ if (header?.is_locked) {
 **Does NOT apply to:**
 - GET (read operations)
 - Generating PDF/print
+
+---
+
+## 3b. STATUS-BASED EDIT GUARD — CRITICAL (Gap từ [THAM KHẢO] §1)
+
+Ngoài `is_locked`, các write operations phải check **status + role + ownership** theo bảng:
+
+| Status | viewer | user | manager | admin |
+|--------|--------|------|---------|-------|
+| `draft` | ✗ | ✓ (own only) | ✓ (all) | ✓ (all) |
+| `pending_approval` | ✗ | ✗ | ✓ | ✓ |
+| `approved` | ✗ | ✗ | ✗ | ✗ |
+| `invoiced` | ✗ | ✗ | ✗ | ✗ (is_locked) |
+
+**"own only"** = invoice_headers.created_by = ctx.userId
+
+---
+
+### Helper function — đặt tại `lib/auth/editGuard.ts`
+
+```typescript
+// lib/auth/editGuard.ts
+// Import và dùng trong TẤT CẢ write API routes cho invoices
+
+export interface EditGuardContext {
+  isLocked:    boolean
+  status:      string
+  role:        string
+  createdBy:   string   // invoice_headers.created_by (app_users.id)
+  userId:      string   // current user's app_users.id
+}
+
+/**
+ * Returns error message string nếu không được phép edit, null nếu được phép.
+ * Gọi sau khi đã load invoice header.
+ */
+export function checkEditPermission(ctx: EditGuardContext): string | null {
+  // 1. Invoiced — is_locked từ trigger
+  if (ctx.isLocked) {
+    return 'Invoice is locked (invoiced). No changes allowed.'
+  }
+
+  // 2. Approved — không ai được edit
+  if (ctx.status === 'approved') {
+    return 'Invoice is approved and cannot be modified. Ask a manager to return it to pending.'
+  }
+
+  // 3. Pending Approval — chỉ manager/admin
+  if (ctx.status === 'pending_approval' && ctx.role === 'user') {
+    return 'Invoice is pending approval. Only managers and admins can make changes.'
+  }
+
+  // 4. Draft — user chỉ edit invoice của mình
+  if (ctx.status === 'draft' && ctx.role === 'user' && ctx.createdBy !== ctx.userId) {
+    return 'You can only edit your own draft invoices.'
+  }
+
+  // 5. viewer — không bao giờ edit
+  if (ctx.role === 'viewer') {
+    return 'Viewers cannot make changes.'
+  }
+
+  return null // allowed
+}
+```
+
+---
+
+### Dùng trong route handlers
+
+```typescript
+// Trong bất kỳ write route nào (PATCH/POST/DELETE cho items, gems, header):
+
+import { checkEditPermission } from '@/lib/auth/editGuard'
+
+// Load header (luôn cần is_locked + status + created_by):
+const { data: header } = await db
+  .from('invoice_headers')
+  .select('is_locked, status, created_by')
+  .eq('id', params.id)
+  .single()
+
+if (!header) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
+
+const editError = checkEditPermission({
+  isLocked:  header.is_locked,
+  status:    header.status,
+  role:      ctx.role,
+  createdBy: header.created_by,
+  userId:    ctx.userId,
+})
+if (editError) {
+  return NextResponse.json({ success: false, message: editError }, { status: 403 })
+}
+```
+
+**Áp dụng cho tất cả routes:**
+- `PATCH  /api/invoices/[id]`
+- `POST   /api/invoices/[id]/items`
+- `PATCH  /api/invoices/[id]/items/[itemId]`
+- `DELETE /api/invoices/[id]/items/[itemId]`
+- `POST   /api/invoices/[id]/items/[itemId]/gems`
+- `PATCH  /api/invoices/[id]/items/[itemId]/gems/[gemId]`
+- `DELETE /api/invoices/[id]/items/[itemId]/gems/[gemId]`
+
+**KHÔNG áp dụng cho:**
+- GET (read-only)
+- `POST /api/invoices/[id]/status` — có logic riêng (ALLOWED_TRANSITIONS)
+- Print / Export
+
+---
+
+### UI guard — `app/(dashboard)/invoices/[id]/page.tsx`
+
+```typescript
+// Thay thế:
+// const canEdit = canDo('edit')
+
+// Bằng:
+const canEdit = canDo('edit')
+  && !header.is_locked
+  && header.status !== 'approved'
+  && !(header.status === 'pending_approval' && user.role === 'user')
+  && !(header.status === 'draft' && user.role === 'user' && header.created_by !== user.id)
+
+// Truyền canEdit vào: JMFormView, DetailView, ItemCard, AddItemModal
+// Khi canEdit = false → ẩn edit buttons, inline inputs, Add/Delete controls
+```
+
+---
+
+### Locked banner theo status
+
+```tsx
+// Thêm banner phía trên invoice (ngoài banner is_locked đã có):
+{header.status === 'approved' && !header.is_locked && (
+  <div style={{ background: 'var(--color-success)', color: '#fff', padding: '6px 16px', textAlign: 'center', fontSize: 'var(--text-xs)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '1rem' }}>
+    <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />
+    Approved — Read Only · Print and Export available
+  </div>
+)}
+
+{header.status === 'pending_approval' && user.role === 'user' && (
+  <div style={{ background: 'var(--color-warning)', color: '#fff', padding: '6px 16px', textAlign: 'center', fontSize: 'var(--text-xs)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '1rem' }}>
+    <i className="fa-solid fa-clock" style={{ marginRight: 6 }} />
+    Pending Approval — Awaiting manager review
+  </div>
+)}
+```
+
+---
+
+### Error responses HTTP 403
+
+| Tình huống | Message |
+|-----------|---------|
+| is_locked (invoiced) | `"Invoice is locked (invoiced). No changes allowed."` |
+| approved | `"Invoice is approved and cannot be modified. Ask a manager to return it to pending."` |
+| pending + user role | `"Invoice is pending approval. Only managers and admins can make changes."` |
+| draft + user + not owner | `"You can only edit your own draft invoices."` |
+| viewer | `"Viewers cannot make changes."` |
 
 ---
 
@@ -266,18 +427,40 @@ if (status && status !== 'all') {
 
 ---
 
-## 10. INVOICE LOCK INDICATOR
+## 10. INVOICE STATUS BANNERS (Toàn bộ trạng thái)
+
+Mỗi status có banner riêng ở đầu trang invoice detail. Thứ tự check:
 
 ```tsx
-// Khi is_locked = true (invoiced):
-// - Hiện lock icon (fa-lock) cạnh invoice title
-// - Ẩn Edit, Delete buttons
-// - Ẩn workflow action buttons
-// - Hiện "FROZEN" badge hoặc "INVOICED" badge với màu success
-// - Tất cả input fields trong Detail View → readonly
+{/* 1. INVOICED — đen, lock icon */}
+{header.is_locked && (
+  <div style={{ background: '#1A1814', color: '#FAFAF7', padding: '8px 16px', textAlign: 'center', fontSize: 'var(--text-xs)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '1rem' }}>
+    <i className="fa-solid fa-lock" style={{ marginRight: 6 }} />
+    Invoiced — This invoice is locked and cannot be modified
+  </div>
+)}
 
-// Visual:
-<i className="fa-solid fa-lock" style={{ color: 'var(--color-success)', marginLeft: 8 }} />
+{/* 2. APPROVED — xanh lá, read-only */}
+{header.status === 'approved' && !header.is_locked && (
+  <div style={{ background: 'var(--color-success)', color: '#fff', padding: '6px 16px', textAlign: 'center', fontSize: 'var(--text-xs)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '1rem' }}>
+    <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />
+    Approved — Read only · Print and Export are available
+  </div>
+)}
+
+{/* 3. PENDING — amber, chỉ hiện với user thường */}
+{header.status === 'pending_approval' && user.role === 'user' && (
+  <div style={{ background: 'var(--color-warning)', color: '#fff', padding: '6px 16px', textAlign: 'center', fontSize: 'var(--text-xs)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '1rem' }}>
+    <i className="fa-solid fa-clock" style={{ marginRight: 6 }} />
+    Pending Approval — Awaiting manager review · No changes allowed
+  </div>
+)}
+```
+
+**Mapping canEdit → ẩn gì:**
+```
+canEdit = false  →  ẩn: Add Item, Import, inline edit cells, Edit button, Delete button
+canEdit = false  →  giữ: Export, Print, Audit timeline, Read-only display
 ```
 
 ---

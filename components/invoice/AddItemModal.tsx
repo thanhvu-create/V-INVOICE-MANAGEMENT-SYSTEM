@@ -20,13 +20,14 @@ interface Form {
   resin_fee:             string
   misc_fee:              string
   notes:                 string
+  image_url:             string
 }
 
 const EMPTY: Form = {
   sku_jwmold: '', qty_pcs: '1', description: '', class: '', sub_class: '',
   metal_type: '', weight_total_gr: '', weight_gold_actual_gr: '',
   labor_fee: '0', casting_fee: '0', design_fee: '0', resin_fee: '0', misc_fee: '0',
-  notes: '',
+  notes: '', image_url: '',
 }
 
 interface Props {
@@ -83,6 +84,7 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
         design_fee:  String(prod.design_fee  ?? 0),
         resin_fee:   String(prod.resin_fee   ?? 0),
         misc_fee:    String(prod.misc_fee    ?? 0),
+        image_url:   prod.image_url          ?? '',
       }))
       setSkuResolved(true)
     } finally {
@@ -108,6 +110,7 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
       resin_fee:             parseFloat(form.resin_fee)          || 0,
       misc_fee:              parseFloat(form.misc_fee)           || 0,
       notes:                 form.notes.trim()                   || null,
+      image_url:             form.image_url                      || null,
     }
     const data = await apiCall(
       () => fetch(`/api/invoices/${invoiceId}/items`, {

@@ -132,18 +132,20 @@ await db.from('daily_metal_rates').delete().eq('id', id)
 
 ## 4. LOOKUP PATTERN (Khi tạo Invoice mới)
 
+> **Nguồn:** [THAM KHẢO] §2.1 — "Khi một Invoice ở trạng thái Draft được tạo, hệ thống sẽ gọi giá trị từ bảng này để tính toán."
+
 ```typescript
 // Lấy rate mặc định cho invoice mới:
 const today = new Date().toISOString().slice(0, 10)  // YYYY-MM-DD
 
-// Thử ngày hôm nay trước:
+// Ưu tiên 1: rate của ngày hôm nay
 const { data: todayRate } = await db
   .from('daily_metal_rates')
   .select('*')
   .eq('rate_date', today)
   .maybeSingle()
 
-// Fallback: lấy rate mới nhất:
+// Ưu tiên 2 (fallback): rate mới nhất có trong DB
 const { data: latestRate } = await db
   .from('daily_metal_rates')
   .select('*')
@@ -152,8 +154,27 @@ const { data: latestRate } = await db
   .single()
 
 const defaultRate = todayRate ?? latestRate
-// Lưu: invoice_headers.metal_rate_id = defaultRate.id
+// Lưu vào header: invoice_headers.metal_rate_id = defaultRate.id
 ```
+
+**Quan trọng:** Rate được **snapshot tại thời điểm tạo** qua `metal_rate_id` FK — nếu rate sau đó bị sửa, invoice đã tạo vẫn dùng giá cũ (trừ khi admin trigger bulk recalculate).
+
+---
+
+## 4b. USD/CHỈ — QUYẾT ĐỊNH THIẾT KẾ
+
+> **Nguồn:** [THAM KHẢO] §2.1 — "Cho phép Admin cập nhật giá USD/gram **hoặc** USD/Chỉ theo ngày."
+
+**Quyết định: Chỉ hỗ trợ USD/gram — KHÔNG implement USD/Chỉ.**
+
+| Lý do | Chi tiết |
+|-------|---------|
+| Toàn bộ pricing chain | `gold_value_usd = weight_gold_actual_gr × rate` — đơn vị **gram** xuyên suốt |
+| `weight_*` fields | Tất cả trong schema dùng đơn vị gram (`NUMERIC(8,4)`) |
+| Import Excel | Cột H/I là gram, không phải Chỉ |
+| Conversion phức tạp | 1 Chỉ = 3.75g — nếu user nhập Chỉ phải convert trước khi lưu, dễ lỗi |
+
+**Nếu cần hiển thị USD/Chỉ trong tương lai:** Chỉ là UI layer — tính `rate_per_chi = rate_per_gram × 3.75` khi hiển thị, KHÔNG lưu vào DB.
 
 ---
 

@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       const skuList = skus.split(',').map(s => s.trim()).filter(Boolean)
       const { data } = await db
         .from('bom_products')
-        .select('sku_jwmold, description, class, sub_class, metal_type, labor_fee, casting_fee, design_fee, resin_fee, misc_fee')
+        .select('sku_jwmold, description, class, sub_class, metal_type, labor_fee, casting_fee, design_fee, resin_fee, misc_fee, image_url')
         .in('sku_jwmold', skuList)
         .eq('is_active', true)
       return NextResponse.json({ success: true, data: data ?? [] })

@@ -131,9 +131,9 @@ export function WorkflowBar({ invoiceId, currentStatus, availableTransitions, on
                   if (!canGo) return
                   const b = e.currentTarget
                   if (!isCurrent) {
-                    b.style.background = 'var(--color-accent)'
+                    b.style.background = 'var(--border-strong)'
                     b.style.color      = 'var(--text-inverse)'
-                    b.style.borderColor = 'var(--color-accent)'
+                    b.style.borderColor = 'var(--border-strong)'
                   }
                 }}
                 onMouseLeave={e => {
@@ -217,14 +217,14 @@ export function WorkflowBar({ invoiceId, currentStatus, availableTransitions, on
                   lineHeight:    1.6,
                   transition:    'border-color 0.15s',
                 }}
-                onFocus={e  => { e.currentTarget.style.borderBottomColor = 'var(--color-accent)'; e.currentTarget.style.borderBottomWidth = '2px' }}
+                onFocus={e  => { e.currentTarget.style.borderBottomColor = 'var(--border-strong)'; e.currentTarget.style.borderBottomWidth = '2px' }}
                 onBlur={e   => { e.currentTarget.style.borderBottomColor = 'var(--border-base)';  e.currentTarget.style.borderBottomWidth = '1px' }}
               />
             </div>
 
             {error && (
               <p style={{
-                color:        'var(--color-accent)',
+                color:        'var(--border-strong)',
                 fontSize:     'var(--text-xs)',
                 marginBottom: '1rem',
                 letterSpacing: '0.03em',

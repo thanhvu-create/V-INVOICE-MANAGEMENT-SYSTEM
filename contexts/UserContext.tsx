@@ -21,11 +21,11 @@ interface UserContextValue {
 
 const ROLE_ACTIONS: Record<Role, string[]> = {
   admin:   [
-    'create', 'edit', 'delete', 'approve', 'reject', 'invoice',
+    'create', 'edit', 'delete', 'approve', 'invoice',
     'import', 'manage_users', 'manage_rates', 'manage_rules',
     'manage_products', 'see_prices',
   ],
-  manager: ['create', 'edit', 'approve', 'reject', 'invoice', 'import', 'see_prices'],
+  manager: ['create', 'edit', 'approve', 'import', 'see_prices'],
   user:    ['create', 'edit', 'import'],
   viewer:  [],
 }
