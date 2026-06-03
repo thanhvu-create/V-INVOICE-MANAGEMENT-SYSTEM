@@ -5,6 +5,7 @@ import { AdminModal, fieldStyle, labelStyle, inputStyle, btnPrimary, btnSecondar
 import { Pagination } from '@/components/ui/Pagination'
 import { toast } from '@/components/ui/Toast'
 import { DriveImageInput } from '@/components/ui/DriveImageInput'
+import { DriveImage } from '@/components/invoice/DriveImage'
 
 interface Product {
   id: string; sku_jwmold: string; description: string | null
@@ -131,6 +132,7 @@ export default function ProductsPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
+              <th style={{ ...th, width: 52 }}>Hình</th>
               <th style={th}>SKU</th>
               <th style={th}>Description</th>
               <th style={th}>Metal</th>
@@ -145,6 +147,9 @@ export default function ProductsPage() {
               <tr key={p.id} style={{ opacity: p.is_active ? 1 : 0.5 }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                 onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                <td style={{ ...td, padding: '4px 6px' }}>
+                  <DriveImage url={p.image_url} alt={p.sku_jwmold} size={40} />
+                </td>
                 <td style={{ ...td, fontFamily: 'var(--font-mono)', fontWeight: 600, background: 'rgba(200,180,100,0.08)' }}>{p.sku_jwmold}</td>
                 <td style={{ ...td, fontFamily: 'var(--font-body)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.description ?? '—'}</td>
                 <td style={{ ...td, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>{p.metal_type ?? '—'}</td>
@@ -174,7 +179,18 @@ export default function ProductsPage() {
       <Pagination page={page} totalPages={totalPages} total={total} pageSize={20} onPageChange={setPage} />
 
       {modal && (
-        <AdminModal title={modal === 'add' ? 'Add Product' : `Edit Product — ${editing?.sku_jwmold}`} onClose={closeModal} width={560}>
+        <AdminModal title={modal === 'add' ? 'Add Product' : `Edit Product — ${editing?.sku_jwmold}`} onClose={closeModal} width={580}>
+          {/* Image preview at top when editing and has image */}
+          {modal === 'edit' && form.image_url && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', padding: '0.75rem', background: 'var(--bg-base)', border: '1px solid var(--border-light)', marginBottom: '1rem' }}>
+              <DriveImage url={form.image_url} alt={form.sku_jwmold} size={80} />
+              <div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Hình hiện tại</div>
+                <div style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', wordBreak: 'break-all', maxWidth: 340 }}>{form.image_url}</div>
+              </div>
+            </div>
+          )}
+
           {modal === 'add' && (
             <div style={fieldStyle}>
               <label style={labelStyle}>SKU (JWMold) *</label>
