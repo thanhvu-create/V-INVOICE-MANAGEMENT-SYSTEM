@@ -5,6 +5,7 @@ import { useUser } from '@/contexts/UserContext'
 import { useRouter } from 'next/navigation'
 import { apiCall } from '@/lib/api'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 
 const GEM_TYPES = ['RD', 'PR', 'BG', 'MQ', 'OV', 'PS', 'RDL', 'XC', 'PL']
 const PRICE_UNITS = [
@@ -176,7 +177,8 @@ export default function GemCatalogPage() {
 
       {/* Add / Edit Modal */}
       {modal.open && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <ModalPortal>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: 'var(--bg-surface)', width: 520, border: '1px solid var(--border-base)' }}>
             <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-base)' }}>
               <span style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-xl)' }}>{modal.gem ? 'Edit Gem' : 'Add Gem'}</span>
@@ -228,6 +230,7 @@ export default function GemCatalogPage() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       <ConfirmDialog

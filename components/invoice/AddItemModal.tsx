@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { apiCall } from '@/lib/api'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 
 const METAL_TYPES = ['18KW', '18KY', '14KY', 'PT950', 'PT', '24K', 'AG', 'PD']
 
@@ -135,8 +136,9 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
   const grid2: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }
 
   return (
+    <ModalPortal>
     <div
-      style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
       onClick={onClose}
     >
       <div
@@ -246,5 +248,6 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
         </div>
       </div>
     </div>
+    </ModalPortal>
   )
 }

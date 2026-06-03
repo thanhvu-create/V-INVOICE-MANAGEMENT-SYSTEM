@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { toast } from '@/components/ui/Toast'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { computeKaratPrices, OZ_PER_GRAM } from '@/lib/gold-fetch'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 
 const KARATS = ['24K','23K','22K','18K','15K','14K','10K','PT','AG','PD'] as const
 
@@ -240,7 +241,8 @@ export default function MetalRatesPage() {
 
       {/* Add / Edit Modal */}
       {modal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto' }}>
+        <ModalPortal>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.55)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto' }}>
           <div style={{ background: 'var(--bg-surface)', width: 680, border: '1px solid var(--border-base)', margin: '2rem auto' }}>
 
             {/* Modal header */}
@@ -324,6 +326,7 @@ export default function MetalRatesPage() {
             </div>
           </div>
         </div>
+        </ModalPortal>
       )}
 
       <ConfirmDialog
