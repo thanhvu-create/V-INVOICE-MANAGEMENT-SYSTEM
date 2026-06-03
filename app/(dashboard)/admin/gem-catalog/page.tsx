@@ -176,7 +176,7 @@ export default function GemCatalogPage() {
 
       {/* Add / Edit Modal */}
       {modal.open && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: 'var(--bg-surface)', width: 520, border: '1px solid var(--border-base)' }}>
             <div style={{ padding: '1rem 1.5rem', borderBottom: '1px solid var(--border-light)', background: 'var(--bg-base)' }}>
               <span style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-xl)' }}>{modal.gem ? 'Edit Gem' : 'Add Gem'}</span>

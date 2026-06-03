@@ -138,7 +138,7 @@ export function GemModal({ open, invoiceId, itemId, gem, onClose, onSaved }: Pro
   }
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
       <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-base)', width: 560, maxHeight: '90vh', overflowY: 'auto' }} onClick={e => e.stopPropagation()}>
 
         {/* Header */}

@@ -240,7 +240,7 @@ export default function MetalRatesPage() {
 
       {/* Add / Edit Modal */}
       {modal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.5)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', overflowY: 'auto' }}>
           <div style={{ background: 'var(--bg-surface)', width: 680, border: '1px solid var(--border-base)', margin: '2rem auto' }}>
 
             {/* Modal header */}
