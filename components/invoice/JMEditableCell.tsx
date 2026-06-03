@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react'
 
 const METAL_TYPES = ['24K','22K','18KW','18KY','18K','15K','14KY','14K','10K','PT950','PT','AG','PD']
+const CLASS_OPTIONS = ['24K','18MTG','DIAJE','DIAMT','18KJE','LGRI','SILJE']
 
 interface Props {
   field:       string
@@ -46,7 +47,8 @@ export function JMEditableCell({
       if (e.key === 'Escape') { e.preventDefault(); onCancel() }
     }
 
-    if (field === 'metal_type') {
+    if (field === 'metal_type' || field === 'class') {
+      const opts = field === 'metal_type' ? METAL_TYPES : CLASS_OPTIONS
       return (
         <td style={{ ...tdStyle, padding: '2px 4px', background: 'var(--bg-surface)' }}>
           <select
@@ -58,7 +60,7 @@ export function JMEditableCell({
             style={{ ...inputBase, cursor: 'pointer' }}
           >
             <option value="">—</option>
-            {METAL_TYPES.map(m => <option key={m} value={m}>{m}</option>)}
+            {opts.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
         </td>
       )

@@ -196,6 +196,7 @@ export interface ImportRow {
   metalType:   string
   class:       string
   subClass:    string
+  notes:       string
 }
 
 export interface ValidationError {

@@ -82,6 +82,7 @@ export async function POST(req: NextRequest) {
         design_fee:            bom.design_fee  ?? 0,
         resin_fee:             bom.resin_fee   ?? 0,
         misc_fee:              bom.misc_fee    ?? 0,
+        notes:                 row.notes       || null,
       }
     })
 

@@ -11,7 +11,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const body = await req.json()
     const db   = createServiceClient()
 
-    const EDITABLE = ['rate_date', 'gold_24k', 'gold_18kw', 'gold_18ky', 'gold_14ky', 'platinum', 'silver', 'palladium']
+    const EDITABLE = [
+      'rate_date',
+      // Old columns — backward compat with invoices that use individual columns
+      'gold_24k', 'gold_18kw', 'gold_18ky', 'gold_14ky', 'platinum', 'silver', 'palladium',
+      // New spot + derived karat fields (from add_metal_rate_spot.sql)
+      'spot_24k_oz', 'spot_pt_oz', 'spot_ag_oz', 'spot_pd_oz',
+      'oz_per_gram', 'loss_gold_pct', 'loss_pt_pct', 'karat_prices',
+    ]
     const updates: Record<string, unknown> = {}
     for (const k of EDITABLE) { if (k in body) updates[k] = body[k] }
 

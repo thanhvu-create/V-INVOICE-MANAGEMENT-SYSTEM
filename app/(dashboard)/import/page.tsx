@@ -75,6 +75,7 @@ async function validateRows(rows: any[][]): Promise<{ valid: ImportRow[]; errors
       metalType:   String(row[9]  || '').trim(),
       class:       String(row[10] || '').trim(),
       subClass:    String(row[11] || '').trim(),
+      notes:       String(row[12] || '').trim(),
     })
   })
 

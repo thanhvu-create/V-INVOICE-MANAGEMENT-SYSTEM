@@ -114,7 +114,7 @@ export function GemModal({ open, invoiceId, itemId, gem, onClose, onSaved }: Pro
         unit_price_per_ct: String(catalog.mk_price ?? ''),
         price_unit:        catalog.price_unit  ?? 'per_ct',
         // per_pcs: weight_ct_after = qty_pcs → total_price = qty_pcs × mk_price via GENERATED col
-        weight_ct_after:   isPcs ? v.qty_pcs : v.weight_ct_after,
+        weight_ct_after:   isPcs ? '0' : v.weight_ct_after,
       }))
       const priceLabel = isPcs
         ? `$${Number(catalog.mk_price).toFixed(2)}/pcs`
@@ -145,10 +145,10 @@ export function GemModal({ open, invoiceId, itemId, gem, onClose, onSaved }: Pro
       size_mm:             form.size_mm.trim()     || null,
       qty_pcs:             parseInt(form.qty_pcs)  || 1,
       weight_ct_before:    parseNum(form.weight_ct_before),
-      // per_pcs: weight_ct_after = qty_pcs so GENERATED total_price = qty_pcs × mk_price
-      weight_ct_after:     isPcs
-        ? (parseInt(form.qty_pcs) || 1)
-        : (parseNum(form.weight_ct_after) ?? 0),
+      // per_pcs (XC/PL): weight_ct_after = 0 → weight_gr = 0, total_price = 0
+      // Crystal price is reference only — not billed via T.Giá (matches Excel)
+      // Charge goes through setting_fee_per_pcs × qty_pcs instead
+      weight_ct_after:     isPcs ? 0 : (parseNum(form.weight_ct_after) ?? 0),
       unit_price_per_ct:   parseNum(form.unit_price_per_ct)   ?? 0,
       setting_type:        form.setting_type.trim()  || null,
       setting_fee_per_pcs: parseNum(form.setting_fee_per_pcs) ?? 0,
@@ -232,9 +232,9 @@ export function GemModal({ open, invoiceId, itemId, gem, onClose, onSaved }: Pro
               </div>
             )}
             {isPcs && (
-              <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-warning)', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-info)', display: 'flex', alignItems: 'center', gap: 4 }}>
                 <i className="fa-solid fa-circle-info" />
-                Loại tính theo <strong>số viên (pcs)</strong> — T.GIÁ = Qty × Đơn giá
+                Loại tính theo <strong>số viên (pcs)</strong> — T.Giá = $0 · Phí nhận hột = Qty × Setting Fee
               </div>
             )}
           </div>
@@ -291,13 +291,13 @@ export function GemModal({ open, invoiceId, itemId, gem, onClose, onSaved }: Pro
             <div>
               <label style={labelStyle}>
                 Wt After (ct) *
-                {isPcs && <span style={{ color: 'var(--color-warning)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}> = Qty</span>}
+                {isPcs && <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}> = 0 (pcs)</span>}
               </label>
               <input
                 type="number" min="0" step="0.0001"
                 style={isPcs ? readonlyStyle : inputStyle}
                 placeholder="0.0000"
-                value={isPcs ? form.qty_pcs : form.weight_ct_after}
+                value={isPcs ? '0' : form.weight_ct_after}
                 onChange={isPcs ? undefined : f('weight_ct_after')}
                 readOnly={isPcs}
               />

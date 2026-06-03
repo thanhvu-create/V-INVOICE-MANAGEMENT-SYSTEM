@@ -94,19 +94,21 @@ export function recalcItem(
   rule:         PricingRule,
   markupTiers?: MarkupTier[]
 ): Partial<InvoiceItem> {
-  const goldValue   = calcGoldValue(item.weight_gold_actual_gr ?? 0, item.metal_type ?? '', rate, rule.casting_loss_pct)
+  // weight_no_gem = weight_gold_actual = total - Σ gem.weight_gr (Excel: K = J = I - Σgem)
+  const weightNoGem = calcWeightNoGem(item.weight_total_gr ?? 0, gems)
+  const goldValue   = calcGoldValue(weightNoGem, item.metal_type ?? '', rate, rule.casting_loss_pct)
   const withGold    = { ...item, gold_value_usd: goldValue }
   const hpusa       = calcHPUSA(withGold, gems)
   const prices      = calcPrices(hpusa, rule)
-  const weightNoGem = calcWeightNoGem(item.weight_total_gr ?? 0, gems)
 
   const result: Partial<InvoiceItem> = {
-    weight_no_gem_gr: weightNoGem,
-    gold_value_usd:   goldValue,
-    hpusa:            prices.hpusa,
-    cif_price:        prices.cif_price,
-    tag_price:        prices.tag_price,
-    fr_price:         prices.fr_price,
+    weight_no_gem_gr:      weightNoGem,
+    weight_gold_actual_gr: weightNoGem,  // sync: gold_actual = total - gem_weight
+    gold_value_usd:        goldValue,
+    hpusa:                 prices.hpusa,
+    cif_price:             prices.cif_price,
+    tag_price:             prices.tag_price,
+    fr_price:              prices.fr_price,
   }
 
   // Auto-compute sell_price if price_list_type is set and tiers are provided

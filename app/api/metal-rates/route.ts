@@ -35,14 +35,22 @@ export async function POST(req: NextRequest) {
   try {
     await requireRole('admin')
     const body = await req.json()
-    const { rate_date, gold_24k, gold_18kw, gold_18ky, gold_14ky, platinum, silver, palladium } = body
+    const {
+      rate_date, gold_24k, gold_18kw, gold_18ky, gold_14ky, platinum, silver, palladium,
+      spot_24k_oz, spot_pt_oz, spot_ag_oz, spot_pd_oz,
+      oz_per_gram, loss_gold_pct, loss_pt_pct, karat_prices,
+    } = body
 
     if (!rate_date) return NextResponse.json({ success: false, message: 'rate_date is required' }, { status: 400 })
 
     const db = createServiceClient()
     const { data, error } = await db
       .from('daily_metal_rates')
-      .insert({ rate_date, gold_24k, gold_18kw, gold_18ky, gold_14ky, platinum, silver, palladium })
+      .insert({
+        rate_date, gold_24k, gold_18kw, gold_18ky, gold_14ky, platinum, silver, palladium,
+        spot_24k_oz, spot_pt_oz, spot_ag_oz, spot_pd_oz,
+        oz_per_gram, loss_gold_pct, loss_pt_pct, karat_prices,
+      })
       .select()
       .single()
 

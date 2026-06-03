@@ -3,10 +3,10 @@ import * as XLSX from 'xlsx'
 
 export async function GET() {
   const templateRow = {
-    'Store': '', 'Location': '', 'SKU': '', 'SO/MO': '',
+    'Store': 'HP', 'Location': 'Safe 1', 'SKU': '', 'SO/MO': '',
     'Vendor Model': '', 'Description': '', 'Qty': '',
     'Total Weight (g)': '', 'Gold Weight (g)': '',
-    'Metal Type': '', 'Class': '', 'Sub Class': '',
+    'Metal Type': '', 'Class': '', 'Sub Class': '', 'Notes': '',
   }
 
   const wb = XLSX.utils.book_new()
@@ -15,7 +15,7 @@ export async function GET() {
   ws['!cols'] = [
     { wch: 10 }, { wch: 12 }, { wch: 18 }, { wch: 12 },
     { wch: 16 }, { wch: 30 }, { wch: 6  }, { wch: 16 },
-    { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 14 },
+    { wch: 14 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 20 },
   ]
 
   XLSX.utils.book_append_sheet(wb, ws, 'Import Template')

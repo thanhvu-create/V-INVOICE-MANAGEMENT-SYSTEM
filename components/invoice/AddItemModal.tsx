@@ -5,28 +5,32 @@ import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 
 const METAL_TYPES = ['18KW', '18KY', '14KY', 'PT950', 'PT', '24K', 'AG', 'PD']
+const CLASS_OPTIONS = ['24K', '18MTG', 'DIAJE', 'DIAMT', '18KJE', 'LGRI', 'SILJE']
 
 interface Form {
-  sku_jwmold:            string
-  qty_pcs:               string
-  description:           string
-  class:                 string
-  sub_class:             string
-  metal_type:            string
-  weight_total_gr:       string
-  weight_gold_actual_gr: string
-  labor_fee:             string
-  casting_fee:           string
-  design_fee:            string
-  resin_fee:             string
-  misc_fee:              string
-  notes:                 string
-  image_url:             string
+  sku_jwmold:      string
+  qty_pcs:         string
+  description:     string
+  class:           string
+  sub_class:       string
+  size:            string
+  metal_type:      string
+  store:           string
+  location_store:  string
+  weight_total_gr: string
+  labor_fee:       string
+  casting_fee:     string
+  design_fee:      string
+  resin_fee:       string
+  misc_fee:        string
+  notes:           string
+  image_url:       string
 }
 
 const EMPTY: Form = {
   sku_jwmold: '', qty_pcs: '1', description: '', class: '', sub_class: '',
-  metal_type: '', weight_total_gr: '', weight_gold_actual_gr: '',
+  size: '', metal_type: '', store: 'HP', location_store: 'Safe 1',
+  weight_total_gr: '',
   labor_fee: '0', casting_fee: '0', design_fee: '0', resin_fee: '0', misc_fee: '0',
   notes: '', image_url: '',
 }
@@ -78,8 +82,8 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
         sku_jwmold:  sku,
         description: prod.description ?? v.description,
         class:       prod.class       ?? v.class,
-        sub_class:   prod.sub_class    ?? v.sub_class,
-        metal_type:  prod.metal_type   ?? v.metal_type,
+        sub_class:   prod.sub_class   ?? v.sub_class,
+        metal_type:  prod.metal_type  ?? v.metal_type,
         labor_fee:   String(prod.labor_fee   ?? 0),
         casting_fee: String(prod.casting_fee ?? 0),
         design_fee:  String(prod.design_fee  ?? 0),
@@ -97,21 +101,24 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
     if (!form.sku_jwmold.trim()) { setSkuError('SKU is required'); return }
     setSaving(true)
     const body = {
-      sku_jwmold:            form.sku_jwmold.trim().toUpperCase(),
-      qty_pcs:               parseInt(form.qty_pcs)              || 1,
-      description:           form.description.trim()             || null,
-      class:                 form.class.trim()                   || null,
-      sub_class:             form.sub_class.trim()               || null,
-      metal_type:            form.metal_type                     || null,
-      weight_total_gr:       parseFloat(form.weight_total_gr)    || 0,
-      weight_gold_actual_gr: parseFloat(form.weight_gold_actual_gr) || 0,
-      labor_fee:             parseFloat(form.labor_fee)          || 0,
-      casting_fee:           parseFloat(form.casting_fee)        || 0,
-      design_fee:            parseFloat(form.design_fee)         || 0,
-      resin_fee:             parseFloat(form.resin_fee)          || 0,
-      misc_fee:              parseFloat(form.misc_fee)           || 0,
-      notes:                 form.notes.trim()                   || null,
-      image_url:             form.image_url                      || null,
+      sku_jwmold:      form.sku_jwmold.trim().toUpperCase(),
+      qty_pcs:         parseInt(form.qty_pcs)           || 1,
+      description:     form.description.trim()          || null,
+      class:           form.class.trim()                || null,
+      sub_class:       form.sub_class.trim()            || null,
+      size:            form.size.trim()                 || null,
+      metal_type:      form.metal_type                  || null,
+      store:           form.store.trim()                || null,
+      location_store:  form.location_store.trim()       || null,
+      weight_total_gr: parseFloat(form.weight_total_gr) || 0,
+      // weight_gold_actual_gr omitted — recalcItem auto-syncs = weight_total - gem_weight
+      labor_fee:       parseFloat(form.labor_fee)       || 0,
+      casting_fee:     parseFloat(form.casting_fee)     || 0,
+      design_fee:      parseFloat(form.design_fee)      || 0,
+      resin_fee:       parseFloat(form.resin_fee)       || 0,
+      misc_fee:        parseFloat(form.misc_fee)        || 0,
+      notes:           form.notes.trim()                || null,
+      image_url:       form.image_url                   || null,
     }
     const data = await apiCall(
       () => fetch(`/api/invoices/${invoiceId}/items`, {
@@ -191,14 +198,31 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
           </div>
 
           <div style={grid2}>
+            {/* Store + Location */}
+            <div>
+              <label style={labelStyle}>Store</label>
+              <input style={inputStyle} placeholder="HP" value={form.store} onChange={f('store')} />
+            </div>
+            <div>
+              <label style={labelStyle}>Location</label>
+              <input style={inputStyle} placeholder="Safe 1" value={form.location_store} onChange={f('location_store')} />
+            </div>
+
+            {/* Class + Sub Class */}
             <div>
               <label style={labelStyle}>Class</label>
-              <input style={inputStyle} value={form.class} onChange={f('class')} />
+              <select style={inputStyle} value={form.class} onChange={f('class')}>
+                <option value="">—</option>
+                {CLASS_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
+                <option value="OTHER">Other…</option>
+              </select>
             </div>
             <div>
               <label style={labelStyle}>Sub Class</label>
-              <input style={inputStyle} value={form.sub_class} onChange={f('sub_class')} />
+              <input style={inputStyle} placeholder="BL, RI, ER, PD…" value={form.sub_class} onChange={f('sub_class')} />
             </div>
+
+            {/* Metal + Qty */}
             <div>
               <label style={labelStyle}>Metal Type</label>
               <select style={inputStyle} value={form.metal_type} onChange={f('metal_type')}>
@@ -210,13 +234,15 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
               <label style={labelStyle}>Qty Pcs</label>
               <input type="number" min="1" step="1" style={inputStyle} value={form.qty_pcs} onChange={f('qty_pcs')} />
             </div>
+
+            {/* Total Weight + Size */}
             <div>
               <label style={labelStyle}>Total Weight (g)</label>
               <input type="number" min="0" step="0.0001" style={inputStyle} placeholder="0.0000" value={form.weight_total_gr} onChange={f('weight_total_gr')} />
             </div>
             <div>
-              <label style={labelStyle}>Gold Weight (g)</label>
-              <input type="number" min="0" step="0.0001" style={inputStyle} placeholder="0.0000" value={form.weight_gold_actual_gr} onChange={f('weight_gold_actual_gr')} />
+              <label style={labelStyle}>Size (Kích thước)</label>
+              <input style={inputStyle} placeholder='e.g. "6in", "7mm"' value={form.size} onChange={f('size')} />
             </div>
           </div>
 
