@@ -1,37 +1,35 @@
 import type { MetalRate, PricingRule, InvoiceItem, ItemGemDetail } from '@/types'
+import { getKaratRate } from '@/lib/gold-fetch'
 
 // Rates stored in daily_metal_rates are DERIVED rates (already include casting loss %).
-// Formula from actual Excel: rate_18K = spot_oz × (18/24) × (1 + loss%) / 31.103
-// Do NOT multiply by casting_loss_pct again — it is already baked into the stored rate.
-//
-// Metal type key lookup — LEFT(metalType, 2) logic mirrors the Excel formula:
-//   "24" → gold_24k, "22" → gold_18kw (closest), "18" → gold_18kw or gold_18ky
-//   "14" → gold_14ky, "10" → gold_14ky (closest), "PT" → platinum, "AG" → silver, "PD" → palladium
-const RATE_MAP_KEYS: Record<string, keyof MetalRate> = {
-  // Exact matches:
-  '18KW':  'gold_18kw',
-  '18KY':  'gold_18ky',
-  '18K':   'gold_18kw',   // generic 18K → default white
-  '14KY':  'gold_14ky',
-  '14K':   'gold_14ky',
-  '22K':   'gold_18kw',   // no 22K col — use 18kw as closest available
-  '24K':   'gold_24k',
-  'PT950': 'platinum',
-  'PT':    'platinum',
-  'AG':    'silver',
-  'PD':    'palladium',
+// New rows also store karat_prices JSONB (preferred) for all karats: 24K, 23K, 22K, 18K, 15K, 14K, 10K, PT, AG, PD
+// Old rows fallback to individual columns: gold_24k, gold_18kw, gold_18ky, gold_14ky, platinum, silver, palladium
+
+// Old column fallback map (for rows without karat_prices JSONB)
+const OLD_RATE_MAP: Record<string, keyof MetalRate> = {
+  '18KW': 'gold_18kw', '18KY': 'gold_18ky', '18K': 'gold_18kw',
+  '14KY': 'gold_14ky', '14K':  'gold_14ky', '22K': 'gold_18kw',
+  '24K':  'gold_24k',  'PT950':'platinum',   'PT':  'platinum',
+  'AG':   'silver',    'PD':   'palladium',
 }
 
 export function calcGoldValue(
   weightGoldGr: number,
   metalType:    string,
   rate:         MetalRate,
-  _castingLossPct: number  // kept for API compat — NOT used (already in stored rate)
+  _castingLossPct: number  // kept for API compat — NOT used (already in stored derived rate)
 ): number {
-  const key     = RATE_MAP_KEYS[metalType] ?? RATE_MAP_KEYS[metalType?.slice(0, 2)] ?? null
-  const rateVal = key ? ((rate[key] as number | null) ?? rate.gold_24k ?? 0) : (rate.gold_24k ?? 0)
-  // No (1 + castingLoss) multiplication — derived rate already includes casting loss
-  return weightGoldGr * rateVal
+  // Prefer karat_prices JSONB (new rows), fallback to old individual columns
+  const kp = (rate as any).karat_prices ?? null
+  const fallback: Record<string, number | null> = {
+    gold_24k: rate.gold_24k ?? null, gold_18kw: rate.gold_18kw ?? null,
+    gold_18ky: rate.gold_18ky ?? null, gold_14ky: rate.gold_14ky ?? null,
+    platinum: rate.platinum ?? null, silver: rate.silver ?? null, palladium: rate.palladium ?? null,
+  }
+  const rateVal = kp
+    ? getKaratRate(metalType, kp, fallback)
+    : (fallback[OLD_RATE_MAP[metalType] ?? ''] ?? rate.gold_24k ?? 0)
+  return weightGoldGr * (rateVal ?? 0)
 }
 
 export function calcHPUSA(item: Partial<InvoiceItem>, gems: ItemGemDetail[]): number {
