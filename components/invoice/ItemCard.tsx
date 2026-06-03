@@ -73,6 +73,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
       sell_price:            String(item.sell_price ?? ''),
       discount_pct:          String(item.discount_pct ?? ''),
       image_url:             item.image_url ?? '',
+      price_list_type:       item.price_list_type ?? '',
     })
     setEditMode(true)
   }
@@ -86,6 +87,8 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
     setSaving(true)
     const nums = ['qty_pcs', 'weight_total_gr', 'weight_gold_actual_gr',
       'labor_fee', 'casting_fee', 'design_fee', 'resin_fee', 'misc_fee', 'sell_price', 'discount_pct']
+    // price_list_type is a string — send as-is (empty string → null)
+    if ('price_list_type' in form) payload.price_list_type = form.price_list_type || null
     const payload: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(form)) {
       payload[k] = nums.includes(k) ? (parseFloat(v) || null) : (v.trim() || null)
@@ -189,6 +192,8 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
               ['Resin', fmt2(item.resin_fee)],
               ['Phụ kiện', fmt2(item.misc_fee)],
             ] : []),
+            // Sell price channel
+            ...(canSeePrice && item.price_list_type ? [['Kênh giá', item.price_list_type]] : []),
             // Logistics
             ...(item.ship_date    ? [['Ngày gởi', item.ship_date]]             : []),
             ...(item.tracking_no  ? [['Tracking#', item.tracking_no]]          : []),
@@ -271,11 +276,46 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
 
           {/* Pricing (admin/manager) */}
           {canSeePrice && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
-              <div><label style={labelStyle}>Sell Price (USD)</label>
-                <input type="number" min="0" step="0.01" style={inputStyle} value={form.sell_price} onChange={f('sell_price')} /></div>
-              <div><label style={labelStyle}>Discount %</label>
-                <input type="number" min="0" max="100" step="0.01" style={inputStyle} value={form.discount_pct} onChange={f('discount_pct')} /></div>
+            <div style={{ marginBottom: '1rem' }}>
+              {/* Price list type — auto-compute sell_price from markup tiers */}
+              <div style={{ marginBottom: '0.75rem' }}>
+                <label style={labelStyle}>
+                  Kênh giá (Price List)
+                  <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 6 }}>
+                    — chọn để tự tính Sell Price từ CIF
+                  </span>
+                </label>
+                <select
+                  style={{ ...inputStyle, cursor: 'pointer' }}
+                  value={form.price_list_type}
+                  onChange={f('price_list_type')}
+                >
+                  <option value="">— Nhập tay —</option>
+                  <optgroup label="US">
+                    <option value="1)HPUS -P">1) HPUS -P</option>
+                    <option value="2)HPUS FB -P">2) HPUS FB -P</option>
+                    <option value="3)ADM1 -P">3) ADM1 -P</option>
+                    <option value="4)ADM2 -P">4) ADM2 -P</option>
+                    <option value="5)HPB -P">5) HPB -P</option>
+                  </optgroup>
+                  <optgroup label="VN">
+                    <option value="B1)HPVN -P">B1) HPVN -P</option>
+                    <option value="2)AGVN -P">2) AGVN -P</option>
+                  </optgroup>
+                </select>
+                {form.price_list_type && item.cif_price && (
+                  <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-info)', fontFamily: 'var(--font-mono)' }}>
+                    <i className="fa-solid fa-circle-info" style={{ marginRight: 4 }} />
+                    Sell Price sẽ tự tính từ CIF {fmt2(item.cif_price)} × markup tier khi Save
+                  </div>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
+                <div><label style={labelStyle}>Sell Price (USD)</label>
+                  <input type="number" min="0" step="0.01" style={inputStyle} value={form.sell_price} onChange={f('sell_price')} /></div>
+                <div><label style={labelStyle}>Discount %</label>
+                  <input type="number" min="0" max="100" step="0.01" style={inputStyle} value={form.discount_pct} onChange={f('discount_pct')} /></div>
+              </div>
             </div>
           )}
 

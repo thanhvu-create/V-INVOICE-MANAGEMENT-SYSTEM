@@ -30,7 +30,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       'class', 'sub_class', 'labor_fee', 'casting_fee', 'design_fee',
       'resin_fee', 'misc_fee', 'sell_price', 'discount_pct',
       'notes', 'ship_date', 'tracking_no', 'vinvoice_no', 'size', 'customer_name',
-      'image_url',
+      'image_url', 'price_list_type',
     ]
     const updates: Record<string, unknown> = {}
     for (const k of EDITABLE) { if (k in body) updates[k] = body[k] }
@@ -53,12 +53,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     if (error) throw error
 
-    // Recalculate pricing fields
-    const { data: gems } = await db.from('item_gem_details').select('*').eq('invoice_item_id', params.itemId)
+    // Recalculate pricing fields (include markup tiers for sell_price auto-calc)
+    const [{ data: gems }, { data: tiers }] = await Promise.all([
+      db.from('item_gem_details').select('*').eq('invoice_item_id', params.itemId),
+      db.from('mk_store_markup').select('value_from, value_to, markups').order('sort_order'),
+    ])
     const rate = (invoice as any).daily_metal_rates
     const rule = (invoice as any).pricing_rules
     if (rate && rule) {
-      const recalc = recalcItem(item, gems ?? [], rate, rule)
+      const recalc = recalcItem(item, gems ?? [], rate, rule, tiers ?? [])
       await db.from('invoice_items').update(recalc).eq('id', params.itemId)
     }
 

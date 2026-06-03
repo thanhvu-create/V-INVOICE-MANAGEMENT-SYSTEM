@@ -25,15 +25,16 @@ async function guardAndCheck(db: ReturnType<typeof createServiceClient>, invoice
 }
 
 async function triggerRecalc(db: ReturnType<typeof createServiceClient>, itemId: string, invoiceId: string) {
-  const [{ data: item }, { data: gems }, { data: invoice }] = await Promise.all([
+  const [{ data: item }, { data: gems }, { data: invoice }, { data: tiers }] = await Promise.all([
     db.from('invoice_items').select('*').eq('id', itemId).single(),
     db.from('item_gem_details').select('*').eq('invoice_item_id', itemId),
     db.from('invoice_headers').select('daily_metal_rates(*), pricing_rules(*)').eq('id', invoiceId).single(),
+    db.from('mk_store_markup').select('value_from, value_to, markups').order('sort_order'),
   ])
   const rate = (invoice as any)?.daily_metal_rates
   const rule = (invoice as any)?.pricing_rules
   if (item && rate && rule) {
-    const updates = recalcItem(item, gems ?? [], rate, rule)
+    const updates = recalcItem(item, gems ?? [], rate, rule, tiers ?? [])
     await db.from('invoice_items').update(updates).eq('id', itemId)
   }
 }

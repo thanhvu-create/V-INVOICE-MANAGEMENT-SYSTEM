@@ -56,6 +56,31 @@ export function calcPrices(hpusa: number, rule: PricingRule) {
   }
 }
 
+export interface MarkupTier {
+  value_from: number | string
+  value_to:   number | string
+  markups:    Record<string, number>
+}
+
+/**
+ * Lookup sell_price từ mk_store_markup tier table.
+ * cifPrice → tìm tier → lấy markup của priceListType → sell = cif × markup
+ */
+export function calcSellPrice(
+  cifPrice:      number,
+  priceListType: string,
+  tiers:         MarkupTier[]
+): number | null {
+  if (!cifPrice || !priceListType || !tiers?.length) return null
+  const tier = tiers.find(t =>
+    cifPrice >= Number(t.value_from) && cifPrice <= Number(t.value_to)
+  )
+  if (!tier) return null
+  const markup = tier.markups[priceListType]
+  if (markup == null) return null
+  return Math.round(cifPrice * markup * 100) / 100
+}
+
 export function calcWeightNoGem(totalGr: number, gems: ItemGemDetail[]): number {
   const gemGr = gems.reduce((s, g) => s + (g.weight_gr ?? 0), 0)
   return Math.max(0, totalGr - gemGr)
@@ -63,18 +88,19 @@ export function calcWeightNoGem(totalGr: number, gems: ItemGemDetail[]): number 
 
 // Full recalculate for one item — returns fields to UPDATE
 export function recalcItem(
-  item:  Partial<InvoiceItem>,
-  gems:  ItemGemDetail[],
-  rate:  MetalRate,
-  rule:  PricingRule
+  item:         Partial<InvoiceItem>,
+  gems:         ItemGemDetail[],
+  rate:         MetalRate,
+  rule:         PricingRule,
+  markupTiers?: MarkupTier[]
 ): Partial<InvoiceItem> {
-  const goldValue     = calcGoldValue(item.weight_gold_actual_gr ?? 0, item.metal_type ?? '', rate, rule.casting_loss_pct)
-  const withGold      = { ...item, gold_value_usd: goldValue }
-  const hpusa         = calcHPUSA(withGold, gems)
-  const prices        = calcPrices(hpusa, rule)
-  const weightNoGem   = calcWeightNoGem(item.weight_total_gr ?? 0, gems)
+  const goldValue   = calcGoldValue(item.weight_gold_actual_gr ?? 0, item.metal_type ?? '', rate, rule.casting_loss_pct)
+  const withGold    = { ...item, gold_value_usd: goldValue }
+  const hpusa       = calcHPUSA(withGold, gems)
+  const prices      = calcPrices(hpusa, rule)
+  const weightNoGem = calcWeightNoGem(item.weight_total_gr ?? 0, gems)
 
-  return {
+  const result: Partial<InvoiceItem> = {
     weight_no_gem_gr: weightNoGem,
     gold_value_usd:   goldValue,
     hpusa:            prices.hpusa,
@@ -82,4 +108,13 @@ export function recalcItem(
     tag_price:        prices.tag_price,
     fr_price:         prices.fr_price,
   }
+
+  // Auto-compute sell_price if price_list_type is set and tiers are provided
+  const plt = (item as any).price_list_type as string | undefined
+  if (plt && markupTiers?.length) {
+    const sell = calcSellPrice(prices.cif_price, plt, markupTiers)
+    if (sell !== null) result.sell_price = sell
+  }
+
+  return result
 }

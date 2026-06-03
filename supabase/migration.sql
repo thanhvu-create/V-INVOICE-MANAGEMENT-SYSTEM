@@ -434,5 +434,8 @@ ALTER TABLE item_gem_details ADD COLUMN IF NOT EXISTS updated_at          TIMEST
 ALTER TABLE item_gem_details ADD COLUMN IF NOT EXISTS gem_code            TEXT;
 ALTER TABLE item_gem_details ADD COLUMN IF NOT EXISTS price_unit          TEXT DEFAULT 'per_ct';
 
+-- invoice_items: price_list_type for auto sell_price from mk_store_markup tiers
+ALTER TABLE invoice_items ADD COLUMN IF NOT EXISTS price_list_type TEXT;
+
 -- gem_price_catalog (new — CREATE TABLE IF NOT EXISTS above handles fresh deploys)
 -- No ALTER needed for existing DBs that never had this table

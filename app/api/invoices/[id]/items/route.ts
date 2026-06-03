@@ -77,10 +77,13 @@ export async function POST(req: NextRequest, { params }: Params) {
     if (error) throw error
 
     // Recalculate then return updated item (not stale insert result)
+    const [{ data: tiers }] = await Promise.all([
+      db.from('mk_store_markup').select('value_from, value_to, markups').order('sort_order'),
+    ])
     const rate = (invoice as any).daily_metal_rates
     const rule = (invoice as any).pricing_rules
     if (rate && rule) {
-      const updates = recalcItem(item, [], rate, rule)
+      const updates = recalcItem(item, [], rate, rule, tiers ?? [])
       await db.from('invoice_items').update(updates).eq('id', item.id)
     }
 
