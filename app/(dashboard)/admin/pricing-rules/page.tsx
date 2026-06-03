@@ -67,7 +67,7 @@ export default function PricingRulesPage() {
 
   useEffect(() => {
     if (!loaded) return                                    // chờ auth load xong
-    if (!canDo('admin')) { router.push('/dashboard'); return }
+    if (!canDo('manage_rules')) { router.push('/dashboard'); return }
   }, [loaded, canDo])
 
   const load = useCallback(async () => {
