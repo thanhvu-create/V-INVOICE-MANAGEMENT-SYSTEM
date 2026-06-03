@@ -50,6 +50,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
   function openEdit() {
     setForm({
       qty_pcs:               String(item.qty_pcs ?? ''),
+      size:                  item.size           ?? '',
       description:           item.description    ?? '',
       class:                 item.class          ?? '',
       sub_class:             item.sub_class       ?? '',
@@ -167,6 +168,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
         <div style={{ padding: '0.75rem 1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem' }}>
           {[
             ['Qty', item.qty_pcs],
+            ...(item.size         ? [['Size', item.size]]              : []),
             ['Metal', item.metal_type ?? '—'],
             ['Total Wt (g)', fmt4(item.weight_total_gr)],
             ['Gold Wt (g)', fmt4(item.weight_gold_actual_gr)],
@@ -214,6 +216,8 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
             <div><label style={labelStyle}>Qty *</label>
               <input type="number" min="1" step="1" style={inputStyle} value={form.qty_pcs} onChange={f('qty_pcs')} /></div>
+            <div><label style={labelStyle}>Size</label>
+              <input style={inputStyle} value={form.size ?? ''} onChange={f('size')} placeholder="e.g. 6.5, 7mm" /></div>
             <div><label style={labelStyle}>Metal Type</label>
               <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.metal_type} onChange={f('metal_type')}>
                 <option value="">—</option>
