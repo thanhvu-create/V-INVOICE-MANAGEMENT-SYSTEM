@@ -10,7 +10,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const body = await req.json()
     const db   = createServiceClient()
 
-    const EDITABLE = ['description', 'class', 'sub_class', 'metal_type', 'labor_fee', 'casting_fee', 'design_fee', 'resin_fee', 'misc_fee', 'is_active']
+    const EDITABLE = ['description', 'class', 'sub_class', 'metal_type', 'image_url', 'labor_fee', 'casting_fee', 'design_fee', 'resin_fee', 'misc_fee', 'is_active']
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
     for (const k of EDITABLE) { if (k in body) updates[k] = body[k] }
 

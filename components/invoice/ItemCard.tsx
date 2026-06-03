@@ -5,6 +5,7 @@ import { apiCall } from '@/lib/api'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { GemModal } from './GemModal'
 import { DriveImage } from './DriveImage'
+import { DriveImageInput } from '@/components/ui/DriveImageInput'
 import type { InvoiceItem } from '@/types'
 
 const METAL_TYPES = ['18KW', '18KY', '14KY', 'PT950', 'PT', '24K', 'AG', 'PD']
@@ -71,6 +72,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
       vinvoice_no:           item.vinvoice_no     ?? '',
       sell_price:            String(item.sell_price ?? ''),
       discount_pct:          String(item.discount_pct ?? ''),
+      image_url:             item.image_url ?? '',
     })
     setEditMode(true)
   }
@@ -276,6 +278,15 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
                 <input type="number" min="0" max="100" step="0.01" style={inputStyle} value={form.discount_pct} onChange={f('discount_pct')} /></div>
             </div>
           )}
+
+          {/* Image URL */}
+          <div style={{ marginBottom: '1rem' }}>
+            <DriveImageInput
+              label="Hình ảnh (Google Drive link hoặc URL)"
+              value={form.image_url ?? ''}
+              onChange={v => setForm(fv => ({ ...fv, image_url: v }))}
+            />
+          </div>
 
           {/* Computed readonly */}
           <div style={{ background: 'var(--bg-base)', border: '1px solid var(--border-light)', padding: '0.75rem', marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem' }}>

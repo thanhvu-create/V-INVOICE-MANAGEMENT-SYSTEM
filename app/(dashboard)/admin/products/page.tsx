@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react'
 import { AdminModal, fieldStyle, labelStyle, inputStyle, btnPrimary, btnSecondary } from '@/components/admin/AdminModal'
 import { Pagination } from '@/components/ui/Pagination'
 import { toast } from '@/components/ui/Toast'
+import { DriveImageInput } from '@/components/ui/DriveImageInput'
 
 interface Product {
   id: string; sku_jwmold: string; description: string | null
   class: string | null; sub_class: string | null; metal_type: string | null
+  image_url: string | null
   labor_fee: number | null; casting_fee: number | null; design_fee: number | null
   resin_fee: number | null; misc_fee: number | null
   is_active: boolean; created_at: string
@@ -21,7 +23,7 @@ const FEE_FIELDS = [
   { key: 'misc_fee',    label: 'Misc Fee'    },
 ]
 
-const EMPTY_FORM = { sku_jwmold: '', description: '', class: '', sub_class: '', metal_type: '', labor_fee: '', casting_fee: '', design_fee: '', resin_fee: '', misc_fee: '' }
+const EMPTY_FORM = { sku_jwmold: '', description: '', class: '', sub_class: '', metal_type: '', image_url: '', labor_fee: '', casting_fee: '', design_fee: '', resin_fee: '', misc_fee: '' }
 
 const th: React.CSSProperties = { padding: '0.5rem 0.6rem', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '2px solid var(--border-base)', background: 'var(--bg-surface)', whiteSpace: 'nowrap' }
 const td: React.CSSProperties = { padding: '0.55rem 0.6rem', borderBottom: '1px solid var(--border-light)', fontSize: 'var(--text-sm)', verticalAlign: 'middle' }
@@ -62,6 +64,7 @@ export default function ProductsPage() {
     setForm({
       sku_jwmold: p.sku_jwmold, description: p.description ?? '',
       class: p.class ?? '', sub_class: p.sub_class ?? '', metal_type: p.metal_type ?? '',
+      image_url: p.image_url ?? '',
       ...Object.fromEntries(FEE_FIELDS.map(f => [f.key, p[f.key as keyof Product] != null ? String(p[f.key as keyof Product]) : ''])),
     })
     setEditing(p); setError(''); setModal('edit')
@@ -75,6 +78,7 @@ export default function ProductsPage() {
       class: form.class.trim() || null,
       sub_class: form.sub_class.trim() || null,
       metal_type: form.metal_type.trim() || null,
+      image_url: form.image_url.trim() || null,
     }
     if (modal === 'add') body.sku_jwmold = form.sku_jwmold.trim().toUpperCase()
     FEE_FIELDS.forEach(f => { body[f.key] = form[f.key] !== '' ? parseFloat(form[f.key]) : null })
@@ -205,6 +209,13 @@ export default function ProductsPage() {
                   value={form[f.key]} onChange={e => setForm(v => ({ ...v, [f.key]: e.target.value }))} />
               </div>
             ))}
+          </div>
+          <div style={{ marginBottom: '1rem' }}>
+            <DriveImageInput
+              label="Hình ảnh (Google Drive link hoặc URL)"
+              value={form.image_url}
+              onChange={v => setForm(f => ({ ...f, image_url: v }))}
+            />
           </div>
           {error && <p style={{ color: 'var(--color-danger)', fontSize: 'var(--text-sm)', marginBottom: '1rem' }}>{error}</p>}
           <div style={{ display: 'flex', gap: '0.75rem' }}>
