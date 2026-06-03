@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { getAuthContext } from '@/lib/auth/session'
+import { getAuthContext } from '@/lib/auth/getRole'
 
 // GET /api/gem-catalog?code=RD+B1  → lookup single gem by code
 // GET /api/gem-catalog?type=RD     → list by type

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { getAuthContext } from '@/lib/auth/session'
+import { getAuthContext } from '@/lib/auth/getRole'
 
 export async function GET(req: NextRequest) {
   const ctx = await getAuthContext()

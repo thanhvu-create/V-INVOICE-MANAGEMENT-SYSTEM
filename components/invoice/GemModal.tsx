@@ -74,7 +74,7 @@ export function GemModal({ open, invoiceId, itemId, gem, onClose, onSaved }: Pro
       const res  = await fetch(`/api/gem-catalog?code=${encodeURIComponent(code)}`)
       const json = await res.json()
       if (!json.success) {
-        setLookupMsg({ text: `Mã "${code}" không tìm thấy trong NVL catalog.`, ok: false })
+        setLookupMsg({ text: `Gem code "${code}" not found in catalog.`, ok: false })
         return
       }
       const catalog = json.data
@@ -156,7 +156,7 @@ export function GemModal({ open, invoiceId, itemId, gem, onClose, onSaved }: Pro
 
           {/* Row 0: NVL gem_code lookup */}
           <div style={{ marginBottom: '0.75rem', padding: '0.75rem', background: 'var(--bg-base)', border: '1px solid var(--border-light)' }}>
-            <label style={labelStyle}>Mã NVL (Gem Code) — auto-fill giá MK</label>
+            <label style={labelStyle}>NVL Gem Code — auto-fill MK price</label>
             <div style={{ display: 'flex', gap: 6 }}>
               <input
                 style={{ ...inputStyle, fontFamily: 'var(--font-mono)', fontWeight: 600, flex: 1 }}

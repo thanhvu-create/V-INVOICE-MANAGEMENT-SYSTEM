@@ -4,11 +4,12 @@ import { useState, useEffect } from 'react'
 import { useUser } from '@/contexts/UserContext'
 import { useRouter } from 'next/navigation'
 import { apiCall } from '@/lib/api'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
 const GEM_TYPES = ['RD', 'PR', 'BG', 'MQ', 'OV', 'PS', 'RDL', 'XC', 'PL']
 const PRICE_UNITS = [
   { value: 'per_ct',  label: '$/ct (carat)' },
-  { value: 'per_pcs', label: '$/pcs (viên)' },
+  { value: 'per_pcs', label: '$/pcs (piece)' },
 ]
 
 const labelStyle: React.CSSProperties = {
@@ -34,17 +35,19 @@ const tdStyle: React.CSSProperties = {
 const EMPTY = { gem_code: '', gem_type: 'RD', size_range: '', cost_price: '', mk_price: '', price_unit: 'per_ct', notes: '', is_active: true }
 
 export default function GemCatalogPage() {
-  const { user, canDo } = useUser()
+  const { canDo } = useUser()
   const router = useRouter()
-  const [gems, setGems] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [gems, setGems]           = useState<any[]>([])
+  const [loading, setLoading]     = useState(true)
   const [filterType, setFilterType] = useState('')
-  const [modal, setModal] = useState<{ open: boolean; gem?: any }>({ open: false })
-  const [form, setForm] = useState(EMPTY)
-  const [saving, setSaving] = useState(false)
+  const [modal, setModal]         = useState<{ open: boolean; gem?: any }>({ open: false })
+  const [form, setForm]           = useState(EMPTY)
+  const [saving, setSaving]       = useState(false)
+  const [confirmDel, setConfirmDel] = useState<any | null>(null)
+  const [deleting, setDeleting]   = useState(false)
 
   useEffect(() => {
-    if (!canDo('admin')) { router.push('/dashboard'); return }
+    if (!canDo('manage_products')) { router.push('/dashboard'); return }
     load()
   }, [])
 
@@ -89,35 +92,33 @@ export default function GemCatalogPage() {
     if (data !== null) { setModal({ open: false }); load() }
   }
 
-  async function handleDelete(gem: any) {
-    if (!confirm(`Delete gem "${gem.gem_code}"?`)) return
+  async function handleDelete() {
+    if (!confirmDel) return
+    setDeleting(true)
     await apiCall(
-      () => fetch(`/api/admin/gem-catalog?id=${gem.id}`, { method: 'DELETE' }),
+      () => fetch(`/api/admin/gem-catalog?id=${confirmDel.id}`, { method: 'DELETE' }),
       { successMsg: 'Gem deleted.' }
     )
+    setDeleting(false)
+    setConfirmDel(null)
     load()
   }
 
-  const f = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+  const f = (key: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
     setForm(v => ({ ...v, [key]: e.target.type === 'checkbox' ? (e.target as HTMLInputElement).checked : e.target.value }))
-
-  const grouped = GEM_TYPES.reduce((acc, t) => {
-    acc[t] = gems.filter(g => g.gem_type === t)
-    return acc
-  }, {} as Record<string, any[]>)
 
   return (
     <div style={{ padding: '1.5rem 2rem', maxWidth: 1100 }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: '1.5rem' }}>
         <div>
-          <div style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', fontWeight: 400 }}>NVL Xoàn</div>
+          <div style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', fontWeight: 400 }}>Gem Price Catalog</div>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-muted)', marginTop: 4 }}>
-            Bảng giá đá (gem_price_catalog) — MK Price dùng để tính T.Giá Xoàn
+            NVL gem pricing — MK Price is used to calculate gem value (T.Giá Xoàn)
           </div>
         </div>
         <button onClick={openAdd} style={{ background: 'var(--text-primary)', color: 'var(--text-inverse)', border: 'none', padding: '8px 20px', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', borderRadius: 0 }}>
-          <i className="fa-solid fa-plus" style={{ marginRight: 6 }} />Thêm Gem
+          <i className="fa-solid fa-plus" style={{ marginRight: 6 }} />Add Gem
         </button>
       </div>
 
@@ -148,10 +149,12 @@ export default function GemCatalogPage() {
             <tbody>
               {gems.length === 0 ? (
                 <tr><td colSpan={9} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
-                  Chưa có dữ liệu. Chạy <code>gem_price_catalog.sql</code> trên Supabase.
+                  No data. Run <code>gem_price_catalog.sql</code> on Supabase first.
                 </td></tr>
               ) : gems.map(g => (
-                <tr key={g.id} onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                <tr key={g.id}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = '')}>
                   <td style={{ ...tdStyle, fontWeight: 700, color: 'var(--color-info)' }}>{g.gem_type}</td>
                   <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontWeight: 600, background: 'var(--sku-highlight-bg)', color: '#92400E' }}>{g.gem_code}</td>
                   <td style={tdStyle}>{g.size_range ?? '—'}</td>
@@ -162,7 +165,7 @@ export default function GemCatalogPage() {
                   <td style={{ ...tdStyle, color: 'var(--text-muted)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.notes ?? ''}</td>
                   <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                     <button onClick={() => openEdit(g)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginRight: 6 }} title="Edit"><i className="fa-solid fa-pen" /></button>
-                    <button onClick={() => handleDelete(g)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }} title="Delete"><i className="fa-solid fa-trash" /></button>
+                    <button onClick={() => setConfirmDel(g)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }} title="Delete"><i className="fa-solid fa-trash" /></button>
                   </td>
                 </tr>
               ))}
@@ -171,7 +174,7 @@ export default function GemCatalogPage() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* Add / Edit Modal */}
       {modal.open && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(26,24,20,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ background: 'var(--bg-surface)', width: 520, border: '1px solid var(--border-base)' }}>
@@ -187,7 +190,7 @@ export default function GemCatalogPage() {
               </div>
               <div>
                 <label style={labelStyle}>Gem Code *</label>
-                <input style={inputStyle} value={form.gem_code} onChange={f('gem_code')} placeholder="e.g. RD B1" />
+                <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} value={form.gem_code} onChange={f('gem_code')} placeholder="e.g. RD B1" />
               </div>
               <div>
                 <label style={labelStyle}>Size Range</label>
@@ -200,11 +203,11 @@ export default function GemCatalogPage() {
                 </select>
               </div>
               <div>
-                <label style={labelStyle}>Cost Price ($/ct hoặc $/pcs)</label>
+                <label style={labelStyle}>Cost Price (internal)</label>
                 <input type="number" min="0" step="0.01" style={inputStyle} value={form.cost_price} onChange={f('cost_price')} placeholder="0.00" />
               </div>
               <div>
-                <label style={labelStyle}>MK Price * (dùng tính T.Giá)</label>
+                <label style={labelStyle}>MK Price * (gem value calc)</label>
                 <input type="number" min="0" step="0.01" style={{ ...inputStyle, fontWeight: 700 }} value={form.mk_price} onChange={f('mk_price')} placeholder="0.00" />
               </div>
               <div style={{ gridColumn: '1/-1' }}>
@@ -218,13 +221,24 @@ export default function GemCatalogPage() {
             </div>
             <div style={{ padding: '1rem 1.5rem', borderTop: '1px solid var(--border-light)', background: 'var(--bg-base)', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
               <button onClick={() => setModal({ open: false })} style={{ padding: '7px 18px', border: '1px solid var(--border-base)', background: 'transparent', cursor: 'pointer', borderRadius: 0, fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)' }}>Cancel</button>
-              <button onClick={handleSave} disabled={saving || !form.gem_code || !form.gem_type} style={{ padding: '7px 22px', background: 'var(--text-primary)', color: 'var(--text-inverse)', border: 'none', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, borderRadius: 0, fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
+              <button onClick={handleSave} disabled={saving || !form.gem_code || !form.gem_type}
+                style={{ padding: '7px 22px', background: 'var(--text-primary)', color: 'var(--text-inverse)', border: 'none', cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, borderRadius: 0, fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
                 {saving ? 'Saving…' : 'Save'}
               </button>
             </div>
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDel}
+        title="Delete Gem"
+        message={`Delete gem "${confirmDel?.gem_code}" (${confirmDel?.gem_type})? This cannot be undone.`}
+        okText={deleting ? 'Deleting…' : 'Delete'}
+        danger
+        onOk={handleDelete}
+        onCancel={() => setConfirmDel(null)}
+      />
     </div>
   )
 }
