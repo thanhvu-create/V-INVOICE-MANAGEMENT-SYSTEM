@@ -18,7 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/invoices',            label: 'Invoices',      roles: ['admin', 'manager', 'user', 'viewer'] },
   { href: '/import',              label: 'Import',        roles: ['admin', 'manager', 'user'] },
   { href: '/admin/metal-rates',   label: 'Gold Prices',   roles: ['admin', 'manager'] },
-  { href: '/admin/gem-catalog',   label: 'NVL Xoàn',     roles: ['admin'] },
+  { href: '/admin/gem-catalog',   label: 'Gem Catalog',   roles: ['admin'] },
   { href: '/admin/store-markup',  label: 'BG30 Markup',   roles: ['admin'] },
   { href: '/admin/products',      label: 'Products',      roles: ['admin'] },
   { href: '/admin/users',         label: 'Users',         roles: ['admin'] },
