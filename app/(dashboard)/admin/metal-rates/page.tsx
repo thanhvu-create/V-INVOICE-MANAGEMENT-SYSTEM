@@ -29,7 +29,7 @@ const labelStyle: React.CSSProperties = {
 
 const EMPTY_SPOT = {
   rate_date: '', spot_24k_oz: '', spot_pt_oz: '', spot_ag_oz: '', spot_pd_oz: '',
-  loss_gold_pct: '6', loss_pt_pct: '17',
+  oz_per_gram: '31.1035', loss_gold_pct: '6', loss_pt_pct: '17',
 }
 
 export default function MetalRatesPage() {
@@ -57,14 +57,15 @@ export default function MetalRatesPage() {
 
   // Computed karat rates preview (client-side, no save)
   const preview = (() => {
-    const g = parseFloat(form.spot_24k_oz)
-    const p = parseFloat(form.spot_pt_oz)
-    const a = parseFloat(form.spot_ag_oz)
-    const d = parseFloat(form.spot_pd_oz)
+    const g  = parseFloat(form.spot_24k_oz)
+    const p  = parseFloat(form.spot_pt_oz)
+    const a  = parseFloat(form.spot_ag_oz)
+    const d  = parseFloat(form.spot_pd_oz)
+    const oz = parseFloat(form.oz_per_gram) || 31.1035
     const lg = parseFloat(form.loss_gold_pct) || 6
     const lp = parseFloat(form.loss_pt_pct)   || 17
     if (!g) return null
-    return computeKaratPrices(g, p || 0, a || 0, d || 0, lg, lp)
+    return computeKaratPrices(g, p || 0, a || 0, d || 0, lg, lp, oz)
   })()
 
   async function fetchMarket() {
@@ -100,6 +101,7 @@ export default function MetalRatesPage() {
       spot_pt_oz:    r.spot_pt_oz   != null ? String(r.spot_pt_oz)   : '',
       spot_ag_oz:    r.spot_ag_oz   != null ? String(r.spot_ag_oz)   : '',
       spot_pd_oz:    r.spot_pd_oz   != null ? String(r.spot_pd_oz)   : '',
+      oz_per_gram:   r.oz_per_gram  != null ? String(r.oz_per_gram)  : '31.1035',
       loss_gold_pct: r.loss_gold_pct != null ? String(r.loss_gold_pct) : '6',
       loss_pt_pct:   r.loss_pt_pct  != null ? String(r.loss_pt_pct)  : '17',
     })
@@ -116,14 +118,15 @@ export default function MetalRatesPage() {
     const p  = parseFloat(form.spot_pt_oz)  || 0
     const a  = parseFloat(form.spot_ag_oz)  || 0
     const d  = parseFloat(form.spot_pd_oz)  || 0
+    const oz = parseFloat(form.oz_per_gram) || 31.1035
     const lg = parseFloat(form.loss_gold_pct) || 6
     const lp = parseFloat(form.loss_pt_pct)   || 17
-    const kp = computeKaratPrices(g, p, a, d, lg, lp)
+    const kp = computeKaratPrices(g, p, a, d, lg, lp, oz)
 
     const body = {
       rate_date:     form.rate_date,
       spot_24k_oz:   g, spot_pt_oz: p, spot_ag_oz: a, spot_pd_oz: d,
-      loss_gold_pct: lg, loss_pt_pct: lp,
+      oz_per_gram:   oz, loss_gold_pct: lg, loss_pt_pct: lp,
       karat_prices:  kp,
       // Keep old columns for backward compat with existing invoices
       gold_24k:  kp['24K'], gold_18kw: kp['18K'], gold_18ky: kp['18K'],
@@ -271,10 +274,15 @@ export default function MetalRatesPage() {
                 </div>
               </div>
 
-              {/* Loss config */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
+              {/* Config: Oz/gram + Loss% */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
                 <div>
-                  <label style={labelStyle}>Loss % Gold (hao hụt vàng)</label>
+                  <label style={labelStyle}>Oz per Gram</label>
+                  <input type="number" step="0.0001" min="30" max="33" style={{ ...inputStyle, maxWidth: 130 }} value={form.oz_per_gram} onChange={f('oz_per_gram')} />
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 3 }}>1 troy oz = 31.1035 g</div>
+                </div>
+                <div>
+                  <label style={labelStyle}>Loss % Gold</label>
                   <input type="number" step="0.1" min="0" max="30" style={{ ...inputStyle, maxWidth: 120 }} value={form.loss_gold_pct} onChange={f('loss_gold_pct')} />
                 </div>
                 <div>
@@ -300,7 +308,7 @@ export default function MetalRatesPage() {
                     ))}
                   </div>
                   <div style={{ marginTop: 8, fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-                    Oz/gram: {OZ_PER_GRAM} · Loss Gold: {form.loss_gold_pct}% · Loss PT: {form.loss_pt_pct}%
+                    Oz/gram: {form.oz_per_gram} · Loss Gold: {form.loss_gold_pct}% · Loss PT: {form.loss_pt_pct}%
                   </div>
                 </div>
               )}

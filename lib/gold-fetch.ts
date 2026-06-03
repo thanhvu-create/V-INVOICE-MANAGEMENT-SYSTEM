@@ -66,7 +66,7 @@ export async function fetchMetalPrices(): Promise<SpotPrices> {
 }
 
 // ── Karat derived rate formula (từ Excel SUMMARY rows 1-13) ──────────
-export const OZ_PER_GRAM = 31.103
+export const OZ_PER_GRAM = 31.1035  // default troy oz → gram (configurable per rate row)
 
 export interface KaratPrices {
   '24K': number
@@ -86,10 +86,11 @@ export function computeKaratPrices(
   spot_pt_oz:    number,
   spot_ag_oz:    number,
   spot_pd_oz:    number,
-  loss_gold_pct: number = 6,    // default 6%
-  loss_pt_pct:   number = 17,   // default 17%
+  loss_gold_pct: number = 6,          // default 6%
+  loss_pt_pct:   number = 17,         // default 17%
+  oz_per_gram:   number = OZ_PER_GRAM, // configurable, default 31.1035
 ): KaratPrices {
-  const oz    = OZ_PER_GRAM
+  const oz    = oz_per_gram
   const lg    = 1 + loss_gold_pct / 100
   const lp    = 1 + loss_pt_pct   / 100
   const g     = spot_24k_oz
