@@ -87,12 +87,12 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
     setSaving(true)
     const nums = ['qty_pcs', 'weight_total_gr', 'weight_gold_actual_gr',
       'labor_fee', 'casting_fee', 'design_fee', 'resin_fee', 'misc_fee', 'sell_price', 'discount_pct']
-    // price_list_type is a string — send as-is (empty string → null)
-    if ('price_list_type' in form) payload.price_list_type = form.price_list_type || null
     const payload: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(form)) {
       payload[k] = nums.includes(k) ? (parseFloat(v) || null) : (v.trim() || null)
     }
+    // price_list_type is a string — send as-is (empty string → null)
+    if ('price_list_type' in form) payload.price_list_type = form.price_list_type || null
     const data = await apiCall<any>(
       () => fetch(`/api/invoices/${invoiceId}/items/${item.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
