@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { apiCall } from '@/lib/api'
 
 interface GemForm {
+  gem_code:            string   // NVL code: "RD B1", "BG3"… → auto-lookup price
   gem_type:            string
   quality:             string   // P.chất: VVS1, VS1, SI1, LG, F, VF…
   shape:               string
@@ -17,7 +18,7 @@ interface GemForm {
 }
 
 const EMPTY_FORM: GemForm = {
-  gem_type: '', quality: '', shape: '', size_mm: '',
+  gem_code: '', gem_type: '', quality: '', shape: '', size_mm: '',
   qty_pcs: '1', weight_ct_before: '', weight_ct_after: '',
   unit_price_per_ct: '', setting_type: '', setting_fee_per_pcs: '0',
 }
@@ -32,13 +33,17 @@ interface Props {
 }
 
 export function GemModal({ open, invoiceId, itemId, gem, onClose, onSaved }: Props) {
-  const [form,   setForm]   = useState<GemForm>(EMPTY_FORM)
-  const [saving, setSaving] = useState(false)
+  const [form,        setForm]        = useState<GemForm>(EMPTY_FORM)
+  const [saving,      setSaving]      = useState(false)
+  const [lookingUp,   setLookingUp]   = useState(false)
+  const [lookupMsg,   setLookupMsg]   = useState<{ text: string; ok: boolean } | null>(null)
 
   useEffect(() => {
     if (!open) return
+    setLookupMsg(null)
     if (gem) {
       setForm({
+        gem_code:            gem.gem_code              ?? '',
         gem_type:            gem.gem_type             ?? '',
         quality:             gem.quality              ?? '',
         shape:               gem.shape                ?? '',
@@ -59,6 +64,30 @@ export function GemModal({ open, invoiceId, itemId, gem, onClose, onSaved }: Pro
 
   const f = (key: keyof GemForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(v => ({ ...v, [key]: e.target.value }))
+
+  async function lookupGemCode() {
+    const code = form.gem_code.trim().toUpperCase()
+    if (!code) return
+    setLookingUp(true)
+    setLookupMsg(null)
+    try {
+      const res  = await fetch(`/api/gem-catalog?code=${encodeURIComponent(code)}`)
+      const json = await res.json()
+      if (!json.success) {
+        setLookupMsg({ text: `Mã "${code}" không tìm thấy trong NVL catalog.`, ok: false })
+        return
+      }
+      const catalog = json.data
+      setForm(v => ({
+        ...v,
+        gem_type:          catalog.gem_type   || v.gem_type,
+        unit_price_per_ct: String(catalog.mk_price ?? ''),
+      }))
+      setLookupMsg({ text: `✓ Found: ${catalog.gem_type} — MK Price $${Number(catalog.mk_price).toFixed(2)}/${catalog.price_unit === 'per_pcs' ? 'pcs' : 'ct'}`, ok: true })
+    } finally {
+      setLookingUp(false)
+    }
+  }
 
   function parseNum(s: string): number | null {
     const n = parseFloat(s)
@@ -124,6 +153,32 @@ export function GemModal({ open, invoiceId, itemId, gem, onClose, onSaved }: Pro
 
         {/* Body */}
         <div style={{ padding: '1.25rem' }}>
+
+          {/* Row 0: NVL gem_code lookup */}
+          <div style={{ marginBottom: '0.75rem', padding: '0.75rem', background: 'var(--bg-base)', border: '1px solid var(--border-light)' }}>
+            <label style={labelStyle}>Mã NVL (Gem Code) — auto-fill giá MK</label>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                style={{ ...inputStyle, fontFamily: 'var(--font-mono)', fontWeight: 600, flex: 1 }}
+                placeholder="e.g. RD B1, BG3, MQ2…"
+                value={form.gem_code}
+                onChange={f('gem_code')}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); lookupGemCode() } }}
+              />
+              <button
+                onClick={lookupGemCode}
+                disabled={lookingUp || !form.gem_code.trim()}
+                style={{ padding: '6px 14px', background: 'var(--color-info)', color: '#fff', border: 'none', cursor: 'pointer', borderRadius: 0, fontSize: 'var(--text-xs)', fontWeight: 600, whiteSpace: 'nowrap', opacity: lookingUp ? 0.7 : 1 }}
+              >
+                {lookingUp ? <i className="fa-solid fa-circle-notch fa-spin" /> : 'Lookup'}
+              </button>
+            </div>
+            {lookupMsg && (
+              <div style={{ marginTop: 5, fontSize: 'var(--text-xs)', color: lookupMsg.ok ? 'var(--color-success)' : 'var(--color-danger)', fontFamily: 'var(--font-mono)' }}>
+                {lookupMsg.text}
+              </div>
+            )}
+          </div>
 
           {/* Row 1: gem_type + quality */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
