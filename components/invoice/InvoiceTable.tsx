@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { StatusBadge } from '@/components/ui/StatusBadge'
+import { DriveImage } from '@/components/invoice/DriveImage'
 import type { Role } from '@/types'
 
 interface InvoiceRow {
@@ -15,6 +16,7 @@ interface InvoiceRow {
   created_at:        string
   daily_metal_rates: { rate_date: string } | null
   pricing_rules:     { name: string } | null
+  invoice_items:     { image_url: string | null; line_no: number }[] | null
 }
 
 interface Props {
@@ -107,6 +109,9 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
         <tbody>
           {Array.from({ length: 6 }).map((_, i) => (
             <tr key={i} style={{ borderBottom: '1px solid var(--border-light)', animation: `fadeIn 0.3s ease-out ${i * 60}ms both` }}>
+              <td style={{ padding: '6px 8px', width: 52 }}>
+                <span className="skeleton" style={{ width: 38, height: 38 }} />
+              </td>
               <td style={{ padding: '0.75rem 1rem' }}>
                 <span className="skeleton" style={{ width: 110, height: 14 }} />
               </td>
@@ -159,6 +164,7 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
+              <th style={{ ...th, width: 52 }} />
               <th style={th}>PO Number</th>
               <th style={th}>MR</th>
               <th style={th}>Status</th>
@@ -170,13 +176,23 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
             </tr>
           </thead>
           <tbody className="stagger-children">
-            {rows.map(row => (
+            {rows.map(row => {
+              // First non-null image_url sorted by line_no
+              const firstImg = row.invoice_items
+                ?.slice().sort((a, b) => a.line_no - b.line_no)
+                .find(i => i.image_url)?.image_url ?? null
+
+              return (
               <tr
                 key={row.id}
                 style={{ transition: 'background 0.18s ease-out' }}
                 onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                 onMouseLeave={e => (e.currentTarget.style.background = '')}
               >
+                {/* Thumbnail — first item image */}
+                <td style={{ ...td, padding: '6px 8px', width: 52 }}>
+                  <DriveImage url={firstImg} alt={row.po_number} size={38} />
+                </td>
                 <td style={td}>
                   <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 'var(--text-sm)' }}>
                     {row.po_number}
@@ -225,7 +241,8 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
                   </div>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>

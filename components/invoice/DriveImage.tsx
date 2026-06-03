@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { getTokenSilent, clearToken, onTokenChange, isAuthenticated } from '@/lib/driveToken'
+import { ModalPortal } from '@/components/ui/ModalPortal'
 
 interface Props {
   url:   string | null | undefined
@@ -138,22 +139,35 @@ export function DriveImage({ url, alt, size = 44 }: Props) {
       </div>
 
       {lightbox && (
-        <div
-          onClick={() => setLightbox(false)}
-          style={{ position: 'fixed', inset: 0, zIndex: 10001, background: 'rgba(26,24,20,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'zoom-out' }}
-        >
-          <img
-            src={imgSrc} alt={alt}
-            style={{ maxWidth: '90vw', maxHeight: '90vh', objectFit: 'contain', boxShadow: '0 8px 40px rgba(0,0,0,0.5)' }}
-            onClick={e => e.stopPropagation()}
-          />
-          <button
+        <ModalPortal>
+          <div
             onClick={() => setLightbox(false)}
-            style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', color: '#fff', fontSize: 24, cursor: 'pointer' }}
+            style={{
+              position: 'fixed', inset: 0, zIndex: 99999,
+              background: 'rgba(10,8,6,0.92)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'zoom-out',
+            }}
           >
-            <i className="fa-solid fa-xmark" />
-          </button>
-        </div>
+            <img
+              src={imgSrc} alt={alt}
+              style={{ maxWidth: '92vw', maxHeight: '92vh', objectFit: 'contain' }}
+              onClick={e => e.stopPropagation()}
+            />
+            <button
+              onClick={() => setLightbox(false)}
+              style={{
+                position: 'absolute', top: 20, right: 20,
+                background: 'rgba(255,255,255,0.12)', border: 'none',
+                color: '#fff', fontSize: 20, cursor: 'pointer',
+                width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                borderRadius: '50%',
+              }}
+            >
+              <i className="fa-solid fa-xmark" />
+            </button>
+          </div>
+        </ModalPortal>
       )}
     </>
   )

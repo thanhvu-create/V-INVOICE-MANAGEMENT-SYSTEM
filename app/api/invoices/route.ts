@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
       .select(`
         id, po_number, mr_number, status, is_locked, store, created_by, created_at,
         daily_metal_rates ( rate_date ),
-        pricing_rules ( name )
+        pricing_rules ( name ),
+        invoice_items ( image_url, line_no )
       `, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1)
