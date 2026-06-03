@@ -52,8 +52,8 @@ const inputStyle: React.CSSProperties = {
 function pct(v: number) { return `${((v - 1) * 100).toFixed(1)}%` }
 
 export default function PricingRulesPage() {
-  const { canDo } = useUser()
-  const router    = useRouter()
+  const { canDo, loaded } = useUser()
+  const router            = useRouter()
 
   const [rules,      setRules]      = useState<PricingRule[]>([])
   const [loading,    setLoading]    = useState(true)
@@ -66,8 +66,9 @@ export default function PricingRulesPage() {
   const [deleting,   setDeleting]   = useState(false)
 
   useEffect(() => {
+    if (!loaded) return                                    // chờ auth load xong
     if (!canDo('admin')) { router.push('/dashboard'); return }
-  }, [canDo])
+  }, [loaded, canDo])
 
   const load = useCallback(async () => {
     setLoading(true)
