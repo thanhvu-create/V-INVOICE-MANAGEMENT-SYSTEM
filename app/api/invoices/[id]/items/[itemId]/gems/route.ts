@@ -65,6 +65,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       .from('item_gem_details')
       .insert({
         invoice_item_id:     params.itemId,
+        gem_code:            body.gem_code            ?? null,
+        price_unit:          body.price_unit          ?? 'per_ct',
         gem_type:            body.gem_type            ?? null,
         quality:             body.quality             ?? null,
         shape:               body.shape               ?? null,

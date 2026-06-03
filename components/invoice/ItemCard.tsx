@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { apiCall } from '@/lib/api'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { GemModal } from './GemModal'
+import { DriveImage } from './DriveImage'
 import type { InvoiceItem } from '@/types'
 
 const METAL_TYPES = ['18KW', '18KY', '14KY', 'PT950', 'PT', '24K', 'AG', 'PD']
@@ -136,13 +137,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
       {/* Card header */}
       <div style={{ padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', background: 'var(--bg-base)' }}>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          {item.image_url && (
-            <div style={{ width: 44, height: 44, flexShrink: 0, border: '1px solid var(--border-light)', overflow: 'hidden', background: 'var(--bg-muted)' }}>
-              <img src={item.image_url} alt={item.sku_jwmold}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                onError={(e) => { (e.target as HTMLImageElement).parentElement!.style.display = 'none' }} />
-            </div>
-          )}
+          <DriveImage url={item.image_url} alt={item.sku_jwmold} size={44} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>#{item.line_no}</span>
           <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, background: 'var(--sku-highlight-bg)', padding: '1px 8px', color: '#92400E', fontSize: 'var(--text-sm)' }}>{item.sku_jwmold}</span>
           {item.description && <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{item.description}</span>}
@@ -168,22 +163,36 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
         <div style={{ padding: '0.75rem 1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem' }}>
           {[
             ['Qty', item.qty_pcs],
-            ...(item.size         ? [['Size', item.size]]              : []),
+            ...(item.size          ? [['Size', item.size]]                     : []),
             ['Metal', item.metal_type ?? '—'],
-            ['Total Wt (g)', fmt4(item.weight_total_gr)],
-            ['Gold Wt (g)', fmt4(item.weight_gold_actual_gr)],
-            ['No-Gem Wt (g)', fmt4(item.weight_no_gem_gr)],
+            ...(item.vendor_model  ? [['Mã mẫu', item.vendor_model]]           : []),
+            ...(item.so_mo_code    ? [['SO/MO', item.so_mo_code]]              : []),
+            // Weights
+            ['T.Phẩm (gr)', fmt4(item.weight_total_gr)],
+            ['Vàng thực (gr)', fmt4(item.weight_gold_actual_gr)],
+            ['Trừ NVL đá (gr)', fmt4(item.weight_no_gem_gr)],
+            // Prices
             ...(canSeePrice ? [
-              ['Gold Value', fmt2(item.gold_value_usd)],
+              ['Tiền vàng', fmt2(item.gold_value_usd)],
               ['HPUSA', fmt2(item.hpusa)],
               ['CIF', fmt2(item.cif_price)],
               ['Tag', fmt2(item.tag_price)],
               ['FR', fmt2(item.fr_price)],
             ] : []),
-            ...(item.so_mo_code   ? [['SO/MO', item.so_mo_code]]   : []),
-            ...(item.ship_date    ? [['Ship Date', item.ship_date]] : []),
-            ...(item.tracking_no  ? [['Tracking', item.tracking_no]] : []),
-            ...(item.notes        ? [['Notes', item.notes]]         : []),
+            // Fees (individual)
+            ...(canSeePrice && (item.labor_fee || item.casting_fee || item.design_fee || item.resin_fee || item.misc_fee) ? [
+              ['Gia công', fmt2(item.labor_fee)],
+              ['Đúc', fmt2(item.casting_fee)],
+              ['Thiết kế', fmt2(item.design_fee)],
+              ['Resin', fmt2(item.resin_fee)],
+              ['Phụ kiện', fmt2(item.misc_fee)],
+            ] : []),
+            // Logistics
+            ...(item.ship_date    ? [['Ngày gởi', item.ship_date]]             : []),
+            ...(item.tracking_no  ? [['Tracking#', item.tracking_no]]          : []),
+            ...(item.store        ? [['Gởi hàng', item.store]]                 : []),
+            ...(item.vinvoice_no  ? [['Hóa Đơn USA', item.vinvoice_no]]        : []),
+            ...(item.notes        ? [['Notes', item.notes]]                    : []),
           ].map(([label, val]) => (
             <div key={String(label)}>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>

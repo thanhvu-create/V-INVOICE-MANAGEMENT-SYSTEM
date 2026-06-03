@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 import { HelpModal } from '@/components/ui/HelpModal'
+import { DriveAuthButton } from '@/components/ui/DriveAuthButton'
 import type { Role } from '@/types'
 
 interface NavItem {
@@ -107,6 +108,9 @@ export function TopNav() {
               >
                 {user.fullName}
               </span>
+
+              {/* Google Drive auth */}
+              <DriveAuthButton />
 
               {/* Help */}
               <button

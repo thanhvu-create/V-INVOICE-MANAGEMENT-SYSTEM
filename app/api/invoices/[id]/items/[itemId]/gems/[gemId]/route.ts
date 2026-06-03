@@ -33,6 +33,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (editErrorPatch) return NextResponse.json({ success: false, message: editErrorPatch }, { status: 403 })
 
     const EDITABLE = [
+      'gem_code', 'price_unit',
       'gem_type', 'quality', 'shape', 'size_mm', 'qty_pcs',
       'weight_ct_before', 'weight_ct_after', 'unit_price_per_ct',
       'setting_type', 'setting_fee_per_pcs', 'sort_order',

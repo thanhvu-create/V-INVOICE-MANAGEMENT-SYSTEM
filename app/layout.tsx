@@ -30,6 +30,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
           crossOrigin="anonymous"
         />
+        {/* Google Identity Services — required for Drive OAuth popup */}
+        <script src="https://accounts.google.com/gsi/client" async defer />
       </head>
       <body>{children}</body>
     </html>

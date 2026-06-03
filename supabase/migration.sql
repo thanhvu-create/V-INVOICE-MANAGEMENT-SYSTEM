@@ -431,6 +431,8 @@ ALTER TABLE item_gem_details ADD COLUMN IF NOT EXISTS size_mm             TEXT;
 ALTER TABLE item_gem_details ADD COLUMN IF NOT EXISTS setting_type        TEXT;
 ALTER TABLE item_gem_details ADD COLUMN IF NOT EXISTS sort_order          INTEGER DEFAULT 0;
 ALTER TABLE item_gem_details ADD COLUMN IF NOT EXISTS updated_at          TIMESTAMPTZ DEFAULT now();
+ALTER TABLE item_gem_details ADD COLUMN IF NOT EXISTS gem_code            TEXT;
+ALTER TABLE item_gem_details ADD COLUMN IF NOT EXISTS price_unit          TEXT DEFAULT 'per_ct';
 
 -- gem_price_catalog (new — CREATE TABLE IF NOT EXISTS above handles fresh deploys)
 -- No ALTER needed for existing DBs that never had this table
