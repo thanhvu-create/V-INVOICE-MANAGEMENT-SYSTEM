@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from 'react'
 
-const METAL_TYPES = ['18KW', '18KY', '14KY', 'PT950', 'PT', '24K', 'AG', 'PD']
+const METAL_TYPES = ['24K','22K','18KW','18KY','18K','15K','14KY','14K','10K','PT950','PT','AG','PD']
 
 interface Props {
   field:       string
