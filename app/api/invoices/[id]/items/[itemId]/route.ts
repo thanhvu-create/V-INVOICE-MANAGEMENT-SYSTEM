@@ -30,6 +30,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       'class', 'sub_class', 'labor_fee', 'casting_fee', 'design_fee',
       'resin_fee', 'misc_fee', 'sell_price', 'discount_pct',
       'notes', 'ship_date', 'tracking_no', 'vinvoice_no', 'size', 'customer_name',
+      'image_url',
     ]
     const updates: Record<string, unknown> = {}
     for (const k of EDITABLE) { if (k in body) updates[k] = body[k] }
