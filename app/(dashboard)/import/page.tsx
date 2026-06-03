@@ -52,7 +52,11 @@ async function validateRows(rows: any[][]): Promise<{ valid: ImportRow[]; errors
     if (!sku && !row[3] && !row[6]) return
 
     if (!sku) { errors.push({ row: rowNum, sku: '(empty)', message: 'SKU is required' }); return }
-    if (!productSet.has(sku)) { errors.push({ row: rowNum, sku, message: `SKU "${sku}" not found in product catalog` }); return }
+
+    // SKU not in catalog → warn only (import with fees=0, user fills later)
+    if (!productSet.has(sku)) {
+      errors.push({ row: rowNum, sku, warn: true, message: `SKU "${sku}" not in product catalog — fees will be 0, auto-fill skipped` })
+    }
 
     const qty         = parseInt(String(row[6] || '0'))
     const weightTotal = parseFloat(String(row[7] || '0'))
@@ -132,8 +136,12 @@ function ImportContent() {
 
     const imported = json.data.imported
     setState({ stage: 'done', imported })
-    if (hadErrors) {
-      toast(`${imported} item${imported !== 1 ? 's' : ''} imported. ${errors.length} row${errors.length !== 1 ? 's' : ''} skipped.`, 'warn', 5000)
+    const hardErrors = errors.filter(e => !e.warn)
+    const warnings   = errors.filter(e =>  e.warn)
+    if (hardErrors.length > 0) {
+      toast(`${imported} items imported. ${hardErrors.length} row${hardErrors.length !== 1 ? 's' : ''} skipped.`, 'warn', 5000)
+    } else if (warnings.length > 0) {
+      toast(`${imported} items imported. ${warnings.length} SKU${warnings.length !== 1 ? 's' : ''} not in catalog — fees set to 0.`, 'warn', 6000)
     } else {
       toast(`${imported} item${imported !== 1 ? 's' : ''} imported successfully.`, 'success')
     }

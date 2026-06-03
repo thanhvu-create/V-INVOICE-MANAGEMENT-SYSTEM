@@ -203,6 +203,7 @@ export interface ValidationError {
   row:     number
   sku:     string
   message: string
+  warn?:   boolean   // true = warning (import anyway), false/undefined = error (skip row)
 }
 
 // ── API responses ─────────────────────────────────────────────────────────────
