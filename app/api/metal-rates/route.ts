@@ -56,11 +56,12 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       if (error.code === '23505') return NextResponse.json({ success: false, message: `Rate for ${rate_date} already exists` }, { status: 409 })
-      throw error
+      return NextResponse.json({ success: false, message: error.message }, { status: 400 })
     }
     return NextResponse.json({ success: true, data })
   } catch (err: any) {
     if (err?.status) return NextResponse.json({ success: false, message: err.message }, { status: err.status })
-    return NextResponse.json({ success: false, message: String(err) }, { status: 500 })
+    const msg = err?.message ?? (typeof err === 'object' ? JSON.stringify(err) : String(err))
+    return NextResponse.json({ success: false, message: msg }, { status: 500 })
   }
 }
