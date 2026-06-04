@@ -9,13 +9,14 @@ import { ModalPortal } from '@/components/ui/ModalPortal'
 const KARATS = ['24K','23K','22K','18K','15K','14K','10K','PT','AG','PD'] as const
 
 const th: React.CSSProperties = {
-  padding: '7px 10px', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.08em',
+  padding: '6px 8px', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.07em',
   textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '2px solid var(--border-base)',
   background: 'var(--bg-base)', whiteSpace: 'nowrap', textAlign: 'right',
 }
 const td: React.CSSProperties = {
-  padding: '7px 10px', borderBottom: '1px solid var(--border-light)',
-  fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', textAlign: 'right', verticalAlign: 'middle',
+  padding: '8px 8px', borderBottom: '1px solid var(--border-light)',
+  fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', textAlign: 'right',
+  verticalAlign: 'middle', whiteSpace: 'nowrap',
 }
 const inputStyle: React.CSSProperties = {
   width: '100%', border: '1px solid var(--border-base)', borderRadius: 0,
@@ -185,26 +186,44 @@ export default function MetalRatesPage() {
           <i className="fa-solid fa-circle-notch fa-spin" style={{ marginRight: 8 }} />Loading...
         </div>
       ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <div style={{ overflowX: 'auto', border: '1px solid var(--border-light)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 1100 }}>
             <thead>
+              {/* Group header row */}
               <tr>
-                <th style={{ ...th, textAlign: 'left' }}>Date</th>
-                <th style={th}>24K oz</th>
-                <th style={th}>PT oz</th>
-                <th style={th}>AG oz</th>
-                {KARATS.map(k => <th key={k} style={{ ...th, color: ['PT','AG','PD'].includes(k) ? 'var(--color-success)' : 'var(--color-info)' }}>{k}<span style={{ display: 'block', fontSize: 9, fontWeight: 400, color: 'var(--text-muted)' }}>$/g</span></th>)}
-                <th style={th} />
+                <th style={{ ...th, textAlign: 'left', borderBottom: '1px solid var(--border-light)', padding: '4px 8px' }} rowSpan={2}>DATE</th>
+                <th colSpan={3} style={{ ...th, textAlign: 'center', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)', background: 'var(--bg-muted)', padding: '4px 8px', fontSize: 9, letterSpacing: '0.12em' }}>
+                  SPOT (USD/oz)
+                </th>
+                <th colSpan={10} style={{ ...th, textAlign: 'center', borderBottom: '1px solid var(--border-light)', color: 'var(--color-info)', background: 'var(--bg-base)', padding: '4px 8px', fontSize: 9, letterSpacing: '0.12em' }}>
+                  DERIVED RATES (USD/g) — casting loss included
+                </th>
+                <th style={{ ...th, borderBottom: '1px solid var(--border-light)' }} rowSpan={2} />
+              </tr>
+              {/* Column header row */}
+              <tr>
+                <th style={{ ...th, color: 'var(--text-muted)', background: 'var(--bg-muted)', borderLeft: '1px solid var(--border-light)' }}>24K</th>
+                <th style={{ ...th, color: 'var(--text-muted)', background: 'var(--bg-muted)' }}>PT</th>
+                <th style={{ ...th, color: 'var(--text-muted)', background: 'var(--bg-muted)', borderRight: '1px solid var(--border-light)' }}>AG</th>
+                {KARATS.map((k, i) => (
+                  <th key={k} style={{
+                    ...th,
+                    color: ['PT','AG','PD'].includes(k) ? 'var(--color-success)' : 'var(--color-info)',
+                    borderLeft: i === 0 ? '1px solid var(--border-light)' : undefined,
+                  }}>
+                    {k}
+                    <span style={{ display: 'block', fontSize: 8, fontWeight: 400, color: 'var(--text-muted)', letterSpacing: 0 }}>$/g</span>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {paginated.length === 0 ? (
-                <tr><td colSpan={14} style={{ ...td, textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                <tr><td colSpan={15} style={{ ...td, textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
                   No rates yet. Click Add Rate or use Fetch Market Prices.
                 </td></tr>
               ) : paginated.map(r => {
                 const kp: any = r.karat_prices ?? {}
-                // Fallback to old individual columns for records without karat_prices JSONB
                 const OLD_COL_MAP: Record<string, string> = {
                   '24K': 'gold_24k', '18K': 'gold_18kw', '14K': 'gold_14ky',
                   'PT': 'platinum', 'AG': 'silver', 'PD': 'palladium',
@@ -214,19 +233,29 @@ export default function MetalRatesPage() {
                   const col = OLD_COL_MAP[k]
                   return col && r[col] != null ? Number(r[col]) : null
                 }
+                const fmtSpot = (v: any) => v != null ? `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'
                 return (
                   <tr key={r.id}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
                     onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                    <td style={{ ...td, textAlign: 'left', fontFamily: 'var(--font-body)', fontWeight: 600 }}>{r.rate_date}</td>
-                    <td style={td}>{r.spot_24k_oz ? `$${Number(r.spot_24k_oz).toLocaleString()}` : '—'}</td>
-                    <td style={td}>{r.spot_pt_oz  ? `$${Number(r.spot_pt_oz).toLocaleString()}`  : '—'}</td>
-                    <td style={td}>{r.spot_ag_oz  ? `$${Number(r.spot_ag_oz).toFixed(2)}`  : '—'}</td>
-                    {KARATS.map(k => {
+                    <td style={{ ...td, textAlign: 'left', fontFamily: 'var(--font-body)', fontWeight: 600, fontSize: 'var(--text-sm)', color: 'var(--text-primary)' }}>{r.rate_date}</td>
+                    <td style={{ ...td, color: 'var(--text-muted)', background: 'var(--bg-base)', borderLeft: '1px solid var(--border-light)' }}>{fmtSpot(r.spot_24k_oz)}</td>
+                    <td style={{ ...td, color: 'var(--text-muted)', background: 'var(--bg-base)' }}>{fmtSpot(r.spot_pt_oz)}</td>
+                    <td style={{ ...td, color: 'var(--text-muted)', background: 'var(--bg-base)', borderRight: '1px solid var(--border-light)' }}>{fmtSpot(r.spot_ag_oz)}</td>
+                    {KARATS.map((k, i) => {
                       const val = getKaratVal(k)
-                      return <td key={k} style={td}>{val != null ? `$${val.toFixed(4)}` : '—'}</td>
+                      return (
+                        <td key={k} style={{
+                          ...td,
+                          borderLeft: i === 0 ? '1px solid var(--border-light)' : undefined,
+                          fontWeight: ['18K','24K'].includes(k) ? 600 : 400,
+                          color: val != null ? 'var(--text-primary)' : 'var(--text-muted)',
+                        }}>
+                          {val != null ? `$${val.toFixed(4)}` : '—'}
+                        </td>
+                      )
                     })}
-                    <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                    <td style={{ ...td, whiteSpace: 'nowrap', paddingLeft: 12 }}>
                       <button onClick={() => openEdit(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginRight: 6 }} title="Edit"><i className="fa-solid fa-pen" /></button>
                       <button onClick={() => setConfirmDel(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }} title="Delete"><i className="fa-solid fa-trash" /></button>
                     </td>
