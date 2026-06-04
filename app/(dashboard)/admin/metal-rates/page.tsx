@@ -204,6 +204,16 @@ export default function MetalRatesPage() {
                 </td></tr>
               ) : paginated.map(r => {
                 const kp: any = r.karat_prices ?? {}
+                // Fallback to old individual columns for records without karat_prices JSONB
+                const OLD_COL_MAP: Record<string, string> = {
+                  '24K': 'gold_24k', '18K': 'gold_18kw', '14K': 'gold_14ky',
+                  'PT': 'platinum', 'AG': 'silver', 'PD': 'palladium',
+                }
+                const getKaratVal = (k: string): number | null => {
+                  if (kp[k] != null) return Number(kp[k])
+                  const col = OLD_COL_MAP[k]
+                  return col && r[col] != null ? Number(r[col]) : null
+                }
                 return (
                   <tr key={r.id}
                     onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')}
@@ -212,9 +222,10 @@ export default function MetalRatesPage() {
                     <td style={td}>{r.spot_24k_oz ? `$${Number(r.spot_24k_oz).toLocaleString()}` : '—'}</td>
                     <td style={td}>{r.spot_pt_oz  ? `$${Number(r.spot_pt_oz).toLocaleString()}`  : '—'}</td>
                     <td style={td}>{r.spot_ag_oz  ? `$${Number(r.spot_ag_oz).toFixed(2)}`  : '—'}</td>
-                    {KARATS.map(k => (
-                      <td key={k} style={td}>{kp[k] ? `$${Number(kp[k]).toFixed(4)}` : r.gold_24k && k === '24K' ? `$${Number(r.gold_24k).toFixed(4)}` : '—'}</td>
-                    ))}
+                    {KARATS.map(k => {
+                      const val = getKaratVal(k)
+                      return <td key={k} style={td}>{val != null ? `$${val.toFixed(4)}` : '—'}</td>
+                    })}
                     <td style={{ ...td, whiteSpace: 'nowrap' }}>
                       <button onClick={() => openEdit(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginRight: 6 }} title="Edit"><i className="fa-solid fa-pen" /></button>
                       <button onClick={() => setConfirmDel(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }} title="Delete"><i className="fa-solid fa-trash" /></button>
