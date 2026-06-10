@@ -9,7 +9,6 @@ const LINKS: LinkDef[] = [
   { href: '/invoices/new',        label: 'New Invoice',   icon: 'fa-file-plus', roles: ['admin', 'manager', 'user'] },
   { href: '/invoices',            label: 'All Invoices',  icon: 'fa-list',      roles: ['admin', 'manager', 'user', 'viewer'] },
   { href: '/admin/metal-rates',   label: 'Metal Rates',   icon: 'fa-coins',     roles: ['admin', 'manager'] },
-  { href: '/admin/pricing-rules', label: 'Pricing Rules', icon: 'fa-sliders',   roles: ['admin'] },
   { href: '/admin/products',      label: 'Products',      icon: 'fa-gem',       roles: ['admin'] },
   { href: '/admin/users',         label: 'Users',         icon: 'fa-users',     roles: ['admin'] },
 ]

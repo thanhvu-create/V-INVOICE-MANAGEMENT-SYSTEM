@@ -7,7 +7,7 @@ type Params = { params: { id: string } }
 // PATCH /api/metal-rates/[id] — update nvl_prices row
 export async function PATCH(req: NextRequest, { params }: Params) {
   try {
-    await requireRole('admin')
+    await requireRole('manager')
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message ?? 'Unauthorized' }, { status: err.status ?? 401 })
   }
@@ -40,7 +40,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 // DELETE /api/metal-rates/[id]
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
-    await requireRole('admin')
+    await requireRole('manager')
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message ?? 'Unauthorized' }, { status: err.status ?? 401 })
   }

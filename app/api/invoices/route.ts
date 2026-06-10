@@ -88,12 +88,16 @@ export async function POST(req: NextRequest) {
       .limit(1)
       .single()
 
+    // AG3 templates (Lầu 3) dùng loss_gold = 11%, khác Lầu 2 (6%)
+    // Ref: JM-FORM §8.2 — CH1_AG3/VNSI_AG3 SUMMARY G3 = 0.11
+    const isAG3 = ['CH1_AG3', 'VNSI_AG3'].includes(template_type)
+
     const nvlSnapshot = latestNVL ? {
       nvl_gold_24k:        latestNVL.gold_24k,
       nvl_pt_price:        latestNVL.pt_price,
       nvl_ag_price:        latestNVL.ag_price,
       nvl_pd_price:        latestNVL.pd_price,
-      nvl_loss_gold:       latestNVL.loss_gold,
+      nvl_loss_gold:       isAG3 ? 0.11 : latestNVL.loss_gold,
       nvl_loss_pt:         latestNVL.loss_pt,
       nvl_cif_rate:        template_type === 'VNSI_AG3' ? 0.10 : 0.05,
       nvl_tag_multiplier:  latestNVL.tag_multiplier ?? 0,

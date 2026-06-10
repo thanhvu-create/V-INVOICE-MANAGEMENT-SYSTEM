@@ -10,8 +10,8 @@ function createServiceClient() {
 }
 
 const PUBLIC_ROUTES  = ['/login', '/api/auth/login', '/api/export/template']
-const ADMIN_ROUTES   = ['/admin/users', '/admin/pricing-rules', '/admin/products']
-const MANAGER_ROUTES = ['/admin/metal-rates']
+const ADMIN_ROUTES   = ['/admin/users']
+const MANAGER_ROUTES = ['/admin/metal-rates', '/admin/products', '/admin/gem-catalog']
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl

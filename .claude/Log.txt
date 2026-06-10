@@ -51,3 +51,55 @@
 1. Run `supabase/fix_v2_logic.sql` in Supabase SQL Editor
 2. For new invoices: set `template_type` and fill `nvl_*` snapshot columns when creating
 3. Existing invoices: need to backfill `template_type` and `nvl_*` columns
+
+---
+
+## 2026-06-10 — Fix v3: Production Sync Audit
+
+### Context:
+Full system audit (backend → frontend) for production readiness. Identified and fixed 5 sync bugs.
+
+### Bugs fixed:
+
+1. **gems/route.ts `triggerRecalc()` — missing NVL multipliers in SELECT**
+   - File: `app/api/invoices/[id]/items/[itemId]/gems/route.ts` line 31
+   - Added `nvl_tag_multiplier, nvl_fr_multiplier` to invoice SELECT
+   - Impact: gem add operations on AG3 templates now correctly propagate tag_price/fb_price to parent item
+
+2. **gems/[gemId]/route.ts `triggerRecalc()` — same missing NVL multipliers**
+   - File: `app/api/invoices/[id]/items/[itemId]/gems/[gemId]/route.ts` line 13
+   - Same fix as above for gem PATCH/DELETE operations
+
+3. **import/route.ts — missing NVL multipliers in SELECT**
+   - File: `app/api/import/route.ts` line 23
+   - Added `nvl_tag_multiplier, nvl_fr_multiplier` to invoice SELECT
+   - Impact: bulk import to AG3 templates now computes tag_price/fb_price correctly
+
+4. **invoices/[id]/route.ts PATCH — nvl_tag/fr_multiplier not in allowed fields**
+   - Added `nvl_tag_multiplier, nvl_fr_multiplier` to `allowed` list (line 67-71)
+   - Also added to `nvlChanged` check so bulk item recalc fires when these change
+
+5. **middleware.ts — /admin/products admin-only but shown to managers; /admin/gem-catalog unprotected**
+   - Moved `/admin/products` from ADMIN_ROUTES to MANAGER_ROUTES
+   - Added `/admin/gem-catalog` to MANAGER_ROUTES
+   - Now: manager or admin can access NVL Prices + Gem Catalog pages
+   - `/admin/metal-rates` redirect still works (it was already in MANAGER_ROUTES)
+
+6. **metal-rates routes — POST/PATCH/DELETE required admin but should allow managers**
+   - `app/api/metal-rates/route.ts` POST: `requireRole('admin')` → `requireRole('manager')`
+   - `app/api/metal-rates/[id]/route.ts` PATCH+DELETE: same change
+   - Consistent with MANAGER_ROUTES in middleware
+
+### Files changed:
+- `app/api/invoices/[id]/items/[itemId]/gems/route.ts`
+- `app/api/invoices/[id]/items/[itemId]/gems/[gemId]/route.ts`
+- `app/api/import/route.ts`
+- `app/api/invoices/[id]/route.ts`
+- `middleware.ts`
+- `app/api/metal-rates/route.ts`
+- `app/api/metal-rates/[id]/route.ts`
+
+### Still pending (requires Supabase SQL Editor):
+- `supabase/fix_snapshot_trigger.sql` — snapshot trigger fires on 'finalized' (not 'invoiced')
+- `supabase/fix_rpc_table_names.sql` — get_dashboard_stats() uses correct table names
+- `supabase/drop_unused_tables.sql` — drop pricing_rules, mk_store_markup, mk_price_list_type

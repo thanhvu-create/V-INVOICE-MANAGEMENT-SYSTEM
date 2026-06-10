@@ -62,6 +62,8 @@ export interface InvoiceProduct {
   ngay_gui:         string | null
   tracking_no:      string | null
   hoa_don:          string | null
+  // ERP / Chênh lệch (JM Form col N — nhập thủ công)
+  erp_bom_cost:          number | null  // ERP for Bom cost ($)
   // Calculated
   tien_vang:             number | null
   t_pham_tru_nvl_da:     number | null

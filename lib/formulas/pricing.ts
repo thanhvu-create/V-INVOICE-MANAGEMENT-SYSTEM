@@ -43,7 +43,7 @@ export function goldPricePerGram(loai_vang: string, nvl: NVLSnapshot): number | 
     case '14': return spot_gold_24k * (1 + loss_gold) * (14 / 24) / OUNCE_PER_GRAM
     case '10': return spot_gold_24k * (1 + loss_gold) * (10 / 24) / OUNCE_PER_GRAM
     case 'PT': return spot_pt * (1 + loss_pt) / OUNCE_PER_GRAM
-    case 'AG': return spot_ag * (1 + loss_gold) / OUNCE_PER_GRAM
+    case 'AG': return spot_ag * (1 + loss_gold) * (1 + loss_pt) / OUNCE_PER_GRAM  // AG = cả 2 loss (×1.06 × 1.17)
     case 'PD': return spot_pd * (1 + loss_pt) / OUNCE_PER_GRAM
     default:   return null
   }
@@ -109,17 +109,19 @@ export function calcVonSanXuat(
 }
 
 /**
- * CIF price — template-aware
- * CH1 / CH1_AG3: purchase × 1.05  (5%)
- * ADM:           purchase × 1.10  (10% — confirmed from actual ADM Excel file col X24 "CIF 10%")
- * CH2:           null  (no CIF column in CH2 template)
- * VNSI_AG3:      purchase × 1.10  (10%)
+ * CIF price — template-aware (JM Form §8.4)
+ * CH1 / ADM / CH1_AG3: purchase × 1.05  (5% — JM FORM col M = L × 1.05)
+ * VNSI_AG3:            purchase × 1.10  (10% — SUMMARY!G7 = 0.10)
+ * CH2:                 null  (no CIF column in CH2 template)
+ *
+ * NOTE: ADM has an *internal* SUMMARY CIF of 10% (SUMMARY!X = W × 1.10) but the
+ * JM FORM export col M uses L × 1.05. We store the JM FORM value (5%).
  */
 export function calcCIFPrice(purchase: number, template: InvoiceTemplate): number | null {
-  if (template === 'CH1' || template === 'CH1_AG3') {
+  if (template === 'CH1' || template === 'ADM' || template === 'CH1_AG3') {
     return purchase * 1.05
   }
-  if (template === 'ADM' || template === 'VNSI_AG3') {
+  if (template === 'VNSI_AG3') {
     return purchase * 1.10
   }
   return null  // CH2, MANUAL

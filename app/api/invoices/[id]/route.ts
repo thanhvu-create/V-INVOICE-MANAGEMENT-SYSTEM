@@ -68,6 +68,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       'invoice_code', 'channel', 'template_type',
       'nvl_gold_24k', 'nvl_pt_price', 'nvl_ag_price', 'nvl_pd_price',
       'nvl_loss_gold', 'nvl_loss_pt', 'nvl_cif_rate',
+      'nvl_tag_multiplier', 'nvl_fr_multiplier',
     ]
     const updates: Record<string, unknown> = {}
     for (const key of allowed) {
@@ -89,6 +90,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const nvlChanged = [
       'nvl_gold_24k', 'nvl_pt_price', 'nvl_ag_price', 'nvl_pd_price',
       'nvl_loss_gold', 'nvl_loss_pt', 'template_type',
+      'nvl_tag_multiplier', 'nvl_fr_multiplier',
     ].some(k => k in updates)
 
     if (nvlChanged) {

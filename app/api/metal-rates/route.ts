@@ -19,10 +19,10 @@ export async function GET() {
   }
 }
 
-// POST /api/metal-rates — admin only, insert new nvl_prices row
+// POST /api/metal-rates — manager+ can insert new nvl_prices row
 export async function POST(req: NextRequest) {
   try {
-    await requireRole('admin')
+    await requireRole('manager')
   } catch (err: any) {
     return NextResponse.json({ success: false, message: err.message ?? 'Unauthorized' }, { status: err.status ?? 401 })
   }
