@@ -58,6 +58,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
   const skuRef = useRef<HTMLInputElement>(null)
 
   const isAG3    = template === 'CH1_AG3' || template === 'VNSI_AG3'
+  const isAdm    = template === 'ADM'
   const hasFees  = template === 'CH1' || template === 'CH2'
 
   useEffect(() => {
@@ -83,7 +84,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
       vendor_model:     form.vendor_model.trim() || null,
       so_mo:            isAG3 ? null : (form.so_mo.trim() || null),
       po_number:        isAG3 ? (form.po_number.trim() || null) : null,
-      sku_ag:           isAG3 ? (form.sku_ag.trim() || null) : null,
+      sku_ag:           template === 'CH1_AG3' ? (form.sku_ag.trim() || null) : null,
       description:      form.description.trim() || null,
       class:            form.class.trim()        || null,
       sub_class:        form.sub_class.trim()    || null,
@@ -99,8 +100,8 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
       thiet_ke:         hasFees ? (parseFloat(form.thiet_ke)     || 0) : 0,
       resin:            hasFees ? (parseFloat(form.resin)        || 0) : 0,
       phi_phu_kien:     hasFees ? (parseFloat(form.phi_phu_kien) || 0) : 0,
-      bao_hiem:         isAG3 ? null : (parseFloat(form.bao_hiem) || null),
-      nini_adm:         isAG3 ? null : (form.nini_adm.trim() || null),
+      bao_hiem:         (isAG3 || isAdm) ? null : (parseFloat(form.bao_hiem) || null),
+      nini_adm:         (isAG3 || isAdm) ? null : (form.nini_adm.trim() || null),
       chi_tiet_tap:     isAG3 ? (form.chi_tiet_tap.trim() || null) : null,
       image_url:        form.image_url.trim()   || null,
     }
@@ -173,13 +174,13 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
             )}
           </div>
 
-          {/* Vendor Model# + SKU# AG (AG3 only) */}
+          {/* Vendor Model# + SKU# AG (CH1_AG3 only) */}
           <div style={grid2}>
             <div>
               <label style={labelStyle}>Vendor Model# (Mã mẫu)</label>
               <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} placeholder="e.g. L10437" value={form.vendor_model} onChange={f('vendor_model')} />
             </div>
-            {isAG3 && (
+            {template === 'CH1_AG3' && (
               <div>
                 <label style={labelStyle}>SKU# AG</label>
                 <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} placeholder="AG SKU" value={form.sku_ag} onChange={f('sku_ag')} />
@@ -255,13 +256,13 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
             </div>
           )}
 
-          {/* Bảo hiểm + Notes (non-AG3) / Chi tiết/Tập (AG3) */}
+          {/* Notes block — per-template */}
           {isAG3 ? (
             <div style={{ marginBottom: '0.75rem' }}>
               <label style={labelStyle}>Chi tiết / Tập</label>
               <input style={inputStyle} placeholder="Chi tiết hoặc tập..." value={form.chi_tiet_tap} onChange={f('chi_tiet_tap')} />
             </div>
-          ) : (
+          ) : !isAdm ? (
             <div style={{ ...grid2, gridTemplateColumns: '1fr 2fr', marginBottom: '0.75rem' }}>
               <div>
                 <label style={labelStyle}>Bảo hiểm (AC)</label>
@@ -272,7 +273,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
                 <input style={inputStyle} placeholder='e.g. "ba sao"' value={form.nini_adm} onChange={f('nini_adm')} />
               </div>
             </div>
-          )}
+          ) : null}
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
             <button onClick={onClose} style={{ padding: '0.5rem 1.25rem', border: '1px solid var(--border-base)', background: 'transparent', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', cursor: 'pointer', borderRadius: 0 }}>Hủy</button>
