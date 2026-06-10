@@ -57,11 +57,17 @@ export async function POST(req: NextRequest, { params }: Params) {
         loai_vang:         body.loai_vang         ?? null,
         class:             body.class             ?? null,
         sub_class:         body.sub_class         ?? null,
+        kich_thuoc:        body.kich_thuoc        ?? null,
         gia_cong:          body.gia_cong          ?? 0,
         duc:               body.duc               ?? 0,
         thiet_ke:          body.thiet_ke          ?? 0,
         resin:             body.resin             ?? 0,
         phi_phu_kien:      body.phi_phu_kien      ?? 0,
+        bao_hiem:          body.bao_hiem          ?? null,
+        nini_adm:          body.nini_adm          ?? null,
+        ngay_gui:          body.ngay_gui          ?? null,
+        tracking_no:       body.tracking_no       ?? null,
+        hoa_don:           body.hoa_don           ?? null,
         image_url:         body.image_url         ?? null,
       })
       .select()

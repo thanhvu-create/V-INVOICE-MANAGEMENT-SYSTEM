@@ -24,6 +24,7 @@ interface Form {
   thiet_ke:     string
   resin:        string
   phi_phu_kien: string
+  bao_hiem:     string
   nini_adm:     string
   image_url:    string
 }
@@ -33,6 +34,7 @@ const EMPTY: Form = {
   kich_thuoc: '', loai_vang: '', store: 'HP', location: 'Safe 1',
   qt_pcs: '1', wt_gr: '',
   gia_cong: '0', duc: '0', thiet_ke: '0', resin: '0', phi_phu_kien: '0',
+  bao_hiem: '0',
   nini_adm: '', image_url: '',
 }
 
@@ -85,6 +87,7 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
       thiet_ke:         parseFloat(form.thiet_ke)      || 0,
       resin:            parseFloat(form.resin)         || 0,
       phi_phu_kien:     parseFloat(form.phi_phu_kien)  || 0,
+      bao_hiem:         parseFloat(form.bao_hiem)      || null,
       nini_adm:         form.nini_adm.trim()    || null,
       image_url:        form.image_url.trim()   || null,
     }
@@ -214,10 +217,16 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
             </div>
           </div>
 
-          {/* Notes */}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>Ghi chú</label>
-            <input style={inputStyle} placeholder='e.g. "ba sao"' value={form.nini_adm} onChange={f('nini_adm')} />
+          {/* Bảo hiểm + Notes */}
+          <div style={{ ...grid2, gridTemplateColumns: '1fr 2fr', marginBottom: '0.75rem' }}>
+            <div>
+              <label style={labelStyle}>Bảo hiểm (AC)</label>
+              <input type="number" min="0" step="0.01" style={inputStyle} placeholder="0.00" value={form.bao_hiem} onChange={f('bao_hiem')} />
+            </div>
+            <div>
+              <label style={labelStyle}>Ghi chú</label>
+              <input style={inputStyle} placeholder='e.g. "ba sao"' value={form.nini_adm} onChange={f('nini_adm')} />
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>

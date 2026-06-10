@@ -66,6 +66,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
       thiet_ke:          String(item.thiet_ke           ?? 0),
       resin:             String(item.resin              ?? 0),
       phi_phu_kien:      String(item.phi_phu_kien       ?? 0),
+      bao_hiem:          String(item.bao_hiem           ?? 0),
       nini_adm:          item.nini_adm                 ?? '',
       so_mo:             item.so_mo                    ?? '',
       ngay_gui:          item.ngay_gui                 ?? '',
@@ -83,7 +84,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
 
   async function handleSave() {
     setSaving(true)
-    const nums = ['qt_pcs', 't_pham_co_nvl_da', 'gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien']
+    const nums = ['qt_pcs', 't_pham_co_nvl_da', 'gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien', 'bao_hiem']
     const payload: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(form)) {
       payload[k] = nums.includes(k) ? (parseFloat(v) || null) : (v.trim() || null)
@@ -177,6 +178,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               ['Resin/SP', fmt2(item.resin)],
               ['Phụ kiện', fmt2(item.phi_phu_kien)],
             ] : []),
+            ...(item.bao_hiem    ? [['Bảo hiểm', fmt2(item.bao_hiem)]]        : []),
             ...(item.ngay_gui    ? [['Ngày gửi', item.ngay_gui]]             : []),
             ...(item.tracking_no ? [['Tracking#', item.tracking_no]]         : []),
             ...(item.hoa_don     ? [['Hóa Đơn (V-INV)', item.hoa_don]]       : []),
@@ -249,6 +251,11 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               </div>
             </>
           )}
+
+          <div style={{ marginBottom: '1rem' }}>
+            <label style={labelStyle}>Bảo hiểm (AC)</label>
+            <input type="number" min="0" step="0.01" style={{ ...inputStyle, maxWidth: 160 }} value={form.bao_hiem ?? ''} onChange={f('bao_hiem')} placeholder="0.00" />
+          </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
             <div><label style={labelStyle}>Ngày gửi</label>
