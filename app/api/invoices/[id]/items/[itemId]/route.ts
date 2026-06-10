@@ -39,6 +39,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       'image_url', 'bao_hiem', 'vendor_model',
       'po_number', 'sku_ag', 'chi_tiet_tap',
       'erp_bom_cost',
+      'tag_price', 'fb_price',
     ]
     const updates: Record<string, unknown> = {}
     for (const k of EDITABLE) {

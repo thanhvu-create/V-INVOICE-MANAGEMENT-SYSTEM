@@ -146,8 +146,13 @@ export function recalcItem(
   const vonSX    = calcVonSanXuat(withGold, diamonds, template)
   const cif      = calcCIFPrice(vonSX, template)
 
-  const tag = cif != null && nvl.tag_multiplier > 0 ? cif * nvl.tag_multiplier : null
-  const fb  = cif != null && nvl.fr_multiplier  > 0 ? cif * nvl.fr_multiplier  : null
+  const isAG3 = template === 'CH1_AG3' || template === 'VNSI_AG3'
+  const tag = isAG3
+    ? (cif != null && nvl.tag_multiplier > 0 ? cif * nvl.tag_multiplier : null)
+    : (item.tag_price ?? null)
+  const fb = isAG3
+    ? (cif != null && nvl.fr_multiplier > 0 ? cif * nvl.fr_multiplier : null)
+    : (item.fb_price ?? null)
 
   return {
     t_pham_tru_nvl_da:   weightNoGem,

@@ -45,8 +45,8 @@ const JM_COLS: Col[] = [
   // Output prices — all templates
   { key: 'von_san_xuat',     label: 'HP Purchase',       mono: true, computed: true, price: true, width: 105 },
   { key: 'cif_price',        label: 'HP CIF',            mono: true, computed: true, price: true, width: 100 },
-  { key: 'tag_price',        label: 'HP Tag',            mono: true, computed: true, price: true, width: 100 },
-  { key: 'fb_price',         label: 'HP FB',             mono: true, computed: true, price: true, width: 100 },
+  { key: 'tag_price',        label: 'HP Tag',            mono: true, price: true, width: 100 },
+  { key: 'fb_price',         label: 'HP FB',             mono: true, price: true, width: 100 },
   // CH1-only: ERP BOM reference + variance
   { key: 'erp_bom_cost',     label: 'ERP BOM ($)',       mono: true, price: true, ch1only: true, width: 105 },
   { key: 'chenh_lech',       label: 'Chênh lệch',        mono: true, computed: true, price: true, ch1only: true, width: 100 },
@@ -67,11 +67,13 @@ const EDITABLE_FIELDS = new Set([
   't_pham_co_nvl_da',
   'nini_adm', 'chi_tiet_tap',
   'erp_bom_cost',
+  'tag_price', 'fb_price',
 ])
 
 const NUM_FIELDS = new Set([
   'qt_pcs', 't_pham_co_nvl_da',
   'erp_bom_cost',
+  'tag_price', 'fb_price',
 ])
 
 function fmt2(n: number | null | undefined) { return n != null ? `$${n.toFixed(2)}` : '—' }
@@ -284,6 +286,11 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                       }
 
                       if (col.computed) {
+                        return <td key={col.key} style={{ ...td, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', textAlign: 'right', background: 'var(--bg-base)' }}>{displayVal}</td>
+                      }
+
+                      // tag/fb: computed (read-only) for AG3, manually editable for CH1/CH2/ADM
+                      if ((col.key === 'tag_price' || col.key === 'fb_price') && isAG3) {
                         return <td key={col.key} style={{ ...td, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', textAlign: 'right', background: 'var(--bg-base)' }}>{displayVal}</td>
                       }
 
