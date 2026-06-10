@@ -7,16 +7,18 @@ import { apiCall } from '@/lib/api'
 
 
 interface Col {
-  key:       string
-  label:     string
-  mono?:     boolean
-  sku?:      boolean
-  computed?: boolean
-  price?:    boolean
-  notes?:    boolean
-  width?:    number
-  ag3only?:  boolean  // show only for CH1_AG3 / VNSI_AG3
-  noAg3?:    boolean  // hide for CH1_AG3 / VNSI_AG3
+  key:          string
+  label:        string
+  mono?:        boolean
+  sku?:         boolean
+  computed?:    boolean
+  price?:       boolean
+  notes?:       boolean
+  width?:       number
+  ag3only?:     boolean  // show only for CH1_AG3 / VNSI_AG3
+  ch1ag3only?:  boolean  // show only for CH1_AG3
+  noAg3?:       boolean  // hide for CH1_AG3 / VNSI_AG3
+  noAdm?:       boolean  // hide for ADM
 }
 
 // Combined JM Form + SUMMARY sheet columns — all templates
@@ -26,43 +28,45 @@ const JM_COLS: Col[] = [
   { key: 'store',            label: 'Store',                                  width: 70  },
   { key: 'location',         label: 'Location',                               width: 80  },
   { key: 'vendor_model',     label: 'Vendor Model#',                          width: 120 },
-  // AG3-only: PO# (replaces SO-MO) and SKU# AG
-  { key: 'po_number',        label: 'PO#',              ag3only: true,        width: 130 },
-  { key: 'sku_ag',           label: 'SKU# AG',          ag3only: true,        width: 130 },
+  // AG3-only: PO# (replaces SO-MO)
+  { key: 'po_number',        label: 'PO#',              ag3only: true,                    width: 130 },
+  // CH1_AG3-only: SKU# AG (Lầu 3 SKU) — VNSI_AG3 only has one SKU column
+  { key: 'sku_ag',           label: 'SKU# AG',          ch1ag3only: true,                 width: 130 },
   // SO-MO — CH1/CH2/ADM only
-  { key: 'so_mo',            label: 'SO-MO',            noAg3: true,          width: 150 },
-  { key: 'sku',              label: 'SKU',              sku: true,            width: 130 },
-  { key: 'class',            label: 'Class',                                  width: 80  },
-  { key: 'sub_class',        label: 'Sub Class',                              width: 80  },
-  { key: 'description',      label: 'Description',                            width: 220 },
-  { key: 'qt_pcs',           label: 'Qty',              mono: true,           width: 55  },
-  // SUMMARY — hidden for AG3 JM Form view
-  { key: 'kich_thuoc',       label: 'Kích Thước',       noAg3: true,          width: 90  },
-  { key: 'loai_vang',        label: 'Loại vàng',        noAg3: true,          width: 85  },
-  { key: 't_pham_co_nvl_da', label: 'Wt. (gr)',         mono: true,           width: 100 },
+  { key: 'so_mo',            label: 'SO-MO',            noAg3: true,                      width: 150 },
+  { key: 'sku',              label: 'SKU',              sku: true,                        width: 130 },
+  { key: 'class',            label: 'Class',                                              width: 80  },
+  { key: 'sub_class',        label: 'Sub Class',                                          width: 80  },
+  { key: 'description',      label: 'Description',                                        width: 220 },
+  { key: 'qt_pcs',           label: 'Qty',              mono: true,                       width: 55  },
+  // SUMMARY — hidden for AG3
+  { key: 'kich_thuoc',       label: 'Kích Thước',       noAg3: true,                      width: 90  },
+  { key: 'loai_vang',        label: 'Loại vàng',        noAg3: true,                      width: 85  },
+  { key: 't_pham_co_nvl_da', label: 'Wt. (gr)',         mono: true,                       width: 100 },
   // Calculated — hidden for AG3
   { key: 't_pham_tru_nvl_da', label: 'T.Phẩm vàng TT', mono: true, computed: true, noAg3: true, width: 115 },
   { key: 'tien_vang',        label: 'Tiền vàng',        mono: true, computed: true, price: true, noAg3: true, width: 105 },
-  // Manufacturing costs — CH1/CH2 only
-  { key: 'gia_cong',         label: 'Gia công',          mono: true, price: true, width: 85 },
-  { key: 'duc',              label: 'Đúc',               mono: true, price: true, width: 70 },
-  { key: 'thiet_ke',         label: 'Thiết kế',          mono: true, price: true, width: 80 },
-  { key: 'resin',            label: 'Resin',             mono: true, price: true, width: 70 },
-  { key: 'phi_phu_kien',     label: 'Phụ kiện',          mono: true, price: true, width: 85 },
-  // Final prices
+  // Manufacturing costs — CH1/CH2 only (hasFees filter applied in visibleCols)
+  { key: 'gia_cong',         label: 'Gia công',          mono: true, price: true,          width: 85 },
+  { key: 'duc',              label: 'Đúc',               mono: true, price: true,          width: 70 },
+  { key: 'thiet_ke',         label: 'Thiết kế',          mono: true, price: true,          width: 80 },
+  { key: 'resin',            label: 'Resin',             mono: true, price: true,          width: 70 },
+  { key: 'phi_phu_kien',     label: 'Phụ kiện',          mono: true, price: true,          width: 85 },
+  // Final prices — all templates
   { key: 'von_san_xuat',     label: 'HP Purchase',       mono: true, computed: true, price: true, width: 105 },
   { key: 'cif_price',        label: 'HP CIF',            mono: true, computed: true, price: true, width: 100 },
-  // AG3-only computed prices
-  { key: 'tag_price',        label: 'HP Tag',            mono: true, computed: true, price: true, ag3only: true, width: 100 },
-  { key: 'fb_price',         label: 'HP FB',             mono: true, computed: true, price: true, ag3only: true, width: 100 },
-  // Shipping — CH1/CH2/ADM only in JM Form
-  { key: 'bao_hiem',         label: 'Bảo hiểm',          mono: true, price: true, noAg3: true, width: 85 },
-  { key: 'ngay_gui',         label: 'Ngày gửi',          noAg3: true, width: 105 },
-  { key: 'tracking_no',      label: 'Tracking#',         noAg3: true, width: 120 },
-  { key: 'hoa_don',          label: 'Hóa Đơn',           noAg3: true, width: 100 },
-  // Notes
-  { key: 'nini_adm',         label: 'Notes',             notes: true, noAg3: true, width: 140 },
-  { key: 'chi_tiet_tap',     label: 'Chi tiết/Tập',      notes: true, ag3only: true, width: 140 },
+  // Tag/FB — all templates (CH1/CH2/ADM/CH1_AG3/VNSI_AG3 all have HP Tag + HP FB)
+  { key: 'tag_price',        label: 'HP Tag',            mono: true, computed: true, price: true, width: 100 },
+  { key: 'fb_price',         label: 'HP FB',             mono: true, computed: true, price: true, width: 100 },
+  // Shipping — CH1/CH2 only (not ADM, not AG3)
+  { key: 'bao_hiem',         label: 'Bảo hiểm',          mono: true, price: true, noAg3: true, noAdm: true, width: 85 },
+  { key: 'ngay_gui',         label: 'Ngày gửi',          noAg3: true, noAdm: true,              width: 105 },
+  { key: 'tracking_no',      label: 'Tracking#',         noAg3: true, noAdm: true,              width: 120 },
+  { key: 'hoa_don',          label: 'Hóa Đơn',           noAg3: true, noAdm: true,              width: 100 },
+  // Notes — CH1/CH2 only
+  { key: 'nini_adm',         label: 'Notes',             notes: true, noAg3: true, noAdm: true, width: 140 },
+  // Chi tiết/Tập — AG3 only
+  { key: 'chi_tiet_tap',     label: 'Chi tiết/Tập',      notes: true, ag3only: true,            width: 140 },
 ]
 
 const EDITABLE_FIELDS = new Set([
@@ -118,15 +122,18 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [deleting,     setDeleting]     = useState(false)
 
-  const isAG3   = template === 'CH1_AG3' || template === 'VNSI_AG3'
-  const hasGems = template === 'CH1' || template === 'CH2' || template === 'ADM'
-  const hasFees = template === 'CH1' || template === 'CH2'
+  const isAG3    = template === 'CH1_AG3' || template === 'VNSI_AG3'
+  const isAdm    = template === 'ADM'
+  const hasGems  = template === 'CH1' || template === 'CH2' || template === 'ADM'
+  const hasFees  = template === 'CH1' || template === 'CH2'
 
   const visibleCols = JM_COLS.filter(c => {
     if (c.key === 'cif_price' && template === 'CH2') return false
     if (!canSeePrice && c.price) return false
-    if (c.ag3only && !isAG3)  return false
-    if (c.noAg3   &&  isAG3)  return false
+    if (c.ag3only    && !isAG3)              return false
+    if (c.ch1ag3only && template !== 'CH1_AG3') return false
+    if (c.noAg3      &&  isAG3)              return false
+    if (c.noAdm      &&  isAdm)              return false
     if (!hasFees && ['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien'].includes(c.key)) return false
     return true
   })

@@ -38,9 +38,11 @@ interface Props {
 
 export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, template = 'CH1', onRefresh, onItemUpdate }: Props) {
   const isAG3      = template === 'CH1_AG3' || template === 'VNSI_AG3'
+  const isAdm      = template === 'ADM'
   const hasGems    = template === 'CH1' || template === 'CH2' || template === 'ADM'
   const hasFees    = template === 'CH1' || template === 'CH2'
   const hasCIF     = template !== 'CH2'
+  const hasTagFb   = hasCIF  // all templates with CIF also show Tag+FB
   const [editMode, setEditMode] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -51,7 +53,8 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   const [deletingGem, setDeletingGem] = useState(false)
 
   const gems: any[] = item.invoice_diamonds ?? []
-  const isBaSao = (isAG3 ? item.chi_tiet_tap : item.nini_adm)?.toLowerCase().includes('ba sao')
+  const notesVal = isAG3 ? item.chi_tiet_tap : (!isAdm ? item.nini_adm : null)
+  const isBaSao  = notesVal?.toLowerCase().includes('ba sao') ?? false
 
   function openEdit() {
     setForm({
@@ -165,12 +168,12 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
         <div style={{ padding: '0.75rem 1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem' }}>
           {[
             ...(item.vendor_model  ? [['Vendor Model#', item.vendor_model]]       : []),
-            ...(isAG3 && item.po_number  ? [['PO#',      item.po_number]]         : []),
-            ...(isAG3 && item.sku_ag     ? [['SKU# AG',  item.sku_ag]]            : []),
+            ...(isAG3 && item.po_number             ? [['PO#',       item.po_number]]   : []),
+            ...(template === 'CH1_AG3' && item.sku_ag ? [['SKU# AG', item.sku_ag]]      : []),
             ['Qty (pcs)', item.qt_pcs],
-            ...(!isAG3 && item.kich_thuoc ? [['Kích thước', item.kich_thuoc]]     : []),
+            ...(!isAG3 && item.kich_thuoc           ? [['Kích thước', item.kich_thuoc]] : []),
             ['Loại vàng', item.loai_vang ?? '—'],
-            ...(!isAG3 && item.so_mo ? [['SO-MO', item.so_mo]]                    : []),
+            ...(!isAG3 && item.so_mo                ? [['SO-MO', item.so_mo]]           : []),
             ['Wt. (gr)', fmt4(item.t_pham_co_nvl_da ?? item.wt_gr)],
             ...(!isAG3 ? [
               ['T.Phẩm trừ NVL đá (gr)', fmt4(item.t_pham_tru_nvl_da)],
@@ -180,8 +183,8 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               ...(!isAG3 ? [['Tiền vàng', fmt2(item.tien_vang)]] : []),
               ['HP Purchase', fmt2(item.von_san_xuat)],
               ...(hasCIF ? [['HP CIF', fmt2(item.cif_price)]] : []),
-              ...(isAG3 && item.tag_price != null ? [['HP Tag', fmt2(item.tag_price)]] : []),
-              ...(isAG3 && item.fb_price  != null ? [['HP FB',  fmt2(item.fb_price)]]  : []),
+              ...(hasTagFb && item.tag_price != null ? [['HP Tag', fmt2(item.tag_price)]] : []),
+              ...(hasTagFb && item.fb_price  != null ? [['HP FB',  fmt2(item.fb_price)]]  : []),
             ] : []),
             ...(canSeePrice && hasFees && (item.gia_cong || item.duc || item.thiet_ke || item.resin || item.phi_phu_kien) ? [
               ['Gia công/SP', fmt2(item.gia_cong)],
@@ -190,13 +193,13 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               ['Resin/SP', fmt2(item.resin)],
               ['Phụ kiện', fmt2(item.phi_phu_kien)],
             ] : []),
-            ...(!isAG3 && item.bao_hiem    ? [['Bảo hiểm', fmt2(item.bao_hiem)]]      : []),
-            ...(!isAG3 && item.ngay_gui    ? [['Ngày gửi', item.ngay_gui]]             : []),
-            ...(!isAG3 && item.tracking_no ? [['Tracking#', item.tracking_no]]         : []),
-            ...(!isAG3 && item.hoa_don     ? [['Hóa Đơn (V-INV)', item.hoa_don]]       : []),
-            ...(item.store       ? [['Store', item.store]]                              : []),
-            ...(!isAG3 && item.nini_adm    ? [['Notes',      item.nini_adm]]            : []),
-            ...(isAG3  && item.chi_tiet_tap ? [['Chi tiết/Tập', item.chi_tiet_tap]]     : []),
+            ...(!isAG3 && !isAdm && item.bao_hiem    ? [['Bảo hiểm', fmt2(item.bao_hiem)]]    : []),
+            ...(!isAG3 && !isAdm && item.ngay_gui    ? [['Ngày gửi', item.ngay_gui]]           : []),
+            ...(!isAG3 && !isAdm && item.tracking_no ? [['Tracking#', item.tracking_no]]       : []),
+            ...(!isAG3 && !isAdm && item.hoa_don     ? [['Hóa Đơn (V-INV)', item.hoa_don]]     : []),
+            ...(item.store                           ? [['Store', item.store]]                  : []),
+            ...(!isAG3 && !isAdm && item.nini_adm    ? [['Notes', item.nini_adm]]               : []),
+            ...(isAG3 && item.chi_tiet_tap           ? [['Chi tiết/Tập', item.chi_tiet_tap]]    : []),
           ].map(([label, val]) => (
             <div key={String(label)}>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
@@ -228,8 +231,10 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
             <div><label style={labelStyle}>Qty (pcs) *</label>
               <input type="number" min="1" step="1" style={inputStyle} value={form.qt_pcs} onChange={f('qt_pcs')} /></div>
-            <div><label style={labelStyle}>Kích thước</label>
-              <input style={inputStyle} value={form.kich_thuoc ?? ''} onChange={f('kich_thuoc')} placeholder="e.g. 8in, Size 5" /></div>
+            {!isAG3 && (
+              <div><label style={labelStyle}>Kích thước</label>
+                <input style={inputStyle} value={form.kich_thuoc ?? ''} onChange={f('kich_thuoc')} placeholder="e.g. 8in, Size 5" /></div>
+            )}
             <div><label style={labelStyle}>Loại vàng</label>
               <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.loai_vang} onChange={f('loai_vang')}>
                 <option value="">—</option>
@@ -246,8 +251,10 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
             {isAG3 ? (<>
               <div><label style={labelStyle}>PO#</label>
                 <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} value={form.po_number ?? ''} onChange={f('po_number')} placeholder="e.g. 1000011528" /></div>
-              <div><label style={labelStyle}>SKU# AG</label>
-                <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} value={form.sku_ag ?? ''} onChange={f('sku_ag')} /></div>
+              {template === 'CH1_AG3' && (
+                <div><label style={labelStyle}>SKU# AG</label>
+                  <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} value={form.sku_ag ?? ''} onChange={f('sku_ag')} /></div>
+              )}
             </>) : (
               <div><label style={labelStyle}>SO-MO</label>
                 <input style={inputStyle} value={form.so_mo} onChange={f('so_mo')} placeholder="SO26.xxxx-MO26.xxxxx" /></div>
@@ -274,14 +281,14 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
             </>
           )}
 
-          {!isAG3 && (
+          {!isAG3 && !isAdm && (
             <div style={{ marginBottom: '1rem' }}>
               <label style={labelStyle}>Bảo hiểm (AC)</label>
               <input type="number" min="0" step="0.01" style={{ ...inputStyle, maxWidth: 160 }} value={form.bao_hiem ?? ''} onChange={f('bao_hiem')} placeholder="0.00" />
             </div>
           )}
 
-          {!isAG3 && (
+          {!isAG3 && !isAdm && (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
               <div><label style={labelStyle}>Ngày gửi</label>
                 <input type="date" style={inputStyle} value={form.ngay_gui} onChange={f('ngay_gui')} /></div>
@@ -300,7 +307,10 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                                ['Tiền vàng', fmt2(item.tien_vang)]] : []),
                 ['HP Purchase', fmt2(item.von_san_xuat)],
                 ...(hasCIF ? [['HP CIF', fmt2(item.cif_price)]] : []),
-                ...(isAG3 ? [['HP Tag', fmt2(item.tag_price)], ['HP FB', fmt2(item.fb_price)]] : []),
+                ...(hasTagFb ? [
+                  ...(item.tag_price != null ? [['HP Tag', fmt2(item.tag_price)]] : []),
+                  ...(item.fb_price  != null ? [['HP FB',  fmt2(item.fb_price)]]  : []),
+                ] : []),
               ].map(([l, v]) => (
                 <div key={l as string}>
                   <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>{l} <span style={{ color: 'var(--color-info)', fontSize: 9 }}>AUTO</span></div>
@@ -324,13 +334,13 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               <input style={{ ...inputStyle, color: (form.chi_tiet_tap || '').toLowerCase().includes('ba sao') ? '#DC2626' : 'var(--text-primary)', fontWeight: (form.chi_tiet_tap || '').toLowerCase().includes('ba sao') ? 700 : 400 }}
                 value={form.chi_tiet_tap ?? ''} onChange={f('chi_tiet_tap')} placeholder="Chi tiết hoặc tập..." />
             </div>
-          ) : (
+          ) : !isAdm ? (
             <div style={{ marginBottom: '1rem' }}>
               <label style={labelStyle}>Notes / Memo</label>
               <input style={{ ...inputStyle, color: (form.nini_adm || '').toLowerCase().includes('ba sao') ? '#DC2626' : 'var(--text-primary)', fontWeight: (form.nini_adm || '').toLowerCase().includes('ba sao') ? 700 : 400 }}
                 value={form.nini_adm} onChange={f('nini_adm')} placeholder="e.g. Ba Sao — 3 stars" />
             </div>
-          )}
+          ) : null}
 
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button onClick={handleSave} disabled={saving} style={{ padding: '0.5rem 1.5rem', background: 'var(--text-primary)', color: 'var(--text-inverse)', border: 'none', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, borderRadius: 0 }}>

@@ -1,0 +1,53 @@
+## 2026-06-10 — Fix v2: Logic Rewrite (JM-FORM-SUMMARY-logic-flow.md)
+
+### Critical bugs fixed:
+
+1. **Gold price formula** (pricing.ts) — was using pre-derived $/gram rates from `daily_metal_rates`.
+   Now: raw 24K spot ($/oz) + loss% per karat via `goldPricePerGram(loai_vang, nvl)`.
+   Formula: 18K = `gold_24k × 1.06 × (18/24) / 31.103`, PT = `pt_price × 1.17 / 31.103`, etc.
+
+2. **Diamond weight formula** (fix_v2_logic.sql) — GENERATED column `weight_gr` was `weight_ct_after × 0.2`.
+   Now: `weight_ct_before × 0.2` (= tl_truoc_xu_ly_ct / 5 per JM-FORM).
+   Same fix applied to `total_price` GENERATED: `weight_ct_before × unit_price_per_ct` (= t_gia_xoan).
+
+3. **Von SX formula** (pricing.ts `calcVonSanXuat`) — template-aware:
+   - CH1/CH2: Σt_gia_xoan + Σt_phi + tien_vang + gia_cong + duc + thiet_ke + resin + phi_phu_kien
+   - ADM: Σt_gia_xoan + Σt_phi + tien_vang (no individual fees)
+   - CH1_AG3/VNSI_AG3: tien_vang only
+
+4. **CIF formula** (pricing.ts `calcCIFPrice`) — template-aware:
+   - CH1/ADM/CH1_AG3: purchase × 1.05
+   - VNSI_AG3: purchase × 1.10
+   - CH2: null (no CIF column)
+
+5. **Template support** — added `template_type` + NVL snapshot columns to `invoice_headers` (migration).
+   All 6 API routes updated to read `template_type, nvl_*` from invoice instead of fetching `daily_metal_rates(*), pricing_rules(*)`.
+
+6. **UI labels** — fixed to match SUMMARY sheet:
+   - "HPUSA" → "Vốn SX"
+   - "HP CIF" → "CIF/SP"
+   - "No-Gem Wt" → "T.Phẩm vàng TT"
+   - "HP Tag/FB" → removed
+   - Gem table: added Mã Xoàn, Size Range, TL Trước/Sau, and "auto" annotations
+   - CH2 template hides CIF column in JMFormView
+   - ADM template hides individual gia công fields in ItemCard
+
+### Files changed:
+- `supabase/fix_v2_logic.sql` (new — run after migration.sql)
+- `lib/formulas/pricing.ts` (rewrite)
+- `types/index.ts` (update: InvoiceTemplate, NVLSnapshot, new fields)
+- `app/api/invoices/[id]/route.ts`
+- `app/api/invoices/[id]/items/route.ts`
+- `app/api/invoices/[id]/items/[itemId]/route.ts`
+- `app/api/invoices/[id]/items/[itemId]/gems/route.ts`
+- `app/api/invoices/[id]/items/[itemId]/gems/[gemId]/route.ts`
+- `app/api/import/route.ts`
+- `components/invoice/ItemCard.tsx`
+- `components/invoice/JMFormView.tsx`
+- `components/invoice/DetailView.tsx`
+- `app/(dashboard)/invoices/[id]/page.tsx`
+
+### Action required:
+1. Run `supabase/fix_v2_logic.sql` in Supabase SQL Editor
+2. For new invoices: set `template_type` and fill `nvl_*` snapshot columns when creating
+3. Existing invoices: need to backfill `template_type` and `nvl_*` columns
