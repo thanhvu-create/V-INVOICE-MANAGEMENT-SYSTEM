@@ -29,7 +29,7 @@ const field: React.CSSProperties = { marginBottom: '1.25rem' }
 
 export default function NewInvoicePage() {
   const router    = useRouter()
-  const { canDo } = useUser()
+  const { canDo, loaded } = useUser()
 
   const [nvlDefaults, setNvlDefaults] = useState<NVLDefaults | null>(null)
   const [form, setForm] = useState({
@@ -69,6 +69,9 @@ export default function NewInvoicePage() {
     }
   }
 
+  if (!loaded) {
+    return <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
+  }
   if (!canDo('create')) {
     return <p style={{ color: 'var(--color-danger)' }}>You don't have permission to create invoices.</p>
   }

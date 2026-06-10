@@ -74,7 +74,7 @@ async function validateRows(rows: any[][]): Promise<{ valid: ImportRow[]; errors
 }
 
 function ImportContent() {
-  const { canDo } = useUser()
+  const { canDo, loaded } = useUser()
   const router    = useRouter()
   const sp        = useSearchParams()
   const invoiceId = sp.get('invoiceId') ?? ''
@@ -134,6 +134,7 @@ function ImportContent() {
     }
   }
 
+  if (!loaded) return <p style={{ color: 'var(--text-muted)' }}>Loading...</p>
   if (!canDo('import')) {
     return <p style={{ color: 'var(--color-danger)' }}>You don't have permission to import.</p>
   }
