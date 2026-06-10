@@ -5,7 +5,6 @@ import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 
 const LOAI_VANG_OPTIONS = ['24K', '23K', '22K', '18KW', '18KY', '17K', '16K', '15K', '14K', '10K', 'PT950', 'AG', 'PD']
-const CLASS_OPTIONS     = ['24K', '18MTG', 'DIAJE', 'DIAMT', '18KJE', 'LGRI', 'SILJE']
 
 interface Form {
   sku:          string
@@ -206,11 +205,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
 
             <div>
               <label style={labelStyle}>Class</label>
-              <select style={inputStyle} value={form.class} onChange={f('class')}>
-                <option value="">—</option>
-                {CLASS_OPTIONS.map(c => <option key={c} value={c}>{c}</option>)}
-                <option value="OTHER">Other…</option>
-              </select>
+              <input style={inputStyle} placeholder="18MTG, DIAJE…" value={form.class} onChange={f('class')} />
             </div>
             <div>
               <label style={labelStyle}>Sub Class</label>
