@@ -36,7 +36,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       'class', 'sub_class', 'gia_cong', 'duc', 'thiet_ke',
       'resin', 'phi_phu_kien', 'nini_adm',
       'ngay_gui', 'tracking_no', 'hoa_don', 'kich_thuoc',
-      'image_url', 'bao_hiem',
+      'image_url', 'bao_hiem', 'vendor_model',
     ]
     const updates: Record<string, unknown> = {}
     for (const k of EDITABLE) {

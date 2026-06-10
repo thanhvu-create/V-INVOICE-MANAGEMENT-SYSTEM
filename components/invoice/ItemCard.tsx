@@ -54,6 +54,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
 
   function openEdit() {
     setForm({
+      vendor_model:      item.vendor_model             ?? '',
       qt_pcs:            String(item.qt_pcs            ?? ''),
       kich_thuoc:        item.kich_thuoc               ?? '',
       description:       item.description              ?? '',
@@ -159,6 +160,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
       {!editMode && (
         <div style={{ padding: '0.75rem 1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem' }}>
           {[
+            ...(item.vendor_model  ? [['Vendor Model#', item.vendor_model]]       : []),
             ['Qty (pcs)', item.qt_pcs],
             ...(item.kich_thuoc    ? [['Kích thước', item.kich_thuoc]]            : []),
             ['Loại vàng', item.loai_vang ?? '—'],
@@ -228,6 +230,8 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               <input style={inputStyle} value={form.class} onChange={f('class')} /></div>
             <div><label style={labelStyle}>Sub Class</label>
               <input style={inputStyle} value={form.sub_class} onChange={f('sub_class')} /></div>
+            <div><label style={labelStyle}>Vendor Model# (Mã mẫu)</label>
+              <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} value={form.vendor_model ?? ''} onChange={f('vendor_model')} placeholder="e.g. L10437" /></div>
             <div><label style={labelStyle}>SO-MO</label>
               <input style={inputStyle} value={form.so_mo} onChange={f('so_mo')} placeholder="SO26.xxxx-MO26.xxxxx" /></div>
             <div><label style={labelStyle}>T.Phẩm có NVL đá (gr)</label>

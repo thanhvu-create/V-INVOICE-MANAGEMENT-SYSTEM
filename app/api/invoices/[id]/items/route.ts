@@ -68,6 +68,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         ngay_gui:          body.ngay_gui          ?? null,
         tracking_no:       body.tracking_no       ?? null,
         hoa_don:           body.hoa_don           ?? null,
+        vendor_model:      body.vendor_model      ?? null,
         image_url:         body.image_url         ?? null,
       })
       .select()

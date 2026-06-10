@@ -9,6 +9,7 @@ const CLASS_OPTIONS     = ['24K', '18MTG', 'DIAJE', 'DIAMT', '18KJE', 'LGRI', 'S
 
 interface Form {
   sku:          string
+  vendor_model: string
   so_mo:        string
   description:  string
   class:        string
@@ -30,7 +31,7 @@ interface Form {
 }
 
 const EMPTY: Form = {
-  sku: '', so_mo: '', description: '', class: '', sub_class: '',
+  sku: '', vendor_model: '', so_mo: '', description: '', class: '', sub_class: '',
   kich_thuoc: '', loai_vang: '', store: 'HP', location: 'Safe 1',
   qt_pcs: '1', wt_gr: '',
   gia_cong: '0', duc: '0', thiet_ke: '0', resin: '0', phi_phu_kien: '0',
@@ -71,6 +72,7 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
     const wt = parseFloat(form.wt_gr) || 0
     const body = {
       sku:              form.sku.trim().toUpperCase(),
+      vendor_model:     form.vendor_model.trim() || null,
       so_mo:            form.so_mo.trim()       || null,
       description:      form.description.trim() || null,
       class:            form.class.trim()        || null,
@@ -151,6 +153,12 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
               <label style={labelStyle}>SO-MO</label>
               <input style={inputStyle} placeholder="SO26.10628-MO26.36160" value={form.so_mo} onChange={f('so_mo')} />
             </div>
+          </div>
+
+          {/* Vendor Model# */}
+          <div style={{ marginBottom: '0.75rem' }}>
+            <label style={labelStyle}>Vendor Model# (Mã mẫu)</label>
+            <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} placeholder="e.g. L10437" value={form.vendor_model} onChange={f('vendor_model')} />
           </div>
 
           {/* Description */}

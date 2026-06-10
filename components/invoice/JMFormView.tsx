@@ -23,6 +23,7 @@ const JM_COLS: Col[] = [
   { key: 'seq',              label: 'No.',                                  width: 44  },
   { key: 'store',            label: 'Store',                                width: 70  },
   { key: 'location',         label: 'Location',                             width: 80  },
+  { key: 'vendor_model',    label: 'Vendor Model#',                        width: 120 },
   { key: 'so_mo',            label: 'SO-MO',                                width: 150 },
   { key: 'sku',              label: 'SKU',             sku: true,           width: 130 },
   { key: 'class',            label: 'Class',                                width: 80  },
@@ -55,7 +56,7 @@ const JM_COLS: Col[] = [
 ]
 
 const EDITABLE_FIELDS = new Set([
-  'store', 'location', 'so_mo',
+  'store', 'location', 'vendor_model', 'so_mo',
   'qt_pcs', 'description', 'class', 'sub_class',
   'loai_vang', 'kich_thuoc', 't_pham_co_nvl_da',
   'gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien',
