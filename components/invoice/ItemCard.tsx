@@ -61,8 +61,6 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
       vendor_model:      item.vendor_model             ?? '',
       po_number:         item.po_number                ?? '',
       sku_ag:            item.sku_ag                   ?? '',
-      chi_tiet_tap:      item.chi_tiet_tap             ?? '',
-      erp_bom_cost:      String(item.erp_bom_cost      ?? ''),
       qt_pcs:            String(item.qt_pcs            ?? ''),
       kich_thuoc:        item.kich_thuoc               ?? '',
       description:       item.description              ?? '',
@@ -76,7 +74,6 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
       resin:             String(item.resin              ?? 0),
       phi_phu_kien:      String(item.phi_phu_kien       ?? 0),
       bao_hiem:          String(item.bao_hiem           ?? 0),
-      nini_adm:          item.nini_adm                 ?? '',
       so_mo:             item.so_mo                    ?? '',
       ngay_gui:          item.ngay_gui                 ?? '',
       tracking_no:       item.tracking_no              ?? '',
@@ -270,13 +267,6 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               <input type="number" min="0" step="0.0001" style={inputStyle} value={form.t_pham_co_nvl_da} onChange={f('t_pham_co_nvl_da')} /></div>
           </div>
 
-          {template === 'CH1' && (
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={labelStyle}>ERP BOM Cost ($)</label>
-              <input type="number" min="0" step="0.01" style={{ ...inputStyle, maxWidth: 200 }} value={form.erp_bom_cost ?? ''} onChange={f('erp_bom_cost')} placeholder="0.00" />
-            </div>
-          )}
-
           {hasFees && (
             <>
               <p style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Gia công (USD/SP)</p>
@@ -349,20 +339,6 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               onChange={v => setForm(fv => ({ ...fv, image_url: v }))}
             />
           </div>
-
-          {isAG3 ? (
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={labelStyle}>Chi tiết / Tập</label>
-              <input style={{ ...inputStyle, color: (form.chi_tiet_tap || '').toLowerCase().includes('ba sao') ? '#DC2626' : 'var(--text-primary)', fontWeight: (form.chi_tiet_tap || '').toLowerCase().includes('ba sao') ? 700 : 400 }}
-                value={form.chi_tiet_tap ?? ''} onChange={f('chi_tiet_tap')} placeholder="Chi tiết hoặc tập..." />
-            </div>
-          ) : !isAdm ? (
-            <div style={{ marginBottom: '1rem' }}>
-              <label style={labelStyle}>Notes / Memo</label>
-              <input style={{ ...inputStyle, color: (form.nini_adm || '').toLowerCase().includes('ba sao') ? '#DC2626' : 'var(--text-primary)', fontWeight: (form.nini_adm || '').toLowerCase().includes('ba sao') ? 700 : 400 }}
-                value={form.nini_adm} onChange={f('nini_adm')} placeholder="e.g. Ba Sao — 3 stars" />
-            </div>
-          ) : null}
 
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button onClick={handleSave} disabled={saving} style={{ padding: '0.5rem 1.5rem', background: 'var(--text-primary)', color: 'var(--text-inverse)', border: 'none', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, borderRadius: 0 }}>
