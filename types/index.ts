@@ -11,13 +11,15 @@ export interface Invoice {
   status:        InvoiceStatus
   channel:       string | null   // "CH1-Khách", "ADM", ...
   // NVL Snapshot — frozen after finalized
-  nvl_gold_24k:  number | null
-  nvl_pt_price:  number | null
-  nvl_ag_price:  number | null
-  nvl_pd_price:  number | null
-  nvl_loss_gold: number | null
-  nvl_loss_pt:   number | null
-  nvl_cif_rate:  number | null
+  nvl_gold_24k:       number | null
+  nvl_pt_price:       number | null
+  nvl_ag_price:       number | null
+  nvl_pd_price:       number | null
+  nvl_loss_gold:      number | null
+  nvl_loss_pt:        number | null
+  nvl_cif_rate:       number | null
+  nvl_tag_multiplier: number | null  // Tag price = CIF × this
+  nvl_fr_multiplier:  number | null  // FB/FR price = CIF × this
   created_at:    string
   finalized_at:  string | null
   created_by:    string | null   // UUID → app_users.id
@@ -30,8 +32,9 @@ export interface InvoiceProduct {
   id:               string
   invoice_id:       string
   seq:              number
-  // JM Form
+  // JM Form — common
   sku:              string | null
+  vendor_model:     string | null
   so_mo:            string | null
   description:      string | null
   wt_gr:            number | null
@@ -40,6 +43,10 @@ export interface InvoiceProduct {
   location:         string | null
   class:            string | null
   sub_class:        string | null
+  // AG3-only JM Form fields
+  po_number:        string | null  // PO# (AG3 template — replaces SO-MO)
+  sku_ag:           string | null  // SKU# AG (AG3 template)
+  chi_tiet_tap:     string | null  // Chi tiết/Tập notes (AG3 template)
   // SUMMARY
   loai_vang:        string | null
   kich_thuoc:       string | null
@@ -50,7 +57,7 @@ export interface InvoiceProduct {
   thiet_ke:         number | null
   resin:            number | null
   phi_phu_kien:     number | null
-  nini_adm:         string | null  // ghi chú / memo
+  nini_adm:         string | null  // ghi chú / memo (CH1/CH2/ADM)
   bao_hiem:         number | null
   ngay_gui:         string | null
   tracking_no:      string | null
@@ -62,6 +69,8 @@ export interface InvoiceProduct {
   von_san_xuat:          number | null
   purchase_price:        number | null
   cif_price:             number | null
+  tag_price:             number | null  // CIF × nvl_tag_multiplier (AG3)
+  fb_price:              number | null  // CIF × nvl_fr_multiplier  (AG3)
   created_at:            string
   updated_at:            string
   invoice_diamonds?:     InvoiceDiamond[]
@@ -94,14 +103,16 @@ export type ItemGemDetail = InvoiceDiamond
 // ── NVL Prices ───────────────────────────────────────────────────────────────
 
 export interface NVLPrice {
-  id:         number
-  gold_24k:   number
-  pt_price:   number
-  ag_price:   number
-  pd_price:   number
-  loss_gold:  number
-  loss_pt:    number
-  updated_at: string
+  id:              number
+  gold_24k:        number
+  pt_price:        number
+  ag_price:        number
+  pd_price:        number
+  loss_gold:       number
+  loss_pt:         number
+  tag_multiplier:  number | null
+  fr_multiplier:   number | null
+  updated_at:      string
 }
 
 // ── User ─────────────────────────────────────────────────────────────────────

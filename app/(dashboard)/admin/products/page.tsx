@@ -5,27 +5,33 @@ import { AdminModal, fieldStyle, labelStyle, inputStyle, btnPrimary, btnSecondar
 import { toast } from '@/components/ui/Toast'
 
 interface NVLPrice {
-  id:         string
-  gold_24k:   number | null
-  pt_price:   number | null
-  ag_price:   number | null
-  pd_price:   number | null
-  loss_gold:  number | null
-  loss_pt:    number | null
-  updated_at: string
+  id:              string
+  gold_24k:        number | null
+  pt_price:        number | null
+  ag_price:        number | null
+  pd_price:        number | null
+  loss_gold:       number | null
+  loss_pt:         number | null
+  tag_multiplier:  number | null
+  fr_multiplier:   number | null
+  updated_at:      string
 }
 
 const FIELDS: { key: keyof Omit<NVLPrice, 'id' | 'created_at'>; label: string; unit: string; step: string }[] = [
-  { key: 'gold_24k',  label: 'Gold 24K',  unit: '$/oz',  step: '0.01'   },
-  { key: 'pt_price',  label: 'Platinum',  unit: '$/oz',  step: '0.01'   },
-  { key: 'ag_price',  label: 'Silver',    unit: '$/oz',  step: '0.01'   },
-  { key: 'pd_price',  label: 'Palladium', unit: '$/oz',  step: '0.01'   },
-  { key: 'loss_gold', label: 'Loss Gold', unit: '%',     step: '0.001'  },
-  { key: 'loss_pt',   label: 'Loss Pt',   unit: '%',     step: '0.001'  },
+  { key: 'gold_24k',       label: 'Gold 24K',       unit: '$/oz', step: '0.01'  },
+  { key: 'pt_price',       label: 'Platinum',       unit: '$/oz', step: '0.01'  },
+  { key: 'ag_price',       label: 'Silver',         unit: '$/oz', step: '0.01'  },
+  { key: 'pd_price',       label: 'Palladium',      unit: '$/oz', step: '0.01'  },
+  { key: 'loss_gold',      label: 'Loss Gold',      unit: '%',    step: '0.001' },
+  { key: 'loss_pt',        label: 'Loss Pt',        unit: '%',    step: '0.001' },
+  { key: 'tag_multiplier', label: 'Tag Multiplier', unit: '×',    step: '0.01'  },
+  { key: 'fr_multiplier',  label: 'FB/FR Multiplier', unit: '×',  step: '0.01'  },
 ]
 
 const EMPTY_FORM: Record<string, string> = {
-  gold_24k: '', pt_price: '', ag_price: '', pd_price: '', loss_gold: '0.06', loss_pt: '0.17',
+  gold_24k: '', pt_price: '', ag_price: '', pd_price: '',
+  loss_gold: '0.06', loss_pt: '0.17',
+  tag_multiplier: '', fr_multiplier: '',
 }
 
 const th: React.CSSProperties = { padding: '0.5rem 0.75rem', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '2px solid var(--border-base)', background: 'var(--bg-surface)', whiteSpace: 'nowrap' }
@@ -121,7 +127,9 @@ export default function NVLPricesPage() {
                     {r[f.key] != null
                       ? f.unit === '%'
                         ? `${(Number(r[f.key]) * 100).toFixed(1)}%`
-                        : `$${Number(r[f.key]).toFixed(2)}`
+                        : f.unit === '×'
+                          ? `${Number(r[f.key]).toFixed(2)}×`
+                          : `$${Number(r[f.key]).toFixed(2)}`
                       : '—'}
                   </td>
                 ))}

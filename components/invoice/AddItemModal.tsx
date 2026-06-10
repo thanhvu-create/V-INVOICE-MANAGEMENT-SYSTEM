@@ -11,6 +11,8 @@ interface Form {
   sku:          string
   vendor_model: string
   so_mo:        string
+  po_number:    string
+  sku_ag:       string
   description:  string
   class:        string
   sub_class:    string
@@ -27,30 +29,36 @@ interface Form {
   phi_phu_kien: string
   bao_hiem:     string
   nini_adm:     string
+  chi_tiet_tap: string
   image_url:    string
 }
 
 const EMPTY: Form = {
-  sku: '', vendor_model: '', so_mo: '', description: '', class: '', sub_class: '',
+  sku: '', vendor_model: '', so_mo: '', po_number: '', sku_ag: '',
+  description: '', class: '', sub_class: '',
   kich_thuoc: '', loai_vang: '', store: 'HP', location: 'Safe 1',
   qt_pcs: '1', wt_gr: '',
   gia_cong: '0', duc: '0', thiet_ke: '0', resin: '0', phi_phu_kien: '0',
   bao_hiem: '0',
-  nini_adm: '', image_url: '',
+  nini_adm: '', chi_tiet_tap: '', image_url: '',
 }
 
 interface Props {
-  open:      boolean
-  invoiceId: string
-  onClose:   () => void
-  onSaved:   () => void
+  open:         boolean
+  invoiceId:    string
+  template?:    string
+  onClose:      () => void
+  onSaved:      () => void
 }
 
-export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
+export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Props) {
   const [form,   setForm]   = useState<Form>(EMPTY)
   const [saving, setSaving] = useState(false)
   const [error,  setError]  = useState('')
   const skuRef = useRef<HTMLInputElement>(null)
+
+  const isAG3    = template === 'CH1_AG3' || template === 'VNSI_AG3'
+  const hasFees  = template === 'CH1' || template === 'CH2'
 
   useEffect(() => {
     if (open) { setForm(EMPTY); setError('') }
@@ -73,24 +81,27 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
     const body = {
       sku:              form.sku.trim().toUpperCase(),
       vendor_model:     form.vendor_model.trim() || null,
-      so_mo:            form.so_mo.trim()       || null,
+      so_mo:            isAG3 ? null : (form.so_mo.trim() || null),
+      po_number:        isAG3 ? (form.po_number.trim() || null) : null,
+      sku_ag:           isAG3 ? (form.sku_ag.trim() || null) : null,
       description:      form.description.trim() || null,
       class:            form.class.trim()        || null,
       sub_class:        form.sub_class.trim()    || null,
-      kich_thuoc:       form.kich_thuoc.trim()   || null,
+      kich_thuoc:       isAG3 ? null : (form.kich_thuoc.trim() || null),
       loai_vang:        form.loai_vang           || null,
       store:            form.store.trim()        || null,
       location:         form.location.trim()     || null,
       qt_pcs:           parseInt(form.qt_pcs)    || 1,
       wt_gr:            wt,
       t_pham_co_nvl_da: wt,
-      gia_cong:         parseFloat(form.gia_cong)     || 0,
-      duc:              parseFloat(form.duc)           || 0,
-      thiet_ke:         parseFloat(form.thiet_ke)      || 0,
-      resin:            parseFloat(form.resin)         || 0,
-      phi_phu_kien:     parseFloat(form.phi_phu_kien)  || 0,
-      bao_hiem:         parseFloat(form.bao_hiem)      || null,
-      nini_adm:         form.nini_adm.trim()    || null,
+      gia_cong:         hasFees ? (parseFloat(form.gia_cong)    || 0) : 0,
+      duc:              hasFees ? (parseFloat(form.duc)          || 0) : 0,
+      thiet_ke:         hasFees ? (parseFloat(form.thiet_ke)     || 0) : 0,
+      resin:            hasFees ? (parseFloat(form.resin)        || 0) : 0,
+      phi_phu_kien:     hasFees ? (parseFloat(form.phi_phu_kien) || 0) : 0,
+      bao_hiem:         isAG3 ? null : (parseFloat(form.bao_hiem) || null),
+      nini_adm:         isAG3 ? null : (form.nini_adm.trim() || null),
+      chi_tiet_tap:     isAG3 ? (form.chi_tiet_tap.trim() || null) : null,
       image_url:        form.image_url.trim()   || null,
     }
     const data = await apiCall(
@@ -136,7 +147,7 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
         {/* Body */}
         <div style={{ padding: '1.25rem' }}>
 
-          {/* SKU + SO-MO */}
+          {/* SKU + SO-MO / PO# */}
           <div style={grid2}>
             <div>
               <label style={labelStyle}>SKU *</label>
@@ -149,16 +160,31 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
               />
               {error && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)', marginTop: 3 }}>{error}</div>}
             </div>
-            <div>
-              <label style={labelStyle}>SO-MO</label>
-              <input style={inputStyle} placeholder="SO26.10628-MO26.36160" value={form.so_mo} onChange={f('so_mo')} />
-            </div>
+            {isAG3 ? (
+              <div>
+                <label style={labelStyle}>PO#</label>
+                <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} placeholder="e.g. 1000011528" value={form.po_number} onChange={f('po_number')} />
+              </div>
+            ) : (
+              <div>
+                <label style={labelStyle}>SO-MO</label>
+                <input style={inputStyle} placeholder="SO26.10628-MO26.36160" value={form.so_mo} onChange={f('so_mo')} />
+              </div>
+            )}
           </div>
 
-          {/* Vendor Model# */}
-          <div style={{ marginBottom: '0.75rem' }}>
-            <label style={labelStyle}>Vendor Model# (Mã mẫu)</label>
-            <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} placeholder="e.g. L10437" value={form.vendor_model} onChange={f('vendor_model')} />
+          {/* Vendor Model# + SKU# AG (AG3 only) */}
+          <div style={grid2}>
+            <div>
+              <label style={labelStyle}>Vendor Model# (Mã mẫu)</label>
+              <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} placeholder="e.g. L10437" value={form.vendor_model} onChange={f('vendor_model')} />
+            </div>
+            {isAG3 && (
+              <div>
+                <label style={labelStyle}>SKU# AG</label>
+                <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} placeholder="AG SKU" value={form.sku_ag} onChange={f('sku_ag')} />
+              </div>
+            )}
           </div>
 
           {/* Description */}
@@ -206,36 +232,47 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
               <label style={labelStyle}>T.Phẩm có NVL đá (g)</label>
               <input type="number" min="0" step="0.0001" style={inputStyle} placeholder="0.0000" value={form.wt_gr} onChange={f('wt_gr')} />
             </div>
-            <div>
-              <label style={labelStyle}>Kích Thước</label>
-              <input style={inputStyle} placeholder='e.g. "8in", "Size 5"' value={form.kich_thuoc} onChange={f('kich_thuoc')} />
-            </div>
+            {!isAG3 && (
+              <div>
+                <label style={labelStyle}>Kích Thước</label>
+                <input style={inputStyle} placeholder='e.g. "8in", "Size 5"' value={form.kich_thuoc} onChange={f('kich_thuoc')} />
+              </div>
+            )}
           </div>
 
-          {/* Fees */}
-          <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem', marginBottom: '0.75rem' }}>
-            <div style={{ fontSize: 'var(--text-xs)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Chi phí (USD)</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
-              {(['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien'] as const).map(key => (
-                <div key={key}>
-                  <label style={{ ...labelStyle, fontSize: 10 }}>{key.replace('_', ' ')}</label>
-                  <input type="number" min="0" step="0.01" style={{ ...inputStyle, padding: '4px 6px' }} value={form[key]} onChange={f(key)} />
-                </div>
-              ))}
+          {/* Fees (CH1/CH2 only) */}
+          {hasFees && (
+            <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: 'var(--text-xs)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Chi phí (USD)</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
+                {(['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien'] as const).map(key => (
+                  <div key={key}>
+                    <label style={{ ...labelStyle, fontSize: 10 }}>{key.replace('_', ' ')}</label>
+                    <input type="number" min="0" step="0.01" style={{ ...inputStyle, padding: '4px 6px' }} value={form[key]} onChange={f(key)} />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          {/* Bảo hiểm + Notes */}
-          <div style={{ ...grid2, gridTemplateColumns: '1fr 2fr', marginBottom: '0.75rem' }}>
-            <div>
-              <label style={labelStyle}>Bảo hiểm (AC)</label>
-              <input type="number" min="0" step="0.01" style={inputStyle} placeholder="0.00" value={form.bao_hiem} onChange={f('bao_hiem')} />
+          {/* Bảo hiểm + Notes (non-AG3) / Chi tiết/Tập (AG3) */}
+          {isAG3 ? (
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={labelStyle}>Chi tiết / Tập</label>
+              <input style={inputStyle} placeholder="Chi tiết hoặc tập..." value={form.chi_tiet_tap} onChange={f('chi_tiet_tap')} />
             </div>
-            <div>
-              <label style={labelStyle}>Ghi chú</label>
-              <input style={inputStyle} placeholder='e.g. "ba sao"' value={form.nini_adm} onChange={f('nini_adm')} />
+          ) : (
+            <div style={{ ...grid2, gridTemplateColumns: '1fr 2fr', marginBottom: '0.75rem' }}>
+              <div>
+                <label style={labelStyle}>Bảo hiểm (AC)</label>
+                <input type="number" min="0" step="0.01" style={inputStyle} placeholder="0.00" value={form.bao_hiem} onChange={f('bao_hiem')} />
+              </div>
+              <div>
+                <label style={labelStyle}>Ghi chú</label>
+                <input style={inputStyle} placeholder='e.g. "ba sao"' value={form.nini_adm} onChange={f('nini_adm')} />
+              </div>
             </div>
-          </div>
+          )}
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
             <button onClick={onClose} style={{ padding: '0.5rem 1.25rem', border: '1px solid var(--border-base)', background: 'transparent', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', cursor: 'pointer', borderRadius: 0 }}>Hủy</button>

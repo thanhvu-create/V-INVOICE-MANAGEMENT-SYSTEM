@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const { data: invoice } = await db
       .from('invoices')
-      .select('status, created_by, template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt')
+      .select('status, created_by, template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_tag_multiplier, nvl_fr_multiplier')
       .eq('id', params.id)
       .single()
 
@@ -37,6 +37,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       'resin', 'phi_phu_kien', 'nini_adm',
       'ngay_gui', 'tracking_no', 'hoa_don', 'kich_thuoc',
       'image_url', 'bao_hiem', 'vendor_model',
+      'po_number', 'sku_ag', 'chi_tiet_tap',
     ]
     const updates: Record<string, unknown> = {}
     for (const k of EDITABLE) {

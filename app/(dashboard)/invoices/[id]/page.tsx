@@ -170,6 +170,7 @@ export default function InvoiceDetailPage() {
       <AddItemModal
         open={addItemOpen}
         invoiceId={id}
+        template={data?.header?.template_type}
         onClose={() => setAddItemOpen(false)}
         onSaved={fetchData}
       />

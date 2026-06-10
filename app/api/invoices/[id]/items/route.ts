@@ -16,7 +16,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const { data: invoice } = await db
       .from('invoices')
-      .select('status, created_by, template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt')
+      .select('status, created_by, template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_tag_multiplier, nvl_fr_multiplier')
       .eq('id', params.id)
       .single()
 
@@ -69,6 +69,9 @@ export async function POST(req: NextRequest, { params }: Params) {
         tracking_no:       body.tracking_no       ?? null,
         hoa_don:           body.hoa_don           ?? null,
         vendor_model:      body.vendor_model      ?? null,
+        po_number:         body.po_number         ?? null,
+        sku_ag:            body.sku_ag            ?? null,
+        chi_tiet_tap:      body.chi_tiet_tap      ?? null,
         image_url:         body.image_url         ?? null,
       })
       .select()

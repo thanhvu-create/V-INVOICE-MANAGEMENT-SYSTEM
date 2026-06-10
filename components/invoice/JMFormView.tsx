@@ -15,53 +15,64 @@ interface Col {
   price?:    boolean
   notes?:    boolean
   width?:    number
+  ag3only?:  boolean  // show only for CH1_AG3 / VNSI_AG3
+  noAg3?:    boolean  // hide for CH1_AG3 / VNSI_AG3
 }
 
-// Combined JM Form + SUMMARY sheet columns
+// Combined JM Form + SUMMARY sheet columns — all templates
 const JM_COLS: Col[] = [
-  // JM Form identity (A–K)
-  { key: 'seq',              label: 'No.',                                  width: 44  },
-  { key: 'store',            label: 'Store',                                width: 70  },
-  { key: 'location',         label: 'Location',                             width: 80  },
-  { key: 'vendor_model',    label: 'Vendor Model#',                        width: 120 },
-  { key: 'so_mo',            label: 'SO-MO',                                width: 150 },
-  { key: 'sku',              label: 'SKU',             sku: true,           width: 130 },
-  { key: 'class',            label: 'Class',                                width: 80  },
-  { key: 'sub_class',        label: 'Sub Class',                            width: 80  },
-  { key: 'description',      label: 'Description',                          width: 220 },
-  { key: 'qt_pcs',           label: 'Qty',             mono: true,          width: 55  },
-  // SUMMARY info (D, G–K)
-  { key: 'kich_thuoc',       label: 'Kích Thước',                           width: 90  },
-  { key: 'loai_vang',        label: 'Loại vàng',                            width: 85  },
-  { key: 't_pham_co_nvl_da', label: 'T.Phẩm NVL đá',  mono: true,          width: 120 },
-  // Auto-calculated (SUMMARY H–K)
-  { key: 't_pham_tru_nvl_da',label: 'T.Phẩm vàng TT', mono: true, computed: true, width: 115 },
-  { key: 'tien_vang',        label: 'Tiền vàng',       mono: true, computed: true, price: true, width: 105 },
-  // Manufacturing costs (SUMMARY W–AA) — hidden for AG3/VNSI templates
-  { key: 'gia_cong',         label: 'Gia công',         mono: true, price: true, width: 85 },
-  { key: 'duc',              label: 'Đúc',              mono: true, price: true, width: 70 },
-  { key: 'thiet_ke',         label: 'Thiết kế',         mono: true, price: true, width: 80 },
-  { key: 'resin',            label: 'Resin',            mono: true, price: true, width: 70 },
-  { key: 'phi_phu_kien',     label: 'Phụ kiện',         mono: true, price: true, width: 85 },
-  // Final prices (SUMMARY AB, JM-Form L–M)
-  { key: 'von_san_xuat',     label: 'Vốn SX',           mono: true, computed: true, price: true, width: 105 },
-  { key: 'cif_price',        label: 'CIF/SP',            mono: true, computed: true, price: true, width: 100 },
-  // Shipping (SUMMARY AC–AF)
-  { key: 'bao_hiem',         label: 'Bảo hiểm',          mono: true, price: true, width: 85 },
-  { key: 'ngay_gui',         label: 'Ngày gửi',                              width: 105 },
-  { key: 'tracking_no',      label: 'Tracking#',                             width: 120 },
-  { key: 'hoa_don',          label: 'Hóa Đơn',                               width: 100 },
-  // Notes (JM Form R)
-  { key: 'nini_adm',         label: 'Notes',            notes: true,         width: 140 },
+  // Identity — all templates
+  { key: 'seq',              label: 'No.',                                    width: 44  },
+  { key: 'store',            label: 'Store',                                  width: 70  },
+  { key: 'location',         label: 'Location',                               width: 80  },
+  { key: 'vendor_model',     label: 'Vendor Model#',                          width: 120 },
+  // AG3-only: PO# (replaces SO-MO) and SKU# AG
+  { key: 'po_number',        label: 'PO#',              ag3only: true,        width: 130 },
+  { key: 'sku_ag',           label: 'SKU# AG',          ag3only: true,        width: 130 },
+  // SO-MO — CH1/CH2/ADM only
+  { key: 'so_mo',            label: 'SO-MO',            noAg3: true,          width: 150 },
+  { key: 'sku',              label: 'SKU',              sku: true,            width: 130 },
+  { key: 'class',            label: 'Class',                                  width: 80  },
+  { key: 'sub_class',        label: 'Sub Class',                              width: 80  },
+  { key: 'description',      label: 'Description',                            width: 220 },
+  { key: 'qt_pcs',           label: 'Qty',              mono: true,           width: 55  },
+  // SUMMARY — hidden for AG3 JM Form view
+  { key: 'kich_thuoc',       label: 'Kích Thước',       noAg3: true,          width: 90  },
+  { key: 'loai_vang',        label: 'Loại vàng',        noAg3: true,          width: 85  },
+  { key: 't_pham_co_nvl_da', label: 'Wt. (gr)',         mono: true,           width: 100 },
+  // Calculated — hidden for AG3
+  { key: 't_pham_tru_nvl_da', label: 'T.Phẩm vàng TT', mono: true, computed: true, noAg3: true, width: 115 },
+  { key: 'tien_vang',        label: 'Tiền vàng',        mono: true, computed: true, price: true, noAg3: true, width: 105 },
+  // Manufacturing costs — CH1/CH2 only
+  { key: 'gia_cong',         label: 'Gia công',          mono: true, price: true, width: 85 },
+  { key: 'duc',              label: 'Đúc',               mono: true, price: true, width: 70 },
+  { key: 'thiet_ke',         label: 'Thiết kế',          mono: true, price: true, width: 80 },
+  { key: 'resin',            label: 'Resin',             mono: true, price: true, width: 70 },
+  { key: 'phi_phu_kien',     label: 'Phụ kiện',          mono: true, price: true, width: 85 },
+  // Final prices
+  { key: 'von_san_xuat',     label: 'HP Purchase',       mono: true, computed: true, price: true, width: 105 },
+  { key: 'cif_price',        label: 'HP CIF',            mono: true, computed: true, price: true, width: 100 },
+  // AG3-only computed prices
+  { key: 'tag_price',        label: 'HP Tag',            mono: true, computed: true, price: true, ag3only: true, width: 100 },
+  { key: 'fb_price',         label: 'HP FB',             mono: true, computed: true, price: true, ag3only: true, width: 100 },
+  // Shipping — CH1/CH2/ADM only in JM Form
+  { key: 'bao_hiem',         label: 'Bảo hiểm',          mono: true, price: true, noAg3: true, width: 85 },
+  { key: 'ngay_gui',         label: 'Ngày gửi',          noAg3: true, width: 105 },
+  { key: 'tracking_no',      label: 'Tracking#',         noAg3: true, width: 120 },
+  { key: 'hoa_don',          label: 'Hóa Đơn',           noAg3: true, width: 100 },
+  // Notes
+  { key: 'nini_adm',         label: 'Notes',             notes: true, noAg3: true, width: 140 },
+  { key: 'chi_tiet_tap',     label: 'Chi tiết/Tập',      notes: true, ag3only: true, width: 140 },
 ]
 
 const EDITABLE_FIELDS = new Set([
   'store', 'location', 'vendor_model', 'so_mo',
+  'po_number', 'sku_ag',
   'qt_pcs', 'description', 'class', 'sub_class',
   'loai_vang', 'kich_thuoc', 't_pham_co_nvl_da',
   'gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien',
   'bao_hiem', 'ngay_gui', 'tracking_no', 'hoa_don',
-  'nini_adm',
+  'nini_adm', 'chi_tiet_tap',
 ])
 
 const NUM_FIELDS = new Set([
@@ -107,13 +118,15 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [deleting,     setDeleting]     = useState(false)
 
+  const isAG3   = template === 'CH1_AG3' || template === 'VNSI_AG3'
   const hasGems = template === 'CH1' || template === 'CH2' || template === 'ADM'
   const hasFees = template === 'CH1' || template === 'CH2'
 
   const visibleCols = JM_COLS.filter(c => {
     if (c.key === 'cif_price' && template === 'CH2') return false
     if (!canSeePrice && c.price) return false
-    // Manufacturing costs only for CH1/CH2
+    if (c.ag3only && !isAG3)  return false
+    if (c.noAg3   &&  isAG3)  return false
     if (!hasFees && ['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien'].includes(c.key)) return false
     return true
   })
@@ -184,6 +197,8 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
   const totGemWt   = items.reduce((s, i) =>
     s + (i.invoice_diamonds ?? []).reduce((gs: number, g: any) => gs + (g.tl_xoan_gr ?? 0), 0), 0
   )
+  const totTag = items.reduce((s, i) => s + (i.tag_price ?? 0), 0)
+  const totFb  = items.reduce((s, i) => s + (i.fb_price  ?? 0), 0)
 
   const TOTALS: Record<string, string | null> = {
     qt_pcs:            String(totQty),
@@ -198,6 +213,8 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
     von_san_xuat:      fmt2(totVonSX),
     cif_price:         fmt2(totCif),
     bao_hiem:          totBaoHiem > 0 ? fmt2(totBaoHiem) : null,
+    tag_price:         totTag > 0 ? fmt2(totTag) : null,
+    fb_price:          totFb  > 0 ? fmt2(totFb)  : null,
   }
 
   const descIdx   = visibleCols.findIndex(c => c.key === 'description')
@@ -238,7 +255,8 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
             )}
 
             {items.map(item => {
-              const isBaSao = item.nini_adm?.toLowerCase().includes('ba sao')
+              const notesVal = isAG3 ? (item.chi_tiet_tap ?? '') : (item.nini_adm ?? '')
+              const isBaSao  = notesVal.toLowerCase().includes('ba sao')
               const gems: any[] = item.invoice_diamonds ?? []
 
               return (
@@ -278,15 +296,17 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                       }
 
                       if (col.notes) {
+                        const cellVal = item[col.key] ?? ''
+                        const isThisBaSao = cellVal.toLowerCase().includes('ba sao')
                         return (
                           <JMEditableCell key={col.key} field={col.key}
-                            displayValue={item.nini_adm || '—'}
+                            displayValue={cellVal || '—'}
                             isEditing={isEditing}
                             editValue={isEditing ? editCell!.value : ''}
                             isComputed={false} isSaving={isSavingThis}
                             isLocked={isLocked} canEdit={canEdit}
-                            tdStyle={{ ...td, color: isBaSao ? '#DC2626' : 'var(--text-secondary)', fontWeight: isBaSao ? 700 : 400, cursor: canEdit && !isLocked ? 'text' : 'default' }}
-                            onStartEdit={() => startEdit(item.id, col.key, item.nini_adm)}
+                            tdStyle={{ ...td, color: isThisBaSao ? '#DC2626' : 'var(--text-secondary)', fontWeight: isThisBaSao ? 700 : 400, cursor: canEdit && !isLocked ? 'text' : 'default' }}
+                            onStartEdit={() => startEdit(item.id, col.key, cellVal)}
                             onChange={v => setEditCell(prev => prev ? { ...prev, value: v } : null)}
                             onCommit={commitEdit} onCancel={cancelEdit}
                           />

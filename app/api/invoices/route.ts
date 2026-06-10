@@ -83,19 +83,21 @@ export async function POST(req: NextRequest) {
     // Copy NVL snapshot from latest nvl_prices row
     const { data: latestNVL } = await db
       .from('nvl_prices')
-      .select('gold_24k, pt_price, ag_price, pd_price, loss_gold, loss_pt')
+      .select('gold_24k, pt_price, ag_price, pd_price, loss_gold, loss_pt, tag_multiplier, fr_multiplier')
       .order('id', { ascending: false })
       .limit(1)
       .single()
 
     const nvlSnapshot = latestNVL ? {
-      nvl_gold_24k:  latestNVL.gold_24k,
-      nvl_pt_price:  latestNVL.pt_price,
-      nvl_ag_price:  latestNVL.ag_price,
-      nvl_pd_price:  latestNVL.pd_price,
-      nvl_loss_gold: latestNVL.loss_gold,
-      nvl_loss_pt:   latestNVL.loss_pt,
-      nvl_cif_rate:  template_type === 'VNSI_AG3' ? 0.10 : 0.05,
+      nvl_gold_24k:        latestNVL.gold_24k,
+      nvl_pt_price:        latestNVL.pt_price,
+      nvl_ag_price:        latestNVL.ag_price,
+      nvl_pd_price:        latestNVL.pd_price,
+      nvl_loss_gold:       latestNVL.loss_gold,
+      nvl_loss_pt:         latestNVL.loss_pt,
+      nvl_cif_rate:        template_type === 'VNSI_AG3' ? 0.10 : 0.05,
+      nvl_tag_multiplier:  latestNVL.tag_multiplier ?? 0,
+      nvl_fr_multiplier:   latestNVL.fr_multiplier  ?? 0,
     } : {}
 
     const { data, error } = await db

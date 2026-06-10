@@ -17,7 +17,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ success: false, message: 'Invalid JSON body' }, { status: 400 })
   }
 
-  const EDITABLE = ['gold_24k', 'pt_price', 'ag_price', 'pd_price', 'loss_gold', 'loss_pt']
+  const EDITABLE = ['gold_24k', 'pt_price', 'ag_price', 'pd_price', 'loss_gold', 'loss_pt', 'tag_multiplier', 'fr_multiplier']
   const updates: Record<string, unknown> = {}
   for (const k of EDITABLE) { if (k in body) updates[k] = body[k] }
 

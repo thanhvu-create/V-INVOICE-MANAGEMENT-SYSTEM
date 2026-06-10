@@ -36,12 +36,14 @@ export async function POST(req: NextRequest) {
   const { data, error } = await db
     .from('nvl_prices')
     .insert({
-      gold_24k:  body.gold_24k  ?? null,
-      pt_price:  body.pt_price  ?? null,
-      ag_price:  body.ag_price  ?? null,
-      pd_price:  body.pd_price  ?? null,
-      loss_gold: body.loss_gold ?? 0.06,
-      loss_pt:   body.loss_pt   ?? 0.17,
+      gold_24k:        body.gold_24k        ?? null,
+      pt_price:        body.pt_price        ?? null,
+      ag_price:        body.ag_price        ?? null,
+      pd_price:        body.pd_price        ?? null,
+      loss_gold:       body.loss_gold       ?? 0.06,
+      loss_pt:         body.loss_pt         ?? 0.17,
+      tag_multiplier:  body.tag_multiplier  ?? null,
+      fr_multiplier:   body.fr_multiplier   ?? null,
     })
     .select()
     .single()

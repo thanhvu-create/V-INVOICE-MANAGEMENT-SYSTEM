@@ -14,12 +14,14 @@ export type InvoiceTemplate = 'CH1' | 'CH2' | 'ADM' | 'CH1_AG3' | 'VNSI_AG3' | '
  * Maps to invoices columns: nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt
  */
 export interface NVLSnapshot {
-  spot_gold_24k: number  // $/oz raw 24K spot price
-  spot_pt:       number  // $/oz Platinum
-  spot_ag:       number  // $/oz Silver
-  spot_pd:       number  // $/oz Palladium
-  loss_gold:     number  // fraction e.g. 0.06  (6% casting loss for gold)
-  loss_pt:       number  // fraction e.g. 0.17  (17% casting loss for PT/PD)
+  spot_gold_24k:  number  // $/oz raw 24K spot price
+  spot_pt:        number  // $/oz Platinum
+  spot_ag:        number  // $/oz Silver
+  spot_pd:        number  // $/oz Palladium
+  loss_gold:      number  // fraction e.g. 0.06  (6% casting loss for gold)
+  loss_pt:        number  // fraction e.g. 0.17  (17% casting loss for PT/PD)
+  tag_multiplier: number  // tag_price = cif_price × tag_multiplier (AG3)
+  fr_multiplier:  number  // fb_price  = cif_price × fr_multiplier  (AG3)
 }
 
 /**
@@ -140,6 +142,9 @@ export function recalcItem(
   const vonSX    = calcVonSanXuat(withGold, diamonds, template)
   const cif      = calcCIFPrice(vonSX, template)
 
+  const tag = cif != null && nvl.tag_multiplier > 0 ? cif * nvl.tag_multiplier : null
+  const fb  = cif != null && nvl.fr_multiplier  > 0 ? cif * nvl.fr_multiplier  : null
+
   return {
     t_pham_tru_nvl_da:   weightNoGem,
     t_pham_vang_thuc_te: weightNoGem,
@@ -147,6 +152,8 @@ export function recalcItem(
     von_san_xuat:        vonSX,
     purchase_price:      vonSX,
     cif_price:           cif,
+    tag_price:           tag,
+    fb_price:            fb,
   }
 }
 
@@ -156,11 +163,13 @@ export function recalcItem(
  */
 export function nvlFromInvoice(invoice: Record<string, any>): NVLSnapshot {
   return {
-    spot_gold_24k: invoice.nvl_gold_24k  ?? 3300,
-    spot_pt:       invoice.nvl_pt_price  ?? 1050,
-    spot_ag:       invoice.nvl_ag_price  ?? 33,
-    spot_pd:       invoice.nvl_pd_price  ?? 950,
-    loss_gold:     invoice.nvl_loss_gold ?? 0.06,
-    loss_pt:       invoice.nvl_loss_pt   ?? 0.17,
+    spot_gold_24k:  invoice.nvl_gold_24k        ?? 3300,
+    spot_pt:        invoice.nvl_pt_price         ?? 1050,
+    spot_ag:        invoice.nvl_ag_price         ?? 33,
+    spot_pd:        invoice.nvl_pd_price         ?? 950,
+    loss_gold:      invoice.nvl_loss_gold        ?? 0.06,
+    loss_pt:        invoice.nvl_loss_pt          ?? 0.17,
+    tag_multiplier: invoice.nvl_tag_multiplier   ?? 0,
+    fr_multiplier:  invoice.nvl_fr_multiplier    ?? 0,
   }
 }
