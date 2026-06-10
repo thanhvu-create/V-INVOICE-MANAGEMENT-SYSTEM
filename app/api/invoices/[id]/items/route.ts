@@ -72,6 +72,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         po_number:         body.po_number         ?? null,
         sku_ag:            body.sku_ag            ?? null,
         chi_tiet_tap:      body.chi_tiet_tap      ?? null,
+        erp_bom_cost:      body.erp_bom_cost      ?? null,
         image_url:         body.image_url         ?? null,
       })
       .select()

@@ -63,12 +63,13 @@ export function calcWeightNoGem(totalGr: number, diamonds: InvoiceDiamond[]): nu
  * Call this BEFORE recalcItem so that tl_xoan_gr / t_gia_xoan / t_phi are up to date.
  */
 export function recalcDiamond(d: Partial<InvoiceDiamond>): Partial<InvoiceDiamond> {
-  const tl_truoc  = d.tl_truoc_xu_ly_ct ?? 0
-  const don_gia   = d.don_gia           ?? 0
-  const sl_hot    = d.sl_hot            ?? 0
+  // CH2 has no tl_truoc column — use tl_sau as fallback so tl_xoan_gr/t_gia_xoan compute correctly
+  const tl_base = d.tl_truoc_xu_ly_ct ?? d.tl_sau_xu_ly_ct ?? 0
+  const don_gia = d.don_gia ?? 0
+  const sl_hot  = d.sl_hot  ?? 0
   return {
-    tl_xoan_gr:  tl_truoc / 5,
-    t_gia_xoan:  tl_truoc * don_gia,
+    tl_xoan_gr:  tl_base / 5,
+    t_gia_xoan:  tl_base * don_gia,
     don_gia_phi: 1,
     t_phi:       sl_hot * 1,
   }

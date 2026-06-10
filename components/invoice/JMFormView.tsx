@@ -17,6 +17,7 @@ interface Col {
   width?:       number
   ag3only?:     boolean  // show only for CH1_AG3 / VNSI_AG3
   ch1ag3only?:  boolean  // show only for CH1_AG3
+  ch1only?:     boolean  // show only for CH1
   noAg3?:       boolean  // hide for CH1_AG3 / VNSI_AG3
   noAdm?:       boolean  // hide for ADM
 }
@@ -39,13 +40,13 @@ const JM_COLS: Col[] = [
   { key: 'sub_class',        label: 'Sub Class',                                          width: 80  },
   { key: 'description',      label: 'Description',                                        width: 220 },
   { key: 'qt_pcs',           label: 'Qty',              mono: true,                       width: 55  },
-  // SUMMARY — hidden for AG3
-  { key: 'kich_thuoc',       label: 'Kích Thước',       noAg3: true,                      width: 90  },
-  { key: 'loai_vang',        label: 'Loại vàng',        noAg3: true,                      width: 85  },
+  // SUMMARY — AG3 also has kich_thuoc and loai_vang
+  { key: 'kich_thuoc',       label: 'Kích Thước',                                          width: 90  },
+  { key: 'loai_vang',        label: 'Loại vàng',                                           width: 85  },
   { key: 't_pham_co_nvl_da', label: 'Wt. (gr)',         mono: true,                       width: 100 },
-  // Calculated — hidden for AG3
+  // Calculated — t_pham_tru hidden for AG3 (AG3 SUMMARY has no subtract-gem step), tien_vang shown for all
   { key: 't_pham_tru_nvl_da', label: 'T.Phẩm vàng TT', mono: true, computed: true, noAg3: true, width: 115 },
-  { key: 'tien_vang',        label: 'Tiền vàng',        mono: true, computed: true, price: true, noAg3: true, width: 105 },
+  { key: 'tien_vang',        label: 'Tiền vàng',        mono: true, computed: true, price: true, width: 105 },
   // Manufacturing costs — CH1/CH2 only (hasFees filter applied in visibleCols)
   { key: 'gia_cong',         label: 'Gia công',          mono: true, price: true,          width: 85 },
   { key: 'duc',              label: 'Đúc',               mono: true, price: true,          width: 70 },
@@ -55,9 +56,16 @@ const JM_COLS: Col[] = [
   // Final prices — all templates
   { key: 'von_san_xuat',     label: 'HP Purchase',       mono: true, computed: true, price: true, width: 105 },
   { key: 'cif_price',        label: 'HP CIF',            mono: true, computed: true, price: true, width: 100 },
-  // Tag/FB — all templates (CH1/CH2/ADM/CH1_AG3/VNSI_AG3 all have HP Tag + HP FB)
+  // Tag/FB — all templates
   { key: 'tag_price',        label: 'HP Tag',            mono: true, computed: true, price: true, width: 100 },
   { key: 'fb_price',         label: 'HP FB',             mono: true, computed: true, price: true, width: 100 },
+  // CH1-only: ERP BOM reference + variance
+  { key: 'erp_bom_cost',     label: 'ERP BOM ($)',       mono: true, price: true, ch1only: true, width: 105 },
+  { key: 'chenh_lech',       label: 'Chênh lệch',        mono: true, computed: true, price: true, ch1only: true, width: 100 },
+  // AG3-only: per-piece pricing display
+  { key: '_pu_wt',           label: 'Wt./1sp (gr)',      mono: true, computed: true, ag3only: true, width: 100 },
+  { key: '_purchase_unit',   label: 'Purchase/1sp',      mono: true, computed: true, price: true, ag3only: true, width: 110 },
+  { key: '_tag_unit',        label: 'Tag/1sp',           mono: true, computed: true, price: true, ag3only: true, width: 100 },
   // Shipping — CH1/CH2 only (not ADM, not AG3)
   { key: 'bao_hiem',         label: 'Bảo hiểm',          mono: true, price: true, noAg3: true, noAdm: true, width: 85 },
   { key: 'ngay_gui',         label: 'Ngày gửi',          noAg3: true, noAdm: true,              width: 105 },
@@ -77,11 +85,13 @@ const EDITABLE_FIELDS = new Set([
   'gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien',
   'bao_hiem', 'ngay_gui', 'tracking_no', 'hoa_don',
   'nini_adm', 'chi_tiet_tap',
+  'erp_bom_cost',
 ])
 
 const NUM_FIELDS = new Set([
   'qt_pcs', 't_pham_co_nvl_da',
   'gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien', 'bao_hiem',
+  'erp_bom_cost',
 ])
 
 function fmt2(n: number | null | undefined) { return n != null ? `$${n.toFixed(2)}` : '—' }
@@ -93,17 +103,22 @@ function parseFieldValue(field: string, raw: string): unknown {
 }
 
 function getDisplayValue(col: Col, item: any): string {
+  // Computed-display keys (not in DB — derived from other fields)
+  if (col.key === 'chenh_lech')     return fmt2((item.von_san_xuat ?? 0) - (item.erp_bom_cost ?? 0))
+  if (col.key === '_pu_wt')         return fmt4((item.t_pham_co_nvl_da ?? 0) / Math.max(1, item.qt_pcs ?? 1))
+  if (col.key === '_purchase_unit') return fmt2((item.von_san_xuat ?? 0) / Math.max(1, item.qt_pcs ?? 1))
+  if (col.key === '_tag_unit')      return fmt2((item.tag_price ?? 0) / Math.max(1, item.qt_pcs ?? 1))
   const v = item[col.key]
   if (col.price)              return fmt2(v)
   if (col.key === 't_pham_co_nvl_da' || col.key === 't_pham_tru_nvl_da') return fmt4(v)
   return v != null ? String(v) : '—'
 }
 
-const GEM_HEADERS = [
-  'Mã Xoàn', 'P.Chất', 'Size Range',
-  'SL', 'TL Trước (ct)', 'TL Sau (ct)',
-  'TL (gr)', 'Đơn Giá', 'T.Giá Xoàn', '$1/Viên', 'T.Phí',
-]
+function getGemHeaders(tpl: string) {
+  return tpl === 'CH2'
+    ? ['Mã Xoàn', 'P.Chất', 'Size Range', 'SL', 'TL Sau (ct)', 'TL (gr)', 'Đơn Giá', 'T.Giá Xoàn', '$1/Viên', 'T.Phí']
+    : ['Mã Xoàn', 'P.Chất', 'Size Range', 'SL', 'TL Trước (ct)', 'TL Sau (ct)', 'TL (gr)', 'Đơn Giá', 'T.Giá Xoàn', '$1/Viên', 'T.Phí']
+}
 
 interface Props {
   invoiceId:    string
@@ -130,10 +145,11 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
   const visibleCols = JM_COLS.filter(c => {
     if (c.key === 'cif_price' && template === 'CH2') return false
     if (!canSeePrice && c.price) return false
-    if (c.ag3only    && !isAG3)              return false
+    if (c.ag3only    && !isAG3)               return false
     if (c.ch1ag3only && template !== 'CH1_AG3') return false
-    if (c.noAg3      &&  isAG3)              return false
-    if (c.noAdm      &&  isAdm)              return false
+    if (c.ch1only    && template !== 'CH1')   return false
+    if (c.noAg3      &&  isAG3)               return false
+    if (c.noAdm      &&  isAdm)               return false
     if (!hasFees && ['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien'].includes(c.key)) return false
     return true
   })
@@ -359,7 +375,7 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                           <table style={{ borderCollapse: 'collapse', width: 'auto', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)' }}>
                             <thead>
                               <tr>
-                                {GEM_HEADERS.map(h => (
+                                {getGemHeaders(template).map(h => (
                                   <th key={h} style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', background: '#F0EDE8', whiteSpace: 'nowrap', fontSize: 10 }}>{h}</th>
                                 ))}
                               </tr>
@@ -373,9 +389,11 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                                   <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.p_chat ?? 'VVS1'}</td>
                                   <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.size_xoan_range ?? '—'}</td>
                                   <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.sl_hot}</td>
-                                  <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', background: g.tl_truoc_xu_ly_ct == null ? 'rgba(220,38,38,0.08)' : '' }}>
-                                    {g.tl_truoc_xu_ly_ct != null ? g.tl_truoc_xu_ly_ct.toFixed(4) : <span style={{ color: '#DC2626' }}>— nhập tay</span>}
-                                  </td>
+                                  {template !== 'CH2' && (
+                                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', background: g.tl_truoc_xu_ly_ct == null ? 'rgba(220,38,38,0.08)' : '' }}>
+                                      {g.tl_truoc_xu_ly_ct != null ? g.tl_truoc_xu_ly_ct.toFixed(4) : <span style={{ color: '#DC2626' }}>— nhập tay</span>}
+                                    </td>
+                                  )}
                                   <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>{g.tl_sau_xu_ly_ct?.toFixed(4) ?? '—'}</td>
                                   <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>
                                     {fmt4(g.tl_xoan_gr)} <span style={{ fontSize: 9, color: 'var(--color-info)' }}>auto</span>
@@ -393,7 +411,7 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                             </tbody>
                             <tfoot>
                               <tr style={{ background: '#F0EDE8', borderTop: '1px solid var(--border-base)' }}>
-                                <td colSpan={6} style={{ padding: '2px 8px', fontSize: 10, color: 'var(--text-muted)', textAlign: 'right', fontFamily: 'var(--font-body)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                <td colSpan={template === 'CH2' ? 5 : 6} style={{ padding: '2px 8px', fontSize: 10, color: 'var(--text-muted)', textAlign: 'right', fontFamily: 'var(--font-body)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                                   {gems.length} hột — Tổng
                                 </td>
                                 <td style={{ padding: '2px 8px', fontWeight: 700 }}>

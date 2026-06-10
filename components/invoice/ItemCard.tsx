@@ -62,6 +62,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
       po_number:         item.po_number                ?? '',
       sku_ag:            item.sku_ag                   ?? '',
       chi_tiet_tap:      item.chi_tiet_tap             ?? '',
+      erp_bom_cost:      String(item.erp_bom_cost      ?? ''),
       qt_pcs:            String(item.qt_pcs            ?? ''),
       kich_thuoc:        item.kich_thuoc               ?? '',
       description:       item.description              ?? '',
@@ -171,7 +172,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
             ...(isAG3 && item.po_number             ? [['PO#',       item.po_number]]   : []),
             ...(template === 'CH1_AG3' && item.sku_ag ? [['SKU# AG', item.sku_ag]]      : []),
             ['Qty (pcs)', item.qt_pcs],
-            ...(!isAG3 && item.kich_thuoc           ? [['Kích thước', item.kich_thuoc]] : []),
+            ...(item.kich_thuoc                     ? [['Kích thước', item.kich_thuoc]] : []),
             ['Loại vàng', item.loai_vang ?? '—'],
             ...(!isAG3 && item.so_mo                ? [['SO-MO', item.so_mo]]           : []),
             ['Wt. (gr)', fmt4(item.t_pham_co_nvl_da ?? item.wt_gr)],
@@ -180,11 +181,19 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               ['T.Phẩm vàng TT (gr)', fmt4(item.t_pham_vang_thuc_te)],
             ] : []),
             ...(canSeePrice ? [
-              ...(!isAG3 ? [['Tiền vàng', fmt2(item.tien_vang)]] : []),
+              ['Tiền vàng', fmt2(item.tien_vang)],
               ['HP Purchase', fmt2(item.von_san_xuat)],
               ...(hasCIF ? [['HP CIF', fmt2(item.cif_price)]] : []),
               ...(hasTagFb && item.tag_price != null ? [['HP Tag', fmt2(item.tag_price)]] : []),
               ...(hasTagFb && item.fb_price  != null ? [['HP FB',  fmt2(item.fb_price)]]  : []),
+              ...(isAG3 && item.qt_pcs > 1 ? [
+                ['Purchase/1sp', fmt2(item.von_san_xuat != null ? item.von_san_xuat / item.qt_pcs : null)],
+                ...(item.tag_price != null ? [['Tag/1sp', fmt2(item.tag_price / item.qt_pcs)]] : []),
+              ] : []),
+              ...(template === 'CH1' && item.erp_bom_cost != null ? [
+                ['ERP BOM ($)', fmt2(item.erp_bom_cost)],
+                ['Chênh lệch', fmt2((item.von_san_xuat ?? 0) - item.erp_bom_cost)],
+              ] : []),
             ] : []),
             ...(canSeePrice && hasFees && (item.gia_cong || item.duc || item.thiet_ke || item.resin || item.phi_phu_kien) ? [
               ['Gia công/SP', fmt2(item.gia_cong)],
@@ -231,10 +240,8 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
             <div><label style={labelStyle}>Qty (pcs) *</label>
               <input type="number" min="1" step="1" style={inputStyle} value={form.qt_pcs} onChange={f('qt_pcs')} /></div>
-            {!isAG3 && (
-              <div><label style={labelStyle}>Kích thước</label>
-                <input style={inputStyle} value={form.kich_thuoc ?? ''} onChange={f('kich_thuoc')} placeholder="e.g. 8in, Size 5" /></div>
-            )}
+            <div><label style={labelStyle}>Kích thước</label>
+              <input style={inputStyle} value={form.kich_thuoc ?? ''} onChange={f('kich_thuoc')} placeholder="e.g. 8in, Size 5" /></div>
             <div><label style={labelStyle}>Loại vàng</label>
               <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.loai_vang} onChange={f('loai_vang')}>
                 <option value="">—</option>
@@ -262,6 +269,13 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
             <div><label style={labelStyle}>Wt. (gr)</label>
               <input type="number" min="0" step="0.0001" style={inputStyle} value={form.t_pham_co_nvl_da} onChange={f('t_pham_co_nvl_da')} /></div>
           </div>
+
+          {template === 'CH1' && (
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={labelStyle}>ERP BOM Cost ($)</label>
+              <input type="number" min="0" step="0.01" style={{ ...inputStyle, maxWidth: 200 }} value={form.erp_bom_cost ?? ''} onChange={f('erp_bom_cost')} placeholder="0.00" />
+            </div>
+          )}
 
           {hasFees && (
             <>
@@ -303,13 +317,21 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
           {canSeePrice && (
             <div style={{ background: 'var(--bg-base)', border: '1px solid var(--border-light)', padding: '0.75rem', marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem' }}>
               {[
-                ...(!isAG3 ? [['T.Phẩm vàng TT (gr)', fmt4(item.t_pham_tru_nvl_da)],
-                               ['Tiền vàng', fmt2(item.tien_vang)]] : []),
+                ...(!isAG3 ? [['T.Phẩm vàng TT (gr)', fmt4(item.t_pham_tru_nvl_da)]] : []),
+                ['Tiền vàng', fmt2(item.tien_vang)],
                 ['HP Purchase', fmt2(item.von_san_xuat)],
                 ...(hasCIF ? [['HP CIF', fmt2(item.cif_price)]] : []),
                 ...(hasTagFb ? [
                   ...(item.tag_price != null ? [['HP Tag', fmt2(item.tag_price)]] : []),
                   ...(item.fb_price  != null ? [['HP FB',  fmt2(item.fb_price)]]  : []),
+                ] : []),
+                ...(isAG3 && item.qt_pcs > 1 ? [
+                  ['Purchase/1sp', fmt2(item.von_san_xuat != null ? item.von_san_xuat / item.qt_pcs : null)],
+                  ...(item.tag_price != null ? [['Tag/1sp', fmt2(item.tag_price / item.qt_pcs)]] : []),
+                ] : []),
+                ...(template === 'CH1' && item.erp_bom_cost != null ? [
+                  ['ERP BOM ($)', fmt2(item.erp_bom_cost)],
+                  ['Chênh lệch', fmt2((item.von_san_xuat ?? 0) - item.erp_bom_cost)],
                 ] : []),
               ].map(([l, v]) => (
                 <div key={l as string}>
@@ -374,12 +396,10 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', width: '100%' }}>
                 <thead>
-                  <tr>{[
-                    'Mã Xoàn', 'P.Chất', 'Size Range',
-                    'SL', 'TL Trước (ct)', 'TL Sau (ct)',
-                    'TL(gr)', 'Đơn Giá', 'T.Giá Xoàn',
-                    '$1/Viên', 'T.Phí', ''
-                  ].map(h => (
+                  <tr>{(template === 'CH2'
+                    ? ['Mã Xoàn', 'P.Chất', 'Size Range', 'SL', 'TL Sau (ct)', 'TL(gr)', 'Đơn Giá', 'T.Giá Xoàn', '$1/Viên', 'T.Phí', '']
+                    : ['Mã Xoàn', 'P.Chất', 'Size Range', 'SL', 'TL Trước (ct)', 'TL Sau (ct)', 'TL(gr)', 'Đơn Giá', 'T.Giá Xoàn', '$1/Viên', 'T.Phí', '']
+                  ).map(h => (
                     <th key={h} style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--bg-base)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}</tr>
                 </thead>
@@ -390,9 +410,11 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                       <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.p_chat ?? 'VVS1'}</td>
                       <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.size_xoan_range ?? '—'}</td>
                       <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.sl_hot}</td>
-                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', background: g.tl_truoc_xu_ly_ct == null ? 'rgba(220,38,38,0.08)' : '' }}>
-                        {g.tl_truoc_xu_ly_ct != null ? g.tl_truoc_xu_ly_ct.toFixed(4) : <span style={{ color: '#DC2626' }}>— nhập tay</span>}
-                      </td>
+                      {template !== 'CH2' && (
+                        <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', background: g.tl_truoc_xu_ly_ct == null ? 'rgba(220,38,38,0.08)' : '' }}>
+                          {g.tl_truoc_xu_ly_ct != null ? g.tl_truoc_xu_ly_ct.toFixed(4) : <span style={{ color: '#DC2626' }}>— nhập tay</span>}
+                        </td>
+                      )}
                       <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>{g.tl_sau_xu_ly_ct?.toFixed(4) ?? '—'}</td>
                       <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt4(g.tl_xoan_gr)} <span style={{ fontSize: 9, color: 'var(--color-info)' }}>auto</span></td>
                       <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt2(g.don_gia)}</td>
@@ -436,7 +458,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
       {/* Dialogs */}
       <ConfirmDialog open={confirmDelete} title="Delete Item" message={`Delete item "${item.sku}" (seq ${item.seq})?`} okText={deleting ? 'Deleting…' : 'Delete'} danger onOk={handleDelete} onCancel={() => setConfirmDelete(false)} />
       <ConfirmDialog open={!!confirmDeleteGem} title="Delete Gem" message="Delete this gem entry?" okText={deletingGem ? 'Deleting…' : 'Delete'} danger onOk={handleDeleteGem} onCancel={() => setConfirmDeleteGem(null)} />
-      <GemModal open={gemModal.open} invoiceId={invoiceId} itemId={item.id} gem={gemModal.gem} onClose={() => setGemModal({ open: false })} onSaved={handleGemSaved} />
+      <GemModal open={gemModal.open} invoiceId={invoiceId} itemId={item.id} gem={gemModal.gem} template={template} onClose={() => setGemModal({ open: false })} onSaved={handleGemSaved} />
     </div>
   )
 }

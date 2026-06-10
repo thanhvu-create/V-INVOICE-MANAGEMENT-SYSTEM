@@ -88,7 +88,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
       description:      form.description.trim() || null,
       class:            form.class.trim()        || null,
       sub_class:        form.sub_class.trim()    || null,
-      kich_thuoc:       isAG3 ? null : (form.kich_thuoc.trim() || null),
+      kich_thuoc:       form.kich_thuoc.trim() || null,
       loai_vang:        form.loai_vang           || null,
       store:            form.store.trim()        || null,
       location:         form.location.trim()     || null,
@@ -233,12 +233,10 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
               <label style={labelStyle}>T.Phẩm có NVL đá (g)</label>
               <input type="number" min="0" step="0.0001" style={inputStyle} placeholder="0.0000" value={form.wt_gr} onChange={f('wt_gr')} />
             </div>
-            {!isAG3 && (
-              <div>
-                <label style={labelStyle}>Kích Thước</label>
-                <input style={inputStyle} placeholder='e.g. "8in", "Size 5"' value={form.kich_thuoc} onChange={f('kich_thuoc')} />
-              </div>
-            )}
+            <div>
+              <label style={labelStyle}>Kích Thước</label>
+              <input style={inputStyle} placeholder='e.g. "8in", "Size 5"' value={form.kich_thuoc} onChange={f('kich_thuoc')} />
+            </div>
           </div>
 
           {/* Fees (CH1/CH2 only) */}
