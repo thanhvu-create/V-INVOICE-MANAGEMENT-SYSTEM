@@ -43,7 +43,7 @@ export default function NewInvoicePage() {
   useEffect(() => {
     fetch('/api/invoices/new-defaults')
       .then(r => r.json())
-      .then(json => { if (json.success) setNvlDefaults(json.data) })
+      .then(json => { if (json.success) setNvlDefaults(json.data.latestNVL) })
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {

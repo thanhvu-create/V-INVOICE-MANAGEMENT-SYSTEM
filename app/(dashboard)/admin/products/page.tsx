@@ -12,7 +12,7 @@ interface NVLPrice {
   pd_price:   number | null
   loss_gold:  number | null
   loss_pt:    number | null
-  created_at: string
+  updated_at: string
 }
 
 const FIELDS: { key: keyof Omit<NVLPrice, 'id' | 'created_at'>; label: string; unit: string; step: string }[] = [
@@ -126,7 +126,7 @@ export default function NVLPricesPage() {
                   </td>
                 ))}
                 <td style={{ ...td, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                  {r.created_at.slice(0, 10)}
+                  {(r.updated_at ?? r.created_at ?? '').slice(0, 10)}
                   {i === 0 && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--color-success)', fontFamily: 'var(--font-body)', fontWeight: 600 }}>LATEST</span>}
                 </td>
                 <td style={{ ...td, whiteSpace: 'nowrap' }}>
