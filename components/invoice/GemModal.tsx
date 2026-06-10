@@ -31,16 +31,33 @@ interface Props {
   onSaved:   (updatedItem: any) => void
 }
 
+interface NVLHotRow {
+  id: string
+  stone_type: string
+  grade: string
+  size_range: string
+  mk_price: number
+}
+
 export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSaved }: Props) {
   const isCH2 = template === 'CH2'
-  const [form,      setForm]      = useState<GemForm>(EMPTY_FORM)
-  const [saving,    setSaving]    = useState(false)
-  const [lookingUp, setLookingUp] = useState(false)
-  const [lookupMsg, setLookupMsg] = useState<{ text: string; ok: boolean } | null>(null)
+  const [form,       setForm]       = useState<GemForm>(EMPTY_FORM)
+  const [saving,     setSaving]     = useState(false)
+  const [nvlHotList, setNvlHotList] = useState<NVLHotRow[]>([])
+  const [loadingNvl, setLoadingNvl] = useState(false)
 
   useEffect(() => {
     if (!open) return
-    setLookupMsg(null)
+    setLoadingNvl(true)
+    fetch('/api/nvl-hot')
+      .then(r => r.json())
+      .then(j => { if (j.success) setNvlHotList(j.data ?? []) })
+      .catch(() => {})
+      .finally(() => setLoadingNvl(false))
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
     if (gem) {
       setForm({
         ma_xoan:           gem.ma_xoan           ?? '',
@@ -70,25 +87,13 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
   const t_gia_xoan = tlTruoc > 0 && donGia > 0 ? tlTruoc * donGia : null
   const t_phi      = slHot > 0 ? slHot * 1 : null
 
-  async function lookupByRange() {
-    const range = form.size_xoan_range.trim()
-    if (!range) return
-    setLookingUp(true)
-    setLookupMsg(null)
-    try {
-      const res  = await fetch(`/api/nvl-hot?range=${encodeURIComponent(range)}`)
-      const json = await res.json()
-      if (!json.success || !json.data) {
-        setLookupMsg({ text: `Range "${range}" không có trong bảng NVL Hột.`, ok: false })
-        return
-      }
-      setForm(v => ({ ...v, don_gia: String(json.data.mk_price ?? '') }))
-      setLookupMsg({ text: `✓ ${json.data.grade ?? range} · $${json.data.mk_price}/ct`, ok: true })
-    } catch {
-      setLookupMsg({ text: 'Lỗi kết nối lookup.', ok: false })
-    } finally {
-      setLookingUp(false)
-    }
+  function handleRangeChange(range: string) {
+    const found = nvlHotList.find(r => r.size_range === range)
+    setForm(v => ({
+      ...v,
+      size_xoan_range: range,
+      don_gia: found ? String(found.mk_price) : v.don_gia,
+    }))
   }
 
   function parseNum(s: string): number | null {
@@ -166,30 +171,35 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
             </div>
           </div>
 
-          {/* size_xoan_range lookup */}
-          <div style={{ marginBottom: '0.75rem', padding: '0.75rem', background: 'var(--bg-base)', border: '1px solid var(--border-light)' }}>
-            <label style={labelStyle}>Size Range (NVL Hột) — tra đơn giá</label>
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input
-                style={{ ...inputStyle, fontFamily: 'var(--font-mono)', flex: 1 }}
-                placeholder="VD: RD1 0.7 - 2.0, RD2 2.1 - 2.4…"
-                value={form.size_xoan_range}
-                onChange={f('size_xoan_range')}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); lookupByRange() } }}
-              />
-              <button
-                onClick={lookupByRange}
-                disabled={lookingUp || !form.size_xoan_range.trim()}
-                style={{ padding: '6px 14px', background: 'var(--color-info)', color: '#fff', border: 'none', cursor: 'pointer', borderRadius: 0, fontSize: 'var(--text-xs)', fontWeight: 600, whiteSpace: 'nowrap', opacity: lookingUp ? 0.7 : 1 }}
-              >
-                {lookingUp ? <i className="fa-solid fa-circle-notch fa-spin" /> : 'Lookup'}
-              </button>
-            </div>
-            {lookupMsg && (
-              <div style={{ marginTop: 5, fontSize: 'var(--text-xs)', color: lookupMsg.ok ? 'var(--color-success)' : 'var(--color-danger)', fontFamily: 'var(--font-mono)' }}>
-                {lookupMsg.text}
-              </div>
-            )}
+          {/* size_xoan_range — dropdown từ NVL Hột */}
+          <div style={{ marginBottom: '0.75rem' }}>
+            <label style={labelStyle}>
+              Size Range (NVL Hột)
+              {loadingNvl && <span style={{ marginLeft: 6, color: 'var(--text-muted)', fontSize: 10 }}>loading…</span>}
+            </label>
+            <select
+              style={{ ...inputStyle, cursor: 'pointer' }}
+              value={form.size_xoan_range}
+              onChange={e => handleRangeChange(e.target.value)}
+            >
+              <option value="">— chọn size range —</option>
+              {(() => {
+                const groups: Record<string, NVLHotRow[]> = {}
+                for (const row of nvlHotList) {
+                  if (!groups[row.stone_type]) groups[row.stone_type] = []
+                  groups[row.stone_type].push(row)
+                }
+                return Object.entries(groups).map(([type, rows]) => (
+                  <optgroup key={type} label={type}>
+                    {rows.map(r => (
+                      <option key={r.id} value={r.size_range}>
+                        {r.size_range}  ·  ${r.mk_price}/ct
+                      </option>
+                    ))}
+                  </optgroup>
+                ))
+              })()}
+            </select>
           </div>
 
           {/* sl_hot + tl_truoc + tl_sau */}
