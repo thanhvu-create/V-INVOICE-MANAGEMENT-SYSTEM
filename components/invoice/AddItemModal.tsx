@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react'
 import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 
-const LOAI_VANG_OPTIONS = ['24K', '23K', '22K', '18KW', '18KY', '17K', '16K', '15K', '14K', '10K', 'PT950', 'AG', 'PD']
 
 interface Form {
   sku:          string
@@ -214,10 +213,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
 
             <div>
               <label style={labelStyle}>Loại Vàng</label>
-              <select style={inputStyle} value={form.loai_vang} onChange={f('loai_vang')}>
-                <option value="">—</option>
-                {LOAI_VANG_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
+              <input style={inputStyle} placeholder="18KW, 18KY, PT950…" value={form.loai_vang} onChange={f('loai_vang')} />
             </div>
             <div>
               <label style={labelStyle}>Qty (pcs)</label>
