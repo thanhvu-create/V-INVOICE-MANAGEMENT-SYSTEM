@@ -110,15 +110,16 @@ export function calcVonSanXuat(
 
 /**
  * CIF price — template-aware
- * CH1 / ADM / CH1_AG3: purchase × 1.05
- * CH2:                 null  (no CIF column in CH2 template)
- * VNSI_AG3:            purchase × 1.10
+ * CH1 / CH1_AG3: purchase × 1.05  (5%)
+ * ADM:           purchase × 1.10  (10% — confirmed from actual ADM Excel file col X24 "CIF 10%")
+ * CH2:           null  (no CIF column in CH2 template)
+ * VNSI_AG3:      purchase × 1.10  (10%)
  */
 export function calcCIFPrice(purchase: number, template: InvoiceTemplate): number | null {
-  if (template === 'CH1' || template === 'ADM' || template === 'CH1_AG3') {
+  if (template === 'CH1' || template === 'CH1_AG3') {
     return purchase * 1.05
   }
-  if (template === 'VNSI_AG3') {
+  if (template === 'ADM' || template === 'VNSI_AG3') {
     return purchase * 1.10
   }
   return null  // CH2, MANUAL
