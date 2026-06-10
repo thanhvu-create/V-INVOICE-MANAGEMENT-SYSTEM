@@ -1,7 +1,7 @@
 import { createServiceClient } from '@/lib/supabase/server'
 
 export type AuditAction =
-  | 'created' | 'updated' | 'submitted'
+  | 'created' | 'updated' | 'submitted' | 'finalized'
   | 'approved' | 'rejected' | 'invoiced'
   | 'items_imported' | 'item_added' | 'item_updated' | 'item_deleted'
   | 'discount_applied'

@@ -22,7 +22,7 @@ export function ImportPreview({ rows }: Props) {
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead>
           <tr>
-            {['#', 'SKU', 'Description', 'Qty', 'Total Wt (g)', 'Gold Wt (g)', 'Metal', 'Class'].map(h => (
+            {['#', 'SKU', 'SO-MO', 'Description', 'Qty', 'T.Phẩm (g)', 'Loại vàng', 'Class'].map(h => (
               <th key={h} style={th}>{h}</th>
             ))}
           </tr>
@@ -32,11 +32,11 @@ export function ImportPreview({ rows }: Props) {
             <tr key={i} onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
               <td style={{ ...td, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>{row.rowNum}</td>
               <td style={{ ...td, fontFamily: 'var(--font-mono)', fontWeight: 600, background: 'var(--sku-highlight-bg)' }}>{row.sku}</td>
+              <td style={{ ...td, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>{row.soMo || '—'}</td>
               <td style={td}>{row.description || '—'}</td>
               <td style={{ ...td, fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{row.qty}</td>
               <td style={{ ...td, fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{row.weightTotal.toFixed(4)}</td>
-              <td style={{ ...td, fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{row.weightGold.toFixed(4)}</td>
-              <td style={td}>{row.metalType || '—'}</td>
+              <td style={td}>{row.loaiVang || '—'}</td>
               <td style={td}>{row.class || '—'}</td>
             </tr>
           ))}

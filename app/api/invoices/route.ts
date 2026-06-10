@@ -21,12 +21,10 @@ export async function GET(req: NextRequest) {
     const db = createServiceClient()
 
     let query = db
-      .from('invoice_headers')
+      .from('invoices')
       .select(`
-        id, po_number, mr_number, status, is_locked, store, created_by, created_at,
-        daily_metal_rates ( rate_date ),
-        pricing_rules ( name ),
-        invoice_items ( image_url, line_no )
+        id, invoice_code, channel, template_type, status, created_by, created_at, finalized_at,
+        invoice_products ( id, seq )
       `, { count: 'exact' })
       .order('created_at', { ascending: false })
       .range(offset, offset + pageSize - 1)
@@ -35,7 +33,7 @@ export async function GET(req: NextRequest) {
     if (dateFrom) query = query.gte('created_at', dateFrom)
     if (dateTo)   query = query.lte('created_at', dateTo + 'T23:59:59')
     if (search) {
-      query = query.or(`po_number.ilike.%${search}%,mr_number.ilike.%${search}%,store.ilike.%${search}%`)
+      query = query.or(`invoice_code.ilike.%${search}%,channel.ilike.%${search}%`)
     }
 
     const { data, count, error } = await query
@@ -61,40 +59,54 @@ export async function POST(req: NextRequest) {
   try {
     const ctx = await requireRole('user')
     const body = await req.json()
-    const { po_number, mr_number, metal_rate_id, pricing_rule_id, store, notes } = body
+    const { invoice_code, channel, template_type } = body
 
-    if (!po_number?.trim()) {
-      return NextResponse.json({ success: false, message: 'PO number is required' }, { status: 400 })
+    if (!invoice_code?.trim()) {
+      return NextResponse.json({ success: false, message: 'Invoice code is required' }, { status: 400 })
     }
-    if (!metal_rate_id) {
-      return NextResponse.json({ success: false, message: 'Metal rate is required' }, { status: 400 })
+    if (!template_type) {
+      return NextResponse.json({ success: false, message: 'Template type is required' }, { status: 400 })
     }
 
     const db = createServiceClient()
 
-    // Unique PO check
+    // Unique invoice_code check
     const { count } = await db
-      .from('invoice_headers')
+      .from('invoices')
       .select('*', { count: 'exact', head: true })
-      .eq('po_number', po_number.trim())
+      .eq('invoice_code', invoice_code.trim())
 
     if (count && count > 0) {
-      return NextResponse.json({ success: false, message: `PO number "${po_number}" already exists` }, { status: 409 })
+      return NextResponse.json({ success: false, message: `Invoice code "${invoice_code}" already exists` }, { status: 409 })
     }
 
+    // Copy NVL snapshot from latest nvl_prices row
+    const { data: latestNVL } = await db
+      .from('nvl_prices')
+      .select('gold_24k, pt_price, ag_price, pd_price, loss_gold, loss_pt')
+      .order('id', { ascending: false })
+      .limit(1)
+      .single()
+
+    const nvlSnapshot = latestNVL ? {
+      nvl_gold_24k:  latestNVL.gold_24k,
+      nvl_pt_price:  latestNVL.pt_price,
+      nvl_ag_price:  latestNVL.ag_price,
+      nvl_pd_price:  latestNVL.pd_price,
+      nvl_loss_gold: latestNVL.loss_gold,
+      nvl_loss_pt:   latestNVL.loss_pt,
+      nvl_cif_rate:  template_type === 'VNSI_AG3' ? 0.10 : 0.05,
+    } : {}
+
     const { data, error } = await db
-      .from('invoice_headers')
+      .from('invoices')
       .insert({
-        po_number:          po_number.trim(),
-        mr_number:          mr_number?.trim() || null,
-        metal_rate_id,
-        pricing_rule_id:    pricing_rule_id || null,
-        store:              store?.trim() || null,
-        notes:              notes?.trim() || null,
-        created_by:         ctx.fullName,       // denormalized display name
-        created_by_user_id: ctx.userId,         // UUID FK for editGuard ownership check
-        status:             'draft',
-        is_locked:          false,
+        invoice_code:  invoice_code.trim(),
+        channel:       channel?.trim() || null,
+        template_type,
+        status:        'draft',
+        created_by:    ctx.userId,
+        ...nvlSnapshot,
       })
       .select()
       .single()

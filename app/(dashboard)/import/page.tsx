@@ -35,35 +35,24 @@ function parseExcelFile(file: File): Promise<any[][]> {
 }
 
 async function validateRows(rows: any[][]): Promise<{ valid: ImportRow[]; errors: ValidationError[] }> {
-  const valid: ImportRow[]           = []
-  const errors: ValidationError[]    = []
-  const skus = rows.map(r => String(r[2] || '').trim()).filter(Boolean)
+  const valid: ImportRow[]        = []
+  const errors: ValidationError[] = []
 
-  let productSet = new Set<string>()
-  if (skus.length) {
-    const res  = await fetch(`/api/products?skus=${Array.from(new Set(skus)).join(',')}`)
-    const json = await res.json()
-    productSet = new Set<string>((json.data ?? []).map((p: any) => p.sku_jwmold))
-  }
+  // Column layout (new SPHT-based template):
+  // 0:store  1:location  2:sku  3:so_mo  4:description  5:loai_vang
+  // 6:qt_pcs  7:wt_gr  8:class  9:sub_class  10:nini_adm
 
   rows.forEach((row, idx) => {
     const rowNum = idx + 2
-    const sku    = String(row[2] || '').trim()
+    const sku    = String(row[2] || '').trim().toUpperCase()
     if (!sku && !row[3] && !row[6]) return
 
     if (!sku) { errors.push({ row: rowNum, sku: '(empty)', message: 'SKU is required' }); return }
 
-    // SKU not in catalog → warn only (import with fees=0, user fills later)
-    if (!productSet.has(sku)) {
-      errors.push({ row: rowNum, sku, warn: true, message: `SKU "${sku}" not in product catalog — fees will be 0, auto-fill skipped` })
-    }
-
-    const qty         = parseInt(String(row[6] || '0'))
-    const weightTotal = parseFloat(String(row[7] || '0'))
-    const weightGold  = parseFloat(String(row[8] || '0'))
-
+    const qty = parseInt(String(row[6] || '0'))
     if (isNaN(qty) || qty < 1) { errors.push({ row: rowNum, sku, message: 'Qty must be ≥ 1' }); return }
-    if (weightGold > weightTotal) { errors.push({ row: rowNum, sku, message: 'Gold weight cannot exceed total weight' }); return }
+
+    const wt = parseFloat(String(row[7] || '0'))
 
     valid.push({
       rowNum,
@@ -71,15 +60,13 @@ async function validateRows(rows: any[][]): Promise<{ valid: ImportRow[]; errors
       location:    String(row[1]  || '').trim(),
       sku,
       soMo:        String(row[3]  || '').trim(),
-      vendorModel: String(row[4]  || '').trim(),
-      description: String(row[5]  || '').trim(),
+      description: String(row[4]  || '').trim(),
+      loaiVang:    String(row[5]  || '').trim(),
       qty,
-      weightTotal: isNaN(weightTotal) ? 0 : weightTotal,
-      weightGold:  isNaN(weightGold)  ? 0 : weightGold,
-      metalType:   String(row[9]  || '').trim(),
-      class:       String(row[10] || '').trim(),
-      subClass:    String(row[11] || '').trim(),
-      notes:       String(row[12] || '').trim(),
+      weightTotal: isNaN(wt) ? 0 : wt,
+      class:       String(row[8]  || '').trim(),
+      subClass:    String(row[9]  || '').trim(),
+      niniAdm:     String(row[10] || '').trim(),
     })
   })
 
@@ -93,14 +80,14 @@ function ImportContent() {
   const invoiceId = sp.get('invoiceId') ?? ''
 
   const [state, setState] = useState<Stage>({ stage: 'idle' })
-  const [invoice, setInvoice] = useState<{ po_number: string; is_locked: boolean } | null>(null)
+  const [invoice, setInvoice] = useState<{ invoice_code: string; status: string } | null>(null)
 
   useEffect(() => {
     if (!invoiceId) return
     fetch(`/api/invoices/${invoiceId}`)
       .then(r => r.json())
       .then(json => {
-        if (json.success) setInvoice({ po_number: json.data.header.po_number, is_locked: json.data.header.is_locked })
+        if (json.success) setInvoice({ invoice_code: json.data.header.invoice_code, status: json.data.header.status })
       })
   }, [invoiceId])
 
@@ -155,7 +142,7 @@ function ImportContent() {
     return <p style={{ color: 'var(--color-danger)' }}>No invoice selected. Go to an invoice and click Import.</p>
   }
 
-  const locked = invoice?.is_locked
+  const locked = invoice?.status === 'finalized'
 
   return (
     <div style={{ maxWidth: 900 }}>
@@ -163,7 +150,7 @@ function ImportContent() {
       <div style={{ marginBottom: '1.5rem' }}>
         {invoice && (
           <a href={`/invoices/${invoiceId}`} style={{ color: 'var(--text-muted)', textDecoration: 'none', fontSize: 'var(--text-sm)' }}>
-            ← Invoice {invoice.po_number}
+            ← Invoice {invoice.invoice_code}
           </a>
         )}
         <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', fontWeight: 400, margin: '0.25rem 0 0' }}>

@@ -6,9 +6,10 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { GemModal } from './GemModal'
 import { DriveImage } from './DriveImage'
 import { DriveImageInput } from '@/components/ui/DriveImageInput'
-import type { InvoiceItem } from '@/types'
 
-const METAL_TYPES = ['18KW', '18KY', '14KY', 'PT950', 'PT', '24K', 'AG', 'PD']
+import type { InvoiceTemplate } from '@/lib/formulas/pricing'
+
+const METAL_TYPES = ['18KW', '18KY', '18K', '17K', '16K', '15K', '14KY', '14K', '10K', 'PT950', 'PT', 'AG', 'PD', '24K', '22K', '23K']
 
 function fmt2(n: number | null | undefined) { return n != null ? `$${n.toFixed(2)}` : '—' }
 function fmt4(n: number | null | undefined) { return n != null ? n.toFixed(4) : '—' }
@@ -23,9 +24,6 @@ const inputStyle: React.CSSProperties = {
   fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', color: 'var(--text-primary)',
   outline: 'none',
 }
-const roStyle: React.CSSProperties = {
-  ...inputStyle, background: 'var(--bg-base)', color: 'var(--text-muted)', cursor: 'not-allowed',
-}
 
 interface Props {
   invoiceId:    string
@@ -33,11 +31,15 @@ interface Props {
   canSeePrice:  boolean
   canEdit:      boolean
   isLocked:     boolean
+  template?:    InvoiceTemplate
   onRefresh:    () => void
   onItemUpdate: (itemId: string, updatedItem: any) => void
 }
 
-export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRefresh, onItemUpdate }: Props) {
+export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, template = 'CH1', onRefresh, onItemUpdate }: Props) {
+  const hasGems    = template === 'CH1' || template === 'CH2' || template === 'ADM'
+  const hasFees    = template === 'CH1' || template === 'CH2'
+  const hasCIF     = template !== 'CH2'
   const [editMode, setEditMode] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
@@ -47,33 +49,29 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
   const [confirmDeleteGem, setConfirmDeleteGem] = useState<any | null>(null)
   const [deletingGem, setDeletingGem] = useState(false)
 
-  const gems: any[] = item.item_gem_details ?? []
+  const gems: any[] = item.invoice_diamonds ?? []
+  const isBaSao = item.nini_adm?.toLowerCase().includes('ba sao')
 
   function openEdit() {
     setForm({
-      qty_pcs:               String(item.qty_pcs ?? ''),
-      size:                  item.size           ?? '',
-      description:           item.description    ?? '',
-      class:                 item.class          ?? '',
-      sub_class:             item.sub_class       ?? '',
-      metal_type:            item.metal_type      ?? '',
-      weight_total_gr:       String(item.weight_total_gr       ?? ''),
-      weight_gold_actual_gr: String(item.weight_gold_actual_gr ?? ''),
-      labor_fee:             String(item.labor_fee   ?? 0),
-      casting_fee:           String(item.casting_fee ?? 0),
-      design_fee:            String(item.design_fee  ?? 0),
-      resin_fee:             String(item.resin_fee   ?? 0),
-      misc_fee:              String(item.misc_fee    ?? 0),
-      notes:                 item.notes          ?? '',
-      so_mo_code:            item.so_mo_code      ?? '',
-      vendor_model:          item.vendor_model    ?? '',
-      ship_date:             item.ship_date       ?? '',
-      tracking_no:           item.tracking_no     ?? '',
-      vinvoice_no:           item.vinvoice_no     ?? '',
-      sell_price:            String(item.sell_price ?? ''),
-      discount_pct:          String(item.discount_pct ?? ''),
-      image_url:             item.image_url ?? '',
-      price_list_type:       item.price_list_type ?? '',
+      qt_pcs:            String(item.qt_pcs            ?? ''),
+      kich_thuoc:        item.kich_thuoc               ?? '',
+      description:       item.description              ?? '',
+      class:             item.class                    ?? '',
+      sub_class:         item.sub_class                ?? '',
+      loai_vang:         item.loai_vang                ?? '',
+      t_pham_co_nvl_da:  String(item.t_pham_co_nvl_da  ?? ''),
+      gia_cong:          String(item.gia_cong           ?? 0),
+      duc:               String(item.duc                ?? 0),
+      thiet_ke:          String(item.thiet_ke           ?? 0),
+      resin:             String(item.resin              ?? 0),
+      phi_phu_kien:      String(item.phi_phu_kien       ?? 0),
+      nini_adm:          item.nini_adm                 ?? '',
+      so_mo:             item.so_mo                    ?? '',
+      ngay_gui:          item.ngay_gui                 ?? '',
+      tracking_no:       item.tracking_no              ?? '',
+      hoa_don:           item.hoa_don                  ?? '',
+      image_url:         item.image_url                ?? '',
     })
     setEditMode(true)
   }
@@ -85,14 +83,11 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
 
   async function handleSave() {
     setSaving(true)
-    const nums = ['qty_pcs', 'weight_total_gr', 'weight_gold_actual_gr',
-      'labor_fee', 'casting_fee', 'design_fee', 'resin_fee', 'misc_fee', 'sell_price', 'discount_pct']
+    const nums = ['qt_pcs', 't_pham_co_nvl_da', 'gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien']
     const payload: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(form)) {
       payload[k] = nums.includes(k) ? (parseFloat(v) || null) : (v.trim() || null)
     }
-    // price_list_type is a string — send as-is (empty string → null)
-    if ('price_list_type' in form) payload.price_list_type = form.price_list_type || null
     const data = await apiCall<any>(
       () => fetch(`/api/invoices/${invoiceId}/items/${item.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
@@ -102,7 +97,6 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
     setSaving(false)
     if (data !== null) {
       setEditMode(false)
-      // Update only this item in local state — instant update, no full page re-fetch
       onItemUpdate(item.id, data)
     }
   }
@@ -130,21 +124,18 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
     if (updatedItem !== null) onItemUpdate(item.id, updatedItem)
   }
 
-  // Gem mutations return the updated parent item — use local state update
   function handleGemSaved(updatedItem: any) {
     onItemUpdate(item.id, updatedItem)
   }
-
-  const isBaSao = item.notes?.toLowerCase().includes('ba sao')
 
   return (
     <div style={{ marginBottom: '1rem', border: '1px solid var(--border-base)', background: 'var(--bg-surface)' }}>
       {/* Card header */}
       <div style={{ padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', background: 'var(--bg-base)' }}>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <DriveImage url={item.image_url} alt={item.sku_jwmold} size={44} />
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>#{item.line_no}</span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, background: 'var(--sku-highlight-bg)', padding: '1px 8px', color: '#92400E', fontSize: 'var(--text-sm)' }}>{item.sku_jwmold}</span>
+          <DriveImage url={item.image_url} alt={item.sku} size={44} />
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>#{item.seq}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, background: 'var(--sku-highlight-bg)', padding: '1px 8px', color: '#92400E', fontSize: 'var(--text-sm)' }}>{item.sku}</span>
           {item.description && <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{item.description}</span>}
           {isBaSao && <span style={{ fontSize: 'var(--text-xs)', color: '#DC2626', fontWeight: 700 }}>★ BA SAO</span>}
         </div>
@@ -167,59 +158,49 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
       {!editMode && (
         <div style={{ padding: '0.75rem 1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem' }}>
           {[
-            ['Qty', item.qty_pcs],
-            ...(item.size          ? [['Size', item.size]]                     : []),
-            ['Metal', item.metal_type ?? '—'],
-            ...(item.vendor_model  ? [['Mã mẫu', item.vendor_model]]           : []),
-            ...(item.so_mo_code    ? [['SO/MO', item.so_mo_code]]              : []),
-            // Weights
-            ['T.Phẩm (gr)', fmt4(item.weight_total_gr)],
-            ['Vàng thực (gr)', fmt4(item.weight_gold_actual_gr)],
-            ['Trừ NVL đá (gr)', fmt4(item.weight_no_gem_gr)],
-            // Prices
+            ['Qty (pcs)', item.qt_pcs],
+            ...(item.kich_thuoc    ? [['Kích thước', item.kich_thuoc]]            : []),
+            ['Loại vàng', item.loai_vang ?? '—'],
+            ...(item.so_mo         ? [['SO-MO', item.so_mo]]                      : []),
+            ['T.Phẩm có NVL đá (gr)', fmt4(item.t_pham_co_nvl_da ?? item.wt_gr)],
+            ['T.Phẩm trừ NVL đá (gr)', fmt4(item.t_pham_tru_nvl_da)],
+            ['T.Phẩm vàng TT (gr)', fmt4(item.t_pham_vang_thuc_te)],
             ...(canSeePrice ? [
-              ['Tiền vàng', fmt2(item.gold_value_usd)],
-              ['HPUSA', fmt2(item.hpusa)],
-              ['CIF', fmt2(item.cif_price)],
-              ['Tag', fmt2(item.tag_price)],
-              ['FR', fmt2(item.fr_price)],
+              ['Tiền vàng', fmt2(item.tien_vang)],
+              ['Vốn SX', fmt2(item.von_san_xuat)],
+              ...(hasCIF ? [['CIF/SP', fmt2(item.cif_price)]] : []),
             ] : []),
-            // Fees (individual)
-            ...(canSeePrice && (item.labor_fee || item.casting_fee || item.design_fee || item.resin_fee || item.misc_fee) ? [
-              ['Gia công', fmt2(item.labor_fee)],
-              ['Đúc', fmt2(item.casting_fee)],
-              ['Thiết kế', fmt2(item.design_fee)],
-              ['Resin', fmt2(item.resin_fee)],
-              ['Phụ kiện', fmt2(item.misc_fee)],
+            ...(canSeePrice && hasFees && (item.gia_cong || item.duc || item.thiet_ke || item.resin || item.phi_phu_kien) ? [
+              ['Gia công/SP', fmt2(item.gia_cong)],
+              ['Đúc/SP', fmt2(item.duc)],
+              ['Thiết kế/SP', fmt2(item.thiet_ke)],
+              ['Resin/SP', fmt2(item.resin)],
+              ['Phụ kiện', fmt2(item.phi_phu_kien)],
             ] : []),
-            // Sell price channel
-            ...(canSeePrice && item.price_list_type ? [['Kênh giá', item.price_list_type]] : []),
-            // Logistics
-            ...(item.ship_date    ? [['Ngày gởi', item.ship_date]]             : []),
-            ...(item.tracking_no  ? [['Tracking#', item.tracking_no]]          : []),
-            ...(item.store        ? [['Gởi hàng', item.store]]                 : []),
-            ...(item.vinvoice_no  ? [['Hóa Đơn USA', item.vinvoice_no]]        : []),
-            ...(item.notes        ? [['Notes', item.notes]]                    : []),
+            ...(item.ngay_gui    ? [['Ngày gửi', item.ngay_gui]]             : []),
+            ...(item.tracking_no ? [['Tracking#', item.tracking_no]]         : []),
+            ...(item.hoa_don     ? [['Hóa Đơn (V-INV)', item.hoa_don]]       : []),
+            ...(item.store       ? [['Store', item.store]]                    : []),
+            ...(item.nini_adm    ? [['Notes', item.nini_adm]]                 : []),
           ].map(([label, val]) => (
             <div key={String(label)}>
               <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
               <div style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', color: String(label) === 'Notes' && isBaSao ? '#DC2626' : 'inherit', fontWeight: String(label) === 'Notes' && isBaSao ? 700 : 400 }}>{val ?? '—'}</div>
             </div>
           ))}
-          {/* HPUSA breakdown — admin/manager only, only when there are gems */}
           {canSeePrice && gems.length > 0 && (
             <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--border-light)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>HPUSA Breakdown</div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Vốn SX Breakdown</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)' }}>
-                <span>Gold: {fmt2(item.gold_value_usd)}</span>
+                <span>Tiền vàng: {fmt2(item.tien_vang)}</span>
+                {hasGems && <><span style={{ color: 'var(--text-muted)' }}>+</span>
+                <span>T.Giá Xoàn: {fmt2(gems.reduce((s: number, g: any) => s + (g.t_gia_xoan ?? 0), 0))}</span>
                 <span style={{ color: 'var(--text-muted)' }}>+</span>
-                <span>Gems: {fmt2(gems.reduce((s: number, g: any) => s + (g.total_price ?? 0), 0))}</span>
-                <span style={{ color: 'var(--text-muted)' }}>+</span>
-                <span>Setting: {fmt2(gems.reduce((s: number, g: any) => s + (g.total_setting_fee ?? 0), 0))}</span>
-                <span style={{ color: 'var(--text-muted)' }}>+</span>
-                <span>Fees: {fmt2((item.labor_fee ?? 0) + (item.casting_fee ?? 0) + (item.design_fee ?? 0) + (item.resin_fee ?? 0) + (item.misc_fee ?? 0))}</span>
+                <span>T.Phí: {fmt2(gems.reduce((s: number, g: any) => s + (g.t_phi ?? 0), 0))}</span></>}
+                {hasFees && <><span style={{ color: 'var(--text-muted)' }}>+</span>
+                <span>Gia công: {fmt2((item.gia_cong ?? 0) + (item.duc ?? 0) + (item.thiet_ke ?? 0) + (item.resin ?? 0) + (item.phi_phu_kien ?? 0))}</span></>}
                 <span style={{ color: 'var(--text-muted)' }}>=</span>
-                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>HPUSA: {fmt2(item.hpusa)}</span>
+                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Vốn SX: {fmt2(item.von_san_xuat)}</span>
               </div>
             </div>
           )}
@@ -230,12 +211,12 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
       {editMode && (
         <div style={{ padding: '1rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div><label style={labelStyle}>Qty *</label>
-              <input type="number" min="1" step="1" style={inputStyle} value={form.qty_pcs} onChange={f('qty_pcs')} /></div>
-            <div><label style={labelStyle}>Size</label>
-              <input style={inputStyle} value={form.size ?? ''} onChange={f('size')} placeholder="e.g. 6.5, 7mm" /></div>
-            <div><label style={labelStyle}>Metal Type</label>
-              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.metal_type} onChange={f('metal_type')}>
+            <div><label style={labelStyle}>Qty (pcs) *</label>
+              <input type="number" min="1" step="1" style={inputStyle} value={form.qt_pcs} onChange={f('qt_pcs')} /></div>
+            <div><label style={labelStyle}>Kích thước</label>
+              <input style={inputStyle} value={form.kich_thuoc ?? ''} onChange={f('kich_thuoc')} placeholder="e.g. 8in, Size 5" /></div>
+            <div><label style={labelStyle}>Loại vàng</label>
+              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.loai_vang} onChange={f('loai_vang')}>
                 <option value="">—</option>
                 {METAL_TYPES.map(m => <option key={m} value={m}>{m}</option>)}
               </select></div>
@@ -245,81 +226,56 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
               <input style={inputStyle} value={form.class} onChange={f('class')} /></div>
             <div><label style={labelStyle}>Sub Class</label>
               <input style={inputStyle} value={form.sub_class} onChange={f('sub_class')} /></div>
-            <div><label style={labelStyle}>SO/MO Code</label>
-              <input style={inputStyle} value={form.so_mo_code} onChange={f('so_mo_code')} /></div>
-            <div><label style={labelStyle}>Total Weight (g)</label>
-              <input type="number" min="0" step="0.0001" style={inputStyle} value={form.weight_total_gr} onChange={f('weight_total_gr')} /></div>
-            <div><label style={labelStyle}>Gold Weight (g)</label>
-              <input type="number" min="0" step="0.0001" style={inputStyle} value={form.weight_gold_actual_gr} onChange={f('weight_gold_actual_gr')} /></div>
-            <div><label style={labelStyle}>Vendor Model</label>
-              <input style={inputStyle} value={form.vendor_model} onChange={f('vendor_model')} /></div>
+            <div><label style={labelStyle}>SO-MO</label>
+              <input style={inputStyle} value={form.so_mo} onChange={f('so_mo')} placeholder="SO26.xxxx-MO26.xxxxx" /></div>
+            <div><label style={labelStyle}>T.Phẩm có NVL đá (gr)</label>
+              <input type="number" min="0" step="0.0001" style={inputStyle} value={form.t_pham_co_nvl_da} onChange={f('t_pham_co_nvl_da')} /></div>
           </div>
 
-          {/* Fees */}
-          <p style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Fees (USD)</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
-            {(['labor_fee', 'casting_fee', 'design_fee', 'resin_fee', 'misc_fee'] as const).map(k => (
-              <div key={k}><label style={labelStyle}>{k.replace('_fee', '').replace('_', ' ')}</label>
-                <input type="number" min="0" step="0.01" style={inputStyle} value={form[k]} onChange={f(k)} /></div>
-            ))}
-          </div>
+          {hasFees && (
+            <>
+              <p style={{ fontSize: 'var(--text-xs)', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Gia công (USD/SP)</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
+                <div><label style={labelStyle}>Gia công</label>
+                  <input type="number" min="0" step="0.01" style={inputStyle} value={form.gia_cong} onChange={f('gia_cong')} /></div>
+                <div><label style={labelStyle}>Đúc</label>
+                  <input type="number" min="0" step="0.01" style={inputStyle} value={form.duc} onChange={f('duc')} /></div>
+                <div><label style={labelStyle}>Thiết kế</label>
+                  <input type="number" min="0" step="0.01" style={inputStyle} value={form.thiet_ke} onChange={f('thiet_ke')} /></div>
+                <div><label style={labelStyle}>Resin</label>
+                  <input type="number" min="0" step="0.01" style={inputStyle} value={form.resin} onChange={f('resin')} /></div>
+                <div><label style={labelStyle}>Phụ kiện</label>
+                  <input type="number" min="0" step="0.01" style={inputStyle} value={form.phi_phu_kien} onChange={f('phi_phu_kien')} /></div>
+              </div>
+            </>
+          )}
 
-          {/* Shipping */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.75rem', marginBottom: '1rem' }}>
-            <div><label style={labelStyle}>Ship Date</label>
-              <input type="date" style={inputStyle} value={form.ship_date} onChange={f('ship_date')} /></div>
+            <div><label style={labelStyle}>Ngày gửi</label>
+              <input type="date" style={inputStyle} value={form.ngay_gui} onChange={f('ngay_gui')} /></div>
             <div><label style={labelStyle}>Tracking No</label>
               <input style={inputStyle} value={form.tracking_no} onChange={f('tracking_no')} /></div>
-            <div><label style={labelStyle}>V-Invoice No</label>
-              <input style={inputStyle} value={form.vinvoice_no} onChange={f('vinvoice_no')} /></div>
+            <div><label style={labelStyle}>V-Invoice No (Hóa Đơn)</label>
+              <input style={inputStyle} value={form.hoa_don} onChange={f('hoa_don')} /></div>
           </div>
 
-          {/* Pricing (admin/manager) */}
+          {/* Computed readonly */}
           {canSeePrice && (
-            <div style={{ marginBottom: '1rem' }}>
-              {/* Price list type — auto-compute sell_price from markup tiers */}
-              <div style={{ marginBottom: '0.75rem' }}>
-                <label style={labelStyle}>
-                  Kênh giá (Price List)
-                  <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none', letterSpacing: 0, marginLeft: 6 }}>
-                    — chọn để tự tính Sell Price từ CIF
-                  </span>
-                </label>
-                <select
-                  style={{ ...inputStyle, cursor: 'pointer' }}
-                  value={form.price_list_type}
-                  onChange={f('price_list_type')}
-                >
-                  <option value="">— Nhập tay —</option>
-                  <optgroup label="US">
-                    <option value="1)HPUS -P">1) HPUS -P</option>
-                    <option value="2)HPUS FB -P">2) HPUS FB -P</option>
-                    <option value="3)ADM1 -P">3) ADM1 -P</option>
-                    <option value="4)ADM2 -P">4) ADM2 -P</option>
-                    <option value="5)HPB -P">5) HPB -P</option>
-                  </optgroup>
-                  <optgroup label="VN">
-                    <option value="B1)HPVN -P">B1) HPVN -P</option>
-                    <option value="2)AGVN -P">2) AGVN -P</option>
-                  </optgroup>
-                </select>
-                {form.price_list_type && item.cif_price && (
-                  <div style={{ marginTop: 4, fontSize: 'var(--text-xs)', color: 'var(--color-info)', fontFamily: 'var(--font-mono)' }}>
-                    <i className="fa-solid fa-circle-info" style={{ marginRight: 4 }} />
-                    Sell Price sẽ tự tính từ CIF {fmt2(item.cif_price)} × markup tier khi Save
-                  </div>
-                )}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.75rem' }}>
-                <div><label style={labelStyle}>Sell Price (USD)</label>
-                  <input type="number" min="0" step="0.01" style={inputStyle} value={form.sell_price} onChange={f('sell_price')} /></div>
-                <div><label style={labelStyle}>Discount %</label>
-                  <input type="number" min="0" max="100" step="0.01" style={inputStyle} value={form.discount_pct} onChange={f('discount_pct')} /></div>
-              </div>
+            <div style={{ background: 'var(--bg-base)', border: '1px solid var(--border-light)', padding: '0.75rem', marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem' }}>
+              {[
+                ['T.Phẩm vàng TT (gr)', fmt4(item.t_pham_tru_nvl_da)],
+                ['Tiền vàng', fmt2(item.tien_vang)],
+                ['Vốn SX', fmt2(item.von_san_xuat)],
+                ...(hasCIF ? [['CIF/SP', fmt2(item.cif_price)]] : []),
+              ].map(([l, v]) => (
+                <div key={l as string}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>{l} <span style={{ color: 'var(--color-info)', fontSize: 9 }}>AUTO</span></div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }}>{v}</div>
+                </div>
+              ))}
             </div>
           )}
 
-          {/* Image URL */}
           <div style={{ marginBottom: '1rem' }}>
             <DriveImageInput
               label="Hình ảnh (Google Drive link hoặc URL)"
@@ -328,24 +284,10 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
             />
           </div>
 
-          {/* Computed readonly */}
-          <div style={{ background: 'var(--bg-base)', border: '1px solid var(--border-light)', padding: '0.75rem', marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.5rem' }}>
-            {[
-              ['No-Gem Wt', fmt4(item.weight_no_gem_gr)],
-              ...(canSeePrice ? [['Gold Value', fmt2(item.gold_value_usd)], ['HPUSA', fmt2(item.hpusa)], ['CIF', fmt2(item.cif_price)], ['Tag', fmt2(item.tag_price)], ['FR', fmt2(item.fr_price)]] : []),
-            ].map(([l, v]) => (
-              <div key={l as string}>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 2 }}>{l} <span style={{ color: 'var(--color-info)', fontSize: 9 }}>AUTO</span></div>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }}>{v}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Notes */}
           <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>Notes</label>
-            <input style={{ ...inputStyle, color: form.notes.toLowerCase().includes('ba sao') ? '#DC2626' : 'var(--text-primary)', fontWeight: form.notes.toLowerCase().includes('ba sao') ? 700 : 400 }}
-              value={form.notes} onChange={f('notes')} placeholder="e.g. Ba Sao — 3 stars" />
+            <label style={labelStyle}>Notes / Memo</label>
+            <input style={{ ...inputStyle, color: (form.nini_adm || '').toLowerCase().includes('ba sao') ? '#DC2626' : 'var(--text-primary)', fontWeight: (form.nini_adm || '').toLowerCase().includes('ba sao') ? 700 : 400 }}
+              value={form.nini_adm} onChange={f('nini_adm')} placeholder="e.g. Ba Sao — 3 stars" />
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem' }}>
@@ -359,83 +301,89 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, onRe
         </div>
       )}
 
-      {/* Gem sub-table */}
-      <div style={{ borderTop: '1px solid var(--border-light)', padding: '0.75rem 1rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-          <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-            Gems {gems.length > 0 && `(${gems.length})`}
-          </span>
-          {canEdit && !isLocked && (
-            <button onClick={() => setGemModal({ open: true, gem: undefined })}
-              style={{ background: 'none', border: '1px solid var(--border-base)', cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', padding: '2px 8px', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <i className="fa-solid fa-plus" style={{ fontSize: 9 }} /> Add Gem
-            </button>
+      {/* Xoàn (diamond) sub-table */}
+      {hasGems && (
+        <div style={{ borderTop: '1px solid var(--border-light)', padding: '0.75rem 1rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
+              Xoàn / Hột {gems.length > 0 && `(${gems.length}/${template === 'CH2' ? 10 : 5})`}
+            </span>
+            {canEdit && !isLocked && (
+              <button onClick={() => setGemModal({ open: true, gem: undefined })}
+                style={{ background: 'none', border: '1px solid var(--border-base)', cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', padding: '2px 8px', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <i className="fa-solid fa-plus" style={{ fontSize: 9 }} /> Thêm xoàn
+              </button>
+            )}
+          </div>
+
+          {gems.length === 0 ? (
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', margin: 0 }}>Chưa có hột.</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ borderCollapse: 'collapse', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', width: '100%' }}>
+                <thead>
+                  <tr>{[
+                    'Mã Xoàn', 'P.Chất', 'Size Range',
+                    'SL', 'TL Trước (ct)', 'TL Sau (ct)',
+                    'TL(gr)', 'Đơn Giá', 'T.Giá Xoàn',
+                    '$1/Viên', 'T.Phí', ''
+                  ].map(h => (
+                    <th key={h} style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--bg-base)', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody>
+                  {gems.map((g: any) => (
+                    <tr key={g.id} onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
+                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{g.ma_xoan ?? '—'}</td>
+                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.p_chat ?? 'VVS1'}</td>
+                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.size_xoan_range ?? '—'}</td>
+                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.sl_hot}</td>
+                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', background: g.tl_truoc_xu_ly_ct == null ? 'rgba(220,38,38,0.08)' : '' }}>
+                        {g.tl_truoc_xu_ly_ct != null ? g.tl_truoc_xu_ly_ct.toFixed(4) : <span style={{ color: '#DC2626' }}>— nhập tay</span>}
+                      </td>
+                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>{g.tl_sau_xu_ly_ct?.toFixed(4) ?? '—'}</td>
+                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt4(g.tl_xoan_gr)} <span style={{ fontSize: 9, color: 'var(--color-info)' }}>auto</span></td>
+                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt2(g.don_gia)}</td>
+                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{fmt2(g.t_gia_xoan)} <span style={{ fontSize: 9, color: 'var(--color-info)' }}>auto</span></td>
+                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>$1</td>
+                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{fmt2(g.t_phi)} <span style={{ fontSize: 9, color: 'var(--color-info)' }}>auto</span></td>
+                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', whiteSpace: 'nowrap' }}>
+                        {canEdit && !isLocked && (
+                          <>
+                            <button onClick={() => setGemModal({ open: true, gem: g })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginRight: 4, fontSize: 11 }} title="Sửa"><i className="fa-solid fa-pen" /></button>
+                            <button onClick={() => setConfirmDeleteGem(g)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 11 }} title="Xóa"><i className="fa-solid fa-trash" /></button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ background: 'var(--bg-base)', borderTop: '1px solid var(--border-base)' }}>
+                    <td colSpan={6} style={{ padding: '3px 8px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Tổng</td>
+                    <td style={{ padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>
+                      {gems.reduce((s: number, g: any) => s + (g.tl_xoan_gr ?? 0), 0).toFixed(4)}
+                    </td>
+                    <td />{/* Đơn Giá */}
+                    <td style={{ padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 700 }}>
+                      {fmt2(gems.reduce((s: number, g: any) => s + (g.t_gia_xoan ?? 0), 0))}
+                    </td>
+                    <td />
+                    <td style={{ padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 700 }}>
+                      {fmt2(gems.reduce((s: number, g: any) => s + (g.t_phi ?? 0), 0))}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
           )}
         </div>
-
-        {gems.length === 0 ? (
-          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', margin: 0 }}>No gems.</p>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ borderCollapse: 'collapse', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', width: '100%' }}>
-              <thead>
-                <tr>{['Type', 'Quality', 'Shape', 'Size', 'Qty', 'Wt After (ct)', 'Wt (g)', '$/ct', 'Total', 'Setting', 'Fee/pc', 'Total Fee', ''].map(h => (
-                  <th key={h} style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--bg-base)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}</tr>
-              </thead>
-              <tbody>
-                {gems.map((g: any) => (
-                  <tr key={g.id} onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.gem_type ?? '—'}</td>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.quality ?? '—'}</td>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.shape ?? '—'}</td>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.size_mm ?? '—'}</td>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.qty_pcs}</td>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.weight_ct_after?.toFixed(4) ?? '—'}</td>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt4(g.weight_gr)}</td>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt2(g.unit_price_per_ct)}</td>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{fmt2(g.total_price)}</td>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.setting_type ?? '—'}</td>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt2(g.setting_fee_per_pcs)}</td>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{fmt2(g.total_setting_fee)}</td>
-                    <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', whiteSpace: 'nowrap' }}>
-                      {canEdit && !isLocked && (
-                        <>
-                          <button onClick={() => setGemModal({ open: true, gem: g })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginRight: 4, fontSize: 11 }} title="Edit gem"><i className="fa-solid fa-pen" /></button>
-                          <button onClick={() => setConfirmDeleteGem(g)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 11 }} title="Delete gem"><i className="fa-solid fa-trash" /></button>
-                        </>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr style={{ background: 'var(--bg-base)', borderTop: '1px solid var(--border-base)' }}>
-                  <td colSpan={5} style={{ padding: '3px 8px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Subtotal</td>
-                  <td style={{ padding: '3px 8px' }} />{/* Wt After */}
-                  <td style={{ padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>
-                    {gems.reduce((s: number, g: any) => s + (g.weight_gr ?? 0), 0).toFixed(4)}
-                  </td>
-                  <td />{/* $/ct */}
-                  <td style={{ padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 700 }}>
-                    {fmt2(gems.reduce((s: number, g: any) => s + (g.total_price ?? 0), 0))}
-                  </td>
-                  <td />{/* Setting type */}
-                  <td />{/* Fee/pc */}
-                  <td style={{ padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 700 }}>
-                    {fmt2(gems.reduce((s: number, g: any) => s + (g.total_setting_fee ?? 0), 0))}
-                  </td>
-                  <td />{/* Actions */}
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* Dialogs */}
-      <ConfirmDialog open={confirmDelete} title="Delete Item" message={`Delete item "${item.sku_jwmold}" (line ${item.line_no})?`} okText={deleting ? 'Deleting…' : 'Delete'} danger onOk={handleDelete} onCancel={() => setConfirmDelete(false)} />
-      <ConfirmDialog open={!!confirmDeleteGem} title="Delete Gem" message={`Delete this ${confirmDeleteGem?.gem_type ?? 'gem'}?`} okText={deletingGem ? 'Deleting…' : 'Delete'} danger onOk={handleDeleteGem} onCancel={() => setConfirmDeleteGem(null)} />
+      <ConfirmDialog open={confirmDelete} title="Delete Item" message={`Delete item "${item.sku}" (seq ${item.seq})?`} okText={deleting ? 'Deleting…' : 'Delete'} danger onOk={handleDelete} onCancel={() => setConfirmDelete(false)} />
+      <ConfirmDialog open={!!confirmDeleteGem} title="Delete Gem" message="Delete this gem entry?" okText={deletingGem ? 'Deleting…' : 'Delete'} danger onOk={handleDeleteGem} onCancel={() => setConfirmDeleteGem(null)} />
       <GemModal open={gemModal.open} invoiceId={invoiceId} itemId={item.id} gem={gemModal.gem} onClose={() => setGemModal({ open: false })} onSaved={handleGemSaved} />
     </div>
   )

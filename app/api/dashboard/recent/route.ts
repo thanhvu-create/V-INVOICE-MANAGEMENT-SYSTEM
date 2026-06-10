@@ -10,10 +10,10 @@ export async function GET() {
     const db = createServiceClient()
 
     const { data, error } = await db
-      .from('invoice_headers')
+      .from('invoices')
       .select(`
-        id, po_number, store, created_at, status, is_locked,
-        item_count:invoice_items(count)
+        id, invoice_code, channel, template_type, status, created_at, finalized_at,
+        item_count:invoice_products(count)
       `)
       .order('created_at', { ascending: false })
       .limit(5)

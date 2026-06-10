@@ -4,11 +4,9 @@ import { useState } from 'react'
 import type { InvoiceFilters } from '@/types'
 
 const STATUS_OPTIONS = [
-  { value: '',                 label: 'All Statuses' },
-  { value: 'draft',            label: 'Draft' },
-  { value: 'pending_approval', label: 'Pending Approval' },
-  { value: 'approved',         label: 'Approved' },
-  { value: 'invoiced',         label: 'Invoiced' },
+  { value: '',          label: 'All Statuses' },
+  { value: 'draft',     label: 'Draft' },
+  { value: 'finalized', label: 'Finalized' },
 ]
 
 interface Props {
@@ -39,7 +37,7 @@ export function FilterBar({ filters, onApply }: Props) {
   }
 
   function clear() {
-    const empty: InvoiceFilters = { search: '', status: '', dateFrom: '', dateTo: '', rateId: '' }
+    const empty: InvoiceFilters = { search: '', status: '', dateFrom: '', dateTo: '' }
     setLocal(empty)
     onApply(empty)
   }

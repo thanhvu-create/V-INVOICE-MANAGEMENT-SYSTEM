@@ -1,23 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
-import { recalcItem } from '@/lib/formulas/pricing'
+import { recalcItem, recalcDiamond, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 
 type Params = { params: { id: string; itemId: string; gemId: string } }
 
 async function triggerRecalc(db: ReturnType<typeof createServiceClient>, itemId: string, invoiceId: string) {
-  const [{ data: item }, { data: gems }, { data: invoice }, { data: tiers }] = await Promise.all([
-    db.from('invoice_items').select('*').eq('id', itemId).single(),
-    db.from('item_gem_details').select('*').eq('invoice_item_id', itemId),
-    db.from('invoice_headers').select('daily_metal_rates(*), pricing_rules(*)').eq('id', invoiceId).single(),
-    db.from('mk_store_markup').select('value_from, value_to, markups').order('sort_order'),
+  const [{ data: item }, { data: diamonds }, { data: invoice }] = await Promise.all([
+    db.from('invoice_products').select('*').eq('id', itemId).single(),
+    db.from('invoice_diamonds').select('*').eq('product_id', itemId),
+    db.from('invoices').select('template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt').eq('id', invoiceId).single(),
   ])
-  const rate = (invoice as any)?.daily_metal_rates
-  const rule = (invoice as any)?.pricing_rules
-  if (item && rate && rule) {
-    const updates = recalcItem(item, gems ?? [], rate, rule, tiers ?? [])
-    await db.from('invoice_items').update(updates).eq('id', itemId)
+  if (item && invoice) {
+    const gemList = diamonds ?? []
+    if (gemList.length) {
+      await Promise.all(gemList.map(d =>
+        db.from('invoice_diamonds').update(recalcDiamond(d)).eq('id', d.id)
+      ))
+    }
+    const updatedGems = gemList.map(d => ({ ...d, ...recalcDiamond(d) }))
+    const nvl      = nvlFromInvoice(invoice)
+    const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
+    const updates  = recalcItem(item, updatedGems as any, nvl, template)
+    await db.from('invoice_products').update(updates).eq('id', itemId)
   }
 }
 
@@ -28,29 +34,41 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const body = await req.json()
     const db   = createServiceClient()
 
-    const { data: inv } = await db.from('invoice_headers').select('is_locked, status, created_by_user_id').eq('id', params.id).single()
+    const { data: inv } = await db.from('invoices').select('status, created_by').eq('id', params.id).single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
-    const editErrorPatch = checkEditPermission({ isLocked: inv.is_locked, status: inv.status, role: ctx.role, createdBy: (inv as any).created_by_user_id, userId: ctx.userId })
-    if (editErrorPatch) return NextResponse.json({ success: false, message: editErrorPatch }, { status: 403 })
+    const editError = checkEditPermission({
+      isLocked:  inv.status === 'finalized',
+      status:    inv.status,
+      role:      ctx.role,
+      createdBy: inv.created_by,
+      userId:    ctx.userId,
+    })
+    if (editError) return NextResponse.json({ success: false, message: editError }, { status: 403 })
 
     const EDITABLE = [
-      'gem_code', 'price_unit',
-      'gem_type', 'quality', 'shape', 'size_mm', 'qty_pcs',
-      'weight_ct_before', 'weight_ct_after', 'unit_price_per_ct',
-      'setting_type', 'setting_fee_per_pcs', 'sort_order',
+      'ma_xoan', 'p_chat', 'size_xoan_range',
+      'sl_hot', 'tl_truoc_xu_ly_ct', 'tl_sau_xu_ly_ct',
+      'don_gia', 'don_gia_phi', 'seq',
     ]
     const updates: Record<string, unknown> = {}
     for (const k of EDITABLE) { if (k in body) updates[k] = body[k] }
 
-    const { error } = await db.from('item_gem_details').update(updates).eq('id', params.gemId)
+    // Immediately compute derived fields from the updated values
+    const { data: existing } = await db.from('invoice_diamonds').select('*').eq('id', params.gemId).single()
+    if (existing) {
+      const merged = { ...existing, ...updates }
+      const derived = recalcDiamond(merged as any)
+      Object.assign(updates, derived)
+    }
+
+    const { error } = await db.from('invoice_diamonds').update(updates).eq('id', params.gemId)
     if (error) throw error
 
     await triggerRecalc(db, params.itemId, params.id)
 
-    // Return the recalculated parent item (with updated gems) for local state update
     const { data: updatedItem } = await db
-      .from('invoice_items')
-      .select('*, item_gem_details(*)')
+      .from('invoice_products')
+      .select('*, invoice_diamonds(*)')
       .eq('id', params.itemId)
       .single()
 
@@ -67,20 +85,25 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const ctx = await requireRole('user')
     const db  = createServiceClient()
 
-    const { data: inv } = await db.from('invoice_headers').select('is_locked, status, created_by_user_id').eq('id', params.id).single()
+    const { data: inv } = await db.from('invoices').select('status, created_by').eq('id', params.id).single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
-    const editErrorDel = checkEditPermission({ isLocked: inv.is_locked, status: inv.status, role: ctx.role, createdBy: (inv as any).created_by_user_id, userId: ctx.userId })
-    if (editErrorDel) return NextResponse.json({ success: false, message: editErrorDel }, { status: 403 })
+    const editError = checkEditPermission({
+      isLocked:  inv.status === 'finalized',
+      status:    inv.status,
+      role:      ctx.role,
+      createdBy: inv.created_by,
+      userId:    ctx.userId,
+    })
+    if (editError) return NextResponse.json({ success: false, message: editError }, { status: 403 })
 
-    const { error } = await db.from('item_gem_details').delete().eq('id', params.gemId)
+    const { error } = await db.from('invoice_diamonds').delete().eq('id', params.gemId)
     if (error) throw error
 
     await triggerRecalc(db, params.itemId, params.id)
 
-    // Return the recalculated parent item (with remaining gems) for local state update
     const { data: updatedItem } = await db
-      .from('invoice_items')
-      .select('*, item_gem_details(*)')
+      .from('invoice_products')
+      .select('*, invoice_diamonds(*)')
       .eq('id', params.itemId)
       .single()
 

@@ -1,33 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
-import { writeAuditLog, type AuditAction } from '@/lib/audit/log'
+import { writeAuditLog } from '@/lib/audit/log'
 
+// New workflow: draft ↔ finalized (manager/admin only)
 const ALLOWED_TRANSITIONS: Record<string, Record<string, string[]>> = {
-  user:    { draft: ['pending_approval'] },
-  manager: { pending_approval: ['approved', 'draft'] },
-  admin:   {
-    draft:            ['pending_approval'],
-    pending_approval: ['approved', 'draft'],
-    approved:         ['invoiced', 'pending_approval'],
-  },
+  manager: { draft: ['finalized'] },
+  admin:   { draft: ['finalized'], finalized: ['draft'] },
 }
 
 function canTransition(role: string, from: string, to: string): boolean {
   return ALLOWED_TRANSITIONS[role]?.[from]?.includes(to) ?? false
 }
 
-function statusToAction(to: string, from: string): AuditAction {
-  if (to === 'pending_approval') return 'submitted'
-  if (to === 'approved')         return 'approved'
-  if (to === 'invoiced')         return 'invoiced'
-  if (to === 'draft')            return 'rejected'  // going back to draft = rejected
-  return 'updated'
-}
-
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    const ctx = await requireRole('user')
+    const ctx = await requireRole('manager')
     const { to_status, note } = await req.json()
 
     if (!to_status) {
@@ -36,13 +24,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const db = createServiceClient()
     const { data: invoice } = await db
-      .from('invoice_headers')
-      .select('status, is_locked')
+      .from('invoices')
+      .select('status')
       .eq('id', params.id)
       .single()
 
     if (!invoice) return NextResponse.json({ success: false, message: 'Invoice not found' }, { status: 404 })
-    if (invoice.is_locked) return NextResponse.json({ success: false, message: 'Invoice is locked' }, { status: 403 })
 
     if (!canTransition(ctx.role, invoice.status, to_status)) {
       return NextResponse.json(
@@ -51,19 +38,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       )
     }
 
+    const updateData: Record<string, unknown> = { status: to_status }
+    if (to_status === 'finalized') updateData.finalized_at = new Date().toISOString()
+    if (to_status === 'draft')     updateData.finalized_at = null
+
     const { error } = await db
-      .from('invoice_headers')
-      .update({ status: to_status, updated_at: new Date().toISOString() })
+      .from('invoices')
+      .update(updateData)
       .eq('id', params.id)
 
     if (error) throw error
 
-    // DB trigger fires automatically when to_status = 'invoiced' (sets is_locked + snapshot_data)
-
     writeAuditLog({
       invoiceId:  params.id,
       userId:     ctx.userId,
-      action:     statusToAction(to_status, invoice.status),
+      action:     to_status === 'finalized' ? 'finalized' : 'updated',
       fromStatus: invoice.status,
       toStatus:   to_status,
       note:       note || undefined,

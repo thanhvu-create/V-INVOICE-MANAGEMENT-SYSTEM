@@ -1,122 +1,166 @@
-import type { MetalRate, PricingRule, InvoiceItem, ItemGemDetail } from '@/types'
-import { getKaratRate } from '@/lib/gold-fetch'
+// ──────────────────────────────────────────────────────────────────────────────
+// V-Invoice pricing formulas — ported from JM-FORM / SUMMARY Excel logic
+// See: .claude/rules/v-invoice.md for full specification
+// ──────────────────────────────────────────────────────────────────────────────
 
-// Rates stored in daily_metal_rates are DERIVED rates (already include casting loss %).
-// New rows also store karat_prices JSONB (preferred) for all karats: 24K, 23K, 22K, 18K, 15K, 14K, 10K, PT, AG, PD
-// Old rows fallback to individual columns: gold_24k, gold_18kw, gold_18ky, gold_14ky, platinum, silver, palladium
+import type { InvoiceProduct, InvoiceDiamond } from '@/types'
 
-// Old column fallback map (for rows without karat_prices JSONB)
-const OLD_RATE_MAP: Record<string, keyof MetalRate> = {
-  '18KW': 'gold_18kw', '18KY': 'gold_18ky', '18K': 'gold_18kw',
-  '14KY': 'gold_14ky', '14K':  'gold_14ky', '22K': 'gold_18kw',
-  '24K':  'gold_24k',  'PT950':'platinum',   'PT':  'platinum',
-  'AG':   'silver',    'PD':   'palladium',
-}
+const OUNCE_PER_GRAM = 31.103
 
-export function calcGoldValue(
-  weightGoldGr: number,
-  metalType:    string,
-  rate:         MetalRate,
-  _castingLossPct: number  // kept for API compat — NOT used (already in stored derived rate)
-): number {
-  // Prefer karat_prices JSONB (new rows), fallback to old individual columns
-  const kp = (rate as any).karat_prices ?? null
-  const fallback: Record<string, number | null> = {
-    gold_24k: rate.gold_24k ?? null, gold_18kw: rate.gold_18kw ?? null,
-    gold_18ky: rate.gold_18ky ?? null, gold_14ky: rate.gold_14ky ?? null,
-    platinum: rate.platinum ?? null, silver: rate.silver ?? null, palladium: rate.palladium ?? null,
-  }
-  const rateVal = kp
-    ? getKaratRate(metalType, kp, fallback)
-    : (fallback[OLD_RATE_MAP[metalType] ?? ''] ?? rate.gold_24k ?? 0)
-  return weightGoldGr * (rateVal ?? 0)
-}
+export type InvoiceTemplate = 'CH1' | 'CH2' | 'ADM' | 'CH1_AG3' | 'VNSI_AG3' | 'MANUAL'
 
-export function calcHPUSA(item: Partial<InvoiceItem>, gems: ItemGemDetail[]): number {
-  const goldValue   = item.gold_value_usd ?? 0
-  const totalGemVal = gems.reduce((s, g) => s + (g.total_price ?? 0), 0)
-  const totalGemFee = gems.reduce((s, g) => s + (g.total_setting_fee ?? 0), 0)
-  return (
-    goldValue + totalGemVal + totalGemFee
-    + (item.labor_fee   ?? 0)
-    + (item.casting_fee ?? 0)
-    + (item.design_fee  ?? 0)
-    + (item.resin_fee   ?? 0)
-    + (item.misc_fee    ?? 0)
-  )
-}
-
-export function calcPrices(hpusa: number, rule: PricingRule) {
-  const cif = hpusa * rule.cif_multiplier
-  return {
-    hpusa,
-    cif_price: cif,
-    tag_price: cif * rule.tag_multiplier,
-    fr_price:  cif * rule.fr_multiplier,
-  }
-}
-
-export interface MarkupTier {
-  value_from: number | string
-  value_to:   number | string
-  markups:    Record<string, number>
+/**
+ * NVL snapshot — raw spot prices snapshotted into invoice at creation time.
+ * Maps to invoices columns: nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt
+ */
+export interface NVLSnapshot {
+  spot_gold_24k: number  // $/oz raw 24K spot price
+  spot_pt:       number  // $/oz Platinum
+  spot_ag:       number  // $/oz Silver
+  spot_pd:       number  // $/oz Palladium
+  loss_gold:     number  // fraction e.g. 0.06  (6% casting loss for gold)
+  loss_pt:       number  // fraction e.g. 0.17  (17% casting loss for PT/PD)
 }
 
 /**
- * Lookup sell_price từ mk_store_markup tier table.
- * cifPrice → tìm tier → lấy markup của priceListType → sell = cif × markup
+ * Returns gold price per gram for a given loai_vang string.
+ * Uses raw 24K spot ($/oz) + loss% per karat — matches SUMMARY formula exactly.
+ * Returns null if the material code is unknown (caller should show manual-entry field).
  */
-export function calcSellPrice(
-  cifPrice:      number,
-  priceListType: string,
-  tiers:         MarkupTier[]
-): number | null {
-  if (!cifPrice || !priceListType || !tiers?.length) return null
-  const tier = tiers.find(t =>
-    cifPrice >= Number(t.value_from) && cifPrice <= Number(t.value_to)
-  )
-  if (!tier) return null
-  const markup = tier.markups[priceListType]
-  if (markup == null) return null
-  return Math.round(cifPrice * markup * 100) / 100
+export function goldPricePerGram(loai_vang: string, nvl: NVLSnapshot): number | null {
+  const { spot_gold_24k, spot_pt, spot_ag, spot_pd, loss_gold, loss_pt } = nvl
+  const k = loai_vang.substring(0, 2).toUpperCase()
+  switch (k) {
+    case '24': return spot_gold_24k / OUNCE_PER_GRAM
+    case '23': return spot_gold_24k * (23 / 24) / OUNCE_PER_GRAM
+    case '22': return spot_gold_24k * (22 / 24) / OUNCE_PER_GRAM
+    case '18': return spot_gold_24k * (1 + loss_gold) * (18 / 24) / OUNCE_PER_GRAM
+    case '17': return spot_gold_24k * (1 + loss_gold) * (17 / 24) / OUNCE_PER_GRAM
+    case '16': return spot_gold_24k * (1 + loss_gold) * (16 / 24) / OUNCE_PER_GRAM
+    case '15': return spot_gold_24k * (1 + loss_gold) * (15 / 24) / OUNCE_PER_GRAM
+    case '14': return spot_gold_24k * (1 + loss_gold) * (14 / 24) / OUNCE_PER_GRAM
+    case '10': return spot_gold_24k * (1 + loss_gold) * (10 / 24) / OUNCE_PER_GRAM
+    case 'PT': return spot_pt * (1 + loss_pt) / OUNCE_PER_GRAM
+    case 'AG': return spot_ag * (1 + loss_gold) / OUNCE_PER_GRAM
+    case 'PD': return spot_pd * (1 + loss_pt) / OUNCE_PER_GRAM
+    default:   return null
+  }
 }
 
-export function calcWeightNoGem(totalGr: number, gems: ItemGemDetail[]): number {
-  const gemGr = gems.reduce((s, g) => s + (g.weight_gr ?? 0), 0)
+/**
+ * T.Phẩm vàng thực tế = T.Phẩm có NVL đá − Σ TL xoàn (gr)
+ * tl_xoan_gr = tl_truoc_xu_ly_ct / 5 (written by recalcDiamond)
+ */
+export function calcWeightNoGem(totalGr: number, diamonds: InvoiceDiamond[]): number {
+  const gemGr = diamonds.reduce((s, g) => s + (g.tl_xoan_gr ?? 0), 0)
   return Math.max(0, totalGr - gemGr)
 }
 
-// Full recalculate for one item — returns fields to UPDATE
+/**
+ * Computed fields for a single diamond row.
+ * Call this BEFORE recalcItem so that tl_xoan_gr / t_gia_xoan / t_phi are up to date.
+ */
+export function recalcDiamond(d: Partial<InvoiceDiamond>): Partial<InvoiceDiamond> {
+  const tl_truoc  = d.tl_truoc_xu_ly_ct ?? 0
+  const don_gia   = d.don_gia           ?? 0
+  const sl_hot    = d.sl_hot            ?? 0
+  return {
+    tl_xoan_gr:  tl_truoc / 5,
+    t_gia_xoan:  tl_truoc * don_gia,
+    don_gia_phi: 1,
+    t_phi:       sl_hot * 1,
+  }
+}
+
+/**
+ * Vốn sản xuất — template-aware per JM-FORM SUMMARY
+ *
+ * CH1, CH2:  Σt_gia_xoan + Σt_phi + tien_vang + gia_cong + duc + thiet_ke + resin + phi_phu_kien
+ * ADM:       Σt_gia_xoan + Σt_phi + tien_vang  (no individual fabrication fees)
+ * CH1_AG3, VNSI_AG3: tien_vang only (no diamonds, no fees)
+ */
+export function calcVonSanXuat(
+  item:     Partial<InvoiceProduct>,
+  diamonds: InvoiceDiamond[],
+  template: InvoiceTemplate
+): number {
+  const tienVang   = item.tien_vang ?? 0
+  const sumGiaXoan = diamonds.reduce((s, g) => s + (g.t_gia_xoan ?? 0), 0)
+  const sumPhi     = diamonds.reduce((s, g) => s + (g.t_phi      ?? 0), 0)
+
+  if (template === 'CH1' || template === 'CH2') {
+    return (
+      sumGiaXoan + sumPhi + tienVang
+      + (item.gia_cong     ?? 0)
+      + (item.duc          ?? 0)
+      + (item.thiet_ke     ?? 0)
+      + (item.resin        ?? 0)
+      + (item.phi_phu_kien ?? 0)
+    )
+  }
+  if (template === 'ADM') {
+    return sumGiaXoan + sumPhi + tienVang
+  }
+  // CH1_AG3, VNSI_AG3, MANUAL
+  return tienVang
+}
+
+/**
+ * CIF price — template-aware
+ * CH1 / ADM / CH1_AG3: purchase × 1.05
+ * CH2:                 null  (no CIF column in CH2 template)
+ * VNSI_AG3:            purchase × 1.10
+ */
+export function calcCIFPrice(purchase: number, template: InvoiceTemplate): number | null {
+  if (template === 'CH1' || template === 'ADM' || template === 'CH1_AG3') {
+    return purchase * 1.05
+  }
+  if (template === 'VNSI_AG3') {
+    return purchase * 1.10
+  }
+  return null  // CH2, MANUAL
+}
+
+/**
+ * Full recalculate for one invoice product — returns only the derived fields to UPDATE.
+ * Diamonds must already have tl_xoan_gr/t_gia_xoan/t_phi set (call recalcDiamond first).
+ */
 export function recalcItem(
-  item:         Partial<InvoiceItem>,
-  gems:         ItemGemDetail[],
-  rate:         MetalRate,
-  rule:         PricingRule,
-  markupTiers?: MarkupTier[]
-): Partial<InvoiceItem> {
-  // weight_no_gem = weight_gold_actual = total - Σ gem.weight_gr (Excel: K = J = I - Σgem)
-  const weightNoGem = calcWeightNoGem(item.weight_total_gr ?? 0, gems)
-  const goldValue   = calcGoldValue(weightNoGem, item.metal_type ?? '', rate, rule.casting_loss_pct)
-  const withGold    = { ...item, gold_value_usd: goldValue }
-  const hpusa       = calcHPUSA(withGold, gems)
-  const prices      = calcPrices(hpusa, rule)
+  item:     Partial<InvoiceProduct>,
+  diamonds: InvoiceDiamond[],
+  nvl:      NVLSnapshot,
+  template: InvoiceTemplate = 'CH1'
+): Partial<InvoiceProduct> {
+  const weightNoGem = calcWeightNoGem(item.t_pham_co_nvl_da ?? 0, diamonds)
 
-  const result: Partial<InvoiceItem> = {
-    weight_no_gem_gr:      weightNoGem,
-    weight_gold_actual_gr: weightNoGem,  // sync: gold_actual = total - gem_weight
-    gold_value_usd:        goldValue,
-    hpusa:                 prices.hpusa,
-    cif_price:             prices.cif_price,
-    tag_price:             prices.tag_price,
-    fr_price:              prices.fr_price,
+  const gpg       = goldPricePerGram(item.loai_vang ?? '', nvl)
+  const goldValue = gpg !== null ? weightNoGem * gpg : 0
+
+  const withGold = { ...item, tien_vang: goldValue }
+  const vonSX    = calcVonSanXuat(withGold, diamonds, template)
+  const cif      = calcCIFPrice(vonSX, template)
+
+  return {
+    t_pham_tru_nvl_da:   weightNoGem,
+    t_pham_vang_thuc_te: weightNoGem,
+    tien_vang:           goldValue,
+    von_san_xuat:        vonSX,
+    purchase_price:      vonSX,
+    cif_price:           cif,
   }
+}
 
-  // Auto-compute sell_price if price_list_type is set and tiers are provided
-  const plt = (item as any).price_list_type as string | undefined
-  if (plt && markupTiers?.length) {
-    const sell = calcSellPrice(prices.cif_price, plt, markupTiers)
-    if (sell !== null) result.sell_price = sell
+/**
+ * Build NVLSnapshot from invoices DB row.
+ * Falls back to conservative defaults when columns are null.
+ */
+export function nvlFromInvoice(invoice: Record<string, any>): NVLSnapshot {
+  return {
+    spot_gold_24k: invoice.nvl_gold_24k  ?? 3300,
+    spot_pt:       invoice.nvl_pt_price  ?? 1050,
+    spot_ag:       invoice.nvl_ag_price  ?? 33,
+    spot_pd:       invoice.nvl_pd_price  ?? 950,
+    loss_gold:     invoice.nvl_loss_gold ?? 0.06,
+    loss_pt:       invoice.nvl_loss_pt   ?? 0.17,
   }
-
-  return result
 }

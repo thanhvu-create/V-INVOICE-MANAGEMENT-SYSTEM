@@ -47,8 +47,8 @@ export function JMEditableCell({
       if (e.key === 'Escape') { e.preventDefault(); onCancel() }
     }
 
-    if (field === 'metal_type' || field === 'class') {
-      const opts = field === 'metal_type' ? METAL_TYPES : CLASS_OPTIONS
+    if (field === 'loai_vang' || field === 'class') {
+      const opts = field === 'loai_vang' ? METAL_TYPES : CLASS_OPTIONS
       return (
         <td style={{ ...tdStyle, padding: '2px 4px', background: 'var(--bg-surface)' }}>
           <select
@@ -66,8 +66,8 @@ export function JMEditableCell({
       )
     }
 
-    const isNumber = ['qty_pcs', 'weight_total_gr', 'weight_gold_actual_gr',
-      'labor_fee', 'casting_fee', 'design_fee', 'resin_fee', 'misc_fee'].includes(field)
+    const isNumber = ['qt_pcs', 't_pham_co_nvl_da', 'wt_gr',
+      'gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien'].includes(field)
 
     return (
       <td style={{ ...tdStyle, padding: '2px 4px', background: 'var(--bg-surface)' }}>

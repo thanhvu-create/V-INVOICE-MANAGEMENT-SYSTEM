@@ -26,7 +26,6 @@ function InvoiceListContent() {
     status:   searchParams.get('status')   ?? '',
     dateFrom: searchParams.get('dateFrom') ?? '',
     dateTo:   searchParams.get('dateTo')   ?? '',
-    rateId:   searchParams.get('rateId')   ?? '',
   }
 
   const fetchData = useCallback(async () => {

@@ -12,10 +12,10 @@ import { AddItemModal } from '@/components/invoice/AddItemModal'
 
 type InvoiceView = 'jm-form' | 'detail'
 
+// New workflow: draft ↔ finalized (manager/admin only)
 const ALLOWED_TRANSITIONS: Record<string, Record<string, string[]>> = {
-  user:    { draft: ['pending_approval'] },
-  manager: { pending_approval: ['approved', 'draft'] },
-  admin:   { draft: ['pending_approval'], pending_approval: ['approved', 'draft'], approved: ['invoiced', 'pending_approval'] },
+  manager: { draft: ['finalized'] },
+  admin:   { draft: ['finalized'], finalized: ['draft'] },
 }
 
 export default function InvoiceDetailPage() {
@@ -29,13 +29,9 @@ export default function InvoiceDetailPage() {
   const [addItemOpen,  setAddItemOpen]  = useState(false)
 
   const canSeePrice = canDo('see_prices')
-  const isLocked    = data?.header?.is_locked ?? false
+  const isLocked    = data?.header?.status === 'finalized'
   const status      = data?.header?.status ?? ''
-  const canEdit     = canDo('edit')
-    && !isLocked
-    && status !== 'approved'
-    && !(status === 'pending_approval' && user.role === 'user')
-    && !(status === 'draft' && user.role === 'user' && data?.header?.created_by_user_id !== user.id)
+  const canEdit     = canDo('edit') && !isLocked
   const availTrans  = ALLOWED_TRANSITIONS[user.role]?.[status] ?? []
 
   const fetchData = useCallback(async () => {
@@ -48,7 +44,6 @@ export default function InvoiceDetailPage() {
     } finally { setLoading(false) }
   }, [id])
 
-  // Local state update after PATCH — avoids full re-fetch for instant UI response
   const updateItemInState = useCallback((itemId: string, updatedItem: any) => {
     setData(prev => {
       if (!prev) return prev
@@ -74,23 +69,11 @@ export default function InvoiceDetailPage() {
 
   return (
     <div>
-      {/* Status banners — order: invoiced > approved > pending */}
-      {header.is_locked && (
+      {/* Finalized banner */}
+      {isLocked && (
         <div style={{ background: '#1A1814', color: '#FAFAF7', padding: '8px 16px', textAlign: 'center', fontSize: 'var(--text-xs)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '1rem' }}>
           <i className="fa-solid fa-lock" style={{ marginRight: 6 }} />
-          Invoiced — This invoice is locked and cannot be modified
-        </div>
-      )}
-      {!header.is_locked && header.status === 'approved' && (
-        <div style={{ background: 'var(--color-success)', color: '#fff', padding: '6px 16px', textAlign: 'center', fontSize: 'var(--text-xs)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '1rem' }}>
-          <i className="fa-solid fa-circle-check" style={{ marginRight: 6 }} />
-          Approved — Read only · Print and Export available
-        </div>
-      )}
-      {header.status === 'pending_approval' && user.role === 'user' && (
-        <div style={{ background: 'var(--color-warning)', color: '#fff', padding: '6px 16px', textAlign: 'center', fontSize: 'var(--text-xs)', letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: '1rem' }}>
-          <i className="fa-solid fa-clock" style={{ marginRight: 6 }} />
-          Pending Approval — Awaiting manager review · No changes allowed
+          Finalized — This invoice is locked and cannot be modified
         </div>
       )}
 
@@ -101,20 +84,18 @@ export default function InvoiceDetailPage() {
             <a href="/invoices" style={{ color: 'var(--text-muted)', textDecoration: 'none', fontSize: 'var(--text-sm)' }}>← Invoices</a>
           </div>
           <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', fontWeight: 400, margin: '0 0 0.5rem' }}>
-            {header.po_number}
+            {header.invoice_code}
           </h1>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <StatusBadge status={header.status} />
-            {header.store && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)', padding: '2px 8px' }}>{header.store}</span>}
-            {header.mr_number && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>MR: {header.mr_number}</span>}
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Rate: {header.daily_metal_rates?.rate_date ?? '—'}</span>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Rule: {header.pricing_rules?.name ?? '—'}</span>
+            {header.template_type && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)', padding: '2px 8px' }}>{header.template_type}</span>}
+            {header.channel && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{header.channel}</span>}
           </div>
         </div>
 
         {/* Action buttons */}
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          {canEdit && !isLocked && (
+          {canEdit && (
             <button
               onClick={() => setAddItemOpen(true)}
               style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-strong)', background: 'var(--text-primary)', color: 'var(--text-inverse)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)', fontWeight: 600, cursor: 'pointer', borderRadius: 0 }}
@@ -122,7 +103,7 @@ export default function InvoiceDetailPage() {
               <i className="fa-solid fa-plus" style={{ fontSize: 11 }} /> Add Item
             </button>
           )}
-          {canEdit && !isLocked && canDo('import') && (
+          {canEdit && canDo('import') && (
             <a href={`/import?invoiceId=${id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', color: 'var(--text-primary)', textDecoration: 'none', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)' }}>
               <i className="fa-solid fa-file-import" style={{ fontSize: 11 }} /> Import
             </a>
@@ -136,8 +117,8 @@ export default function InvoiceDetailPage() {
         </div>
       </div>
 
-      {/* Workflow bar */}
-      {!header.is_locked && availTrans.length > 0 && (
+      {/* Workflow bar (manager/admin only) */}
+      {availTrans.length > 0 && (
         <div className="no-print" style={{ marginBottom: '1.5rem' }}>
           <WorkflowBar invoiceId={id} currentStatus={header.status} availableTransitions={availTrans} onTransitioned={fetchData} />
         </div>
@@ -162,7 +143,6 @@ export default function InvoiceDetailPage() {
         ))}
       </div>
 
-      {/* Items */}
       {view === 'jm-form' ? (
         <JMFormView
           invoiceId={id}
@@ -170,6 +150,7 @@ export default function InvoiceDetailPage() {
           canSeePrice={canSeePrice}
           canEdit={canEdit}
           isLocked={isLocked}
+          template={header.template_type ?? 'CH1'}
           onRefresh={fetchData}
           onItemUpdate={updateItemInState}
         />
@@ -180,12 +161,12 @@ export default function InvoiceDetailPage() {
           canSeePrice={canSeePrice}
           canEdit={canEdit}
           isLocked={isLocked}
+          template={header.template_type ?? 'CH1'}
           onRefresh={fetchData}
           onItemUpdate={updateItemInState}
         />
       )}
 
-      {/* Add item modal */}
       <AddItemModal
         open={addItemOpen}
         invoiceId={id}
@@ -193,7 +174,6 @@ export default function InvoiceDetailPage() {
         onSaved={fetchData}
       />
 
-      {/* Audit timeline */}
       <AuditTimeline invoiceId={id} />
     </div>
   )

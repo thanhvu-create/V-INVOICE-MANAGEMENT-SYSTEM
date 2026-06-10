@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getAuthContext, requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { checkEditPermission } from '@/lib/auth/editGuard'
-import { recalcItem } from '@/lib/formulas/pricing'
+import { recalcItem, recalcDiamond, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
 
 type Params = { params: { id: string } }
 
@@ -16,14 +16,14 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const db = createServiceClient()
 
     const [headerRes, itemsRes] = await Promise.all([
-      db.from('invoice_headers')
-        .select('*, daily_metal_rates(*), pricing_rules(*)')
+      db.from('invoices')
+        .select('*')
         .eq('id', params.id)
         .single(),
-      db.from('invoice_items')
-        .select('*, item_gem_details(*)')
+      db.from('invoice_products')
+        .select('*, invoice_diamonds(*)')
         .eq('invoice_id', params.id)
-        .order('line_no', { ascending: true }),
+        .order('seq', { ascending: true }),
     ])
 
     if (headerRes.error || !headerRes.data) {
@@ -49,23 +49,33 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const db  = createServiceClient()
 
     const { data: inv } = await db
-      .from('invoice_headers')
-      .select('is_locked, status, created_by_user_id')
+      .from('invoices')
+      .select('status, created_by')
       .eq('id', params.id)
       .single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
-    const editError = checkEditPermission({ isLocked: inv.is_locked, status: inv.status, role: ctx.role, createdBy: inv.created_by_user_id, userId: ctx.userId })
+    const editError = checkEditPermission({
+      isLocked:  inv.status === 'finalized',
+      status:    inv.status,
+      role:      ctx.role,
+      createdBy: inv.created_by,
+      userId:    ctx.userId,
+    })
     if (editError) return NextResponse.json({ success: false, message: editError }, { status: 403 })
 
     const body = await req.json()
-    const allowed = ['po_number', 'mr_number', 'store', 'notes', 'metal_rate_id', 'pricing_rule_id']
-    const updates: Record<string, unknown> = { updated_at: new Date().toISOString() }
+    const allowed = [
+      'invoice_code', 'channel', 'template_type',
+      'nvl_gold_24k', 'nvl_pt_price', 'nvl_ag_price', 'nvl_pd_price',
+      'nvl_loss_gold', 'nvl_loss_pt', 'nvl_cif_rate',
+    ]
+    const updates: Record<string, unknown> = {}
     for (const key of allowed) {
       if (key in body) updates[key] = body[key]
     }
 
     const { data, error } = await db
-      .from('invoice_headers')
+      .from('invoices')
       .update(updates)
       .eq('id', params.id)
       .select()
@@ -73,26 +83,37 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     if (error) throw error
 
-    writeAuditLog({ invoiceId: params.id, userId: ctx.userId, action: 'updated', metadata: { fields: Object.keys(updates).filter(k => k !== 'updated_at') } })
+    writeAuditLog({ invoiceId: params.id, userId: ctx.userId, action: 'updated', metadata: { fields: Object.keys(updates) } })
 
-    // Bulk recalc all items when rate or rule changes — prices would be stale otherwise
-    const rateChanged = 'metal_rate_id' in updates || 'pricing_rule_id' in updates
-    if (rateChanged) {
-      const [{ data: newHeader }, { data: items }] = await Promise.all([
-        db.from('invoice_headers').select('daily_metal_rates(*), pricing_rules(*)').eq('id', params.id).single(),
-        db.from('invoice_items').select('id').eq('invoice_id', params.id),
+    // Bulk recalc all products when NVL snapshot or template changes
+    const nvlChanged = [
+      'nvl_gold_24k', 'nvl_pt_price', 'nvl_ag_price', 'nvl_pd_price',
+      'nvl_loss_gold', 'nvl_loss_pt', 'template_type',
+    ].some(k => k in updates)
+
+    if (nvlChanged) {
+      const [{ data: newHeader }, { data: products }] = await Promise.all([
+        db.from('invoices').select('*').eq('id', params.id).single(),
+        db.from('invoice_products').select('id').eq('invoice_id', params.id),
       ])
-      const rate = (newHeader as any)?.daily_metal_rates
-      const rule = (newHeader as any)?.pricing_rules
-      if (rate && rule && items?.length) {
-        await Promise.all(items.map(async (item) => {
-          const [{ data: fullItem }, { data: gems }] = await Promise.all([
-            db.from('invoice_items').select('*').eq('id', item.id).single(),
-            db.from('item_gem_details').select('*').eq('invoice_item_id', item.id),
+      if (newHeader && products?.length) {
+        const nvl      = nvlFromInvoice(newHeader)
+        const template = ((newHeader as any).template_type ?? 'CH1') as InvoiceTemplate
+        await Promise.all(products.map(async (prod) => {
+          const [{ data: fullProd }, { data: diamonds }] = await Promise.all([
+            db.from('invoice_products').select('*').eq('id', prod.id).single(),
+            db.from('invoice_diamonds').select('*').eq('product_id', prod.id),
           ])
-          if (fullItem) {
-            const recalc = recalcItem(fullItem, gems ?? [], rate, rule)
-            await db.from('invoice_items').update(recalc).eq('id', item.id)
+          if (fullProd) {
+            // Recalc each diamond's derived fields first
+            if (diamonds?.length) {
+              await Promise.all(diamonds.map(d =>
+                db.from('invoice_diamonds').update(recalcDiamond(d)).eq('id', d.id)
+              ))
+            }
+            const updatedDiamonds = diamonds ? diamonds.map(d => ({ ...d, ...recalcDiamond(d) })) : []
+            const recalc = recalcItem(fullProd, updatedDiamonds as any, nvl, template)
+            await db.from('invoice_products').update(recalc).eq('id', prod.id)
           }
         }))
       }
@@ -105,17 +126,19 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 }
 
-// DELETE /api/invoices/[id] — admin only, must not be locked
+// DELETE /api/invoices/[id] — admin only, must not be finalized
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     await requireRole('admin')
     const db = createServiceClient()
 
-    const { data: inv } = await db.from('invoice_headers').select('is_locked, status').eq('id', params.id).single()
+    const { data: inv } = await db.from('invoices').select('status').eq('id', params.id).single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
-    if (inv.is_locked) return NextResponse.json({ success: false, message: 'Invoice is locked and cannot be deleted' }, { status: 403 })
+    if (inv.status === 'finalized') {
+      return NextResponse.json({ success: false, message: 'Invoice is finalized and cannot be deleted' }, { status: 403 })
+    }
 
-    const { error } = await db.from('invoice_headers').delete().eq('id', params.id)
+    const { error } = await db.from('invoices').delete().eq('id', params.id)
     if (error) throw error
 
     return NextResponse.json({ success: true })

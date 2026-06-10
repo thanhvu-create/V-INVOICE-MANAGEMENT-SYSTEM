@@ -4,11 +4,15 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
 
-interface Defaults {
-  defaultRateId: string | null
-  defaultRuleId: string | null
-  rates: Array<{ id: string; rate_date: string }>
-  rules: Array<{ id: string; name: string; is_active: boolean }>
+const TEMPLATE_OPTIONS = ['CH1', 'CH2', 'ADM', 'CH1_AG3', 'VNSI_AG3']
+
+interface NVLDefaults {
+  gold_24k:  number | null
+  pt_price:  number | null
+  ag_price:  number | null
+  pd_price:  number | null
+  loss_gold: number | null
+  loss_pt:   number | null
 }
 
 const label: React.CSSProperties = {
@@ -24,17 +28,14 @@ const input: React.CSSProperties = {
 const field: React.CSSProperties = { marginBottom: '1.25rem' }
 
 export default function NewInvoicePage() {
-  const router     = useRouter()
-  const { canDo }  = useUser()
+  const router    = useRouter()
+  const { canDo } = useUser()
 
-  const [defaults, setDefaults] = useState<Defaults | null>(null)
+  const [nvlDefaults, setNvlDefaults] = useState<NVLDefaults | null>(null)
   const [form, setForm] = useState({
-    po_number:       '',
-    mr_number:       '',
-    metal_rate_id:   '',
-    pricing_rule_id: '',
-    store:           '',
-    notes:           '',
+    invoice_code:  '',
+    template_type: 'CH1',
+    channel:       '',
   })
   const [error,   setError]   = useState('')
   const [loading, setLoading] = useState(false)
@@ -42,24 +43,24 @@ export default function NewInvoicePage() {
   useEffect(() => {
     fetch('/api/invoices/new-defaults')
       .then(r => r.json())
-      .then(json => {
-        if (json.success) {
-          setDefaults(json.data)
-          setForm(f => ({
-            ...f,
-            metal_rate_id:   json.data.defaultRateId ?? '',
-            pricing_rule_id: json.data.defaultRuleId ?? '',
-          }))
-        }
-      })
+      .then(json => { if (json.success) setNvlDefaults(json.data) })
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
+    if (!form.invoice_code.trim()) { setError('Invoice code is required'); return }
     setLoading(true)
     try {
-      const res  = await fetch('/api/invoices', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) })
+      const res  = await fetch('/api/invoices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          invoice_code:  form.invoice_code.trim().toUpperCase(),
+          template_type: form.template_type,
+          channel:       form.channel.trim() || null,
+        }),
+      })
       const json = await res.json()
       if (!json.success) { setError(json.message); return }
       router.push(`/invoices/${json.data.id}`)
@@ -85,63 +86,64 @@ export default function NewInvoicePage() {
 
       <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-base)', padding: '2rem' }}>
         <form onSubmit={handleSubmit}>
-          {/* PO Number */}
+
+          {/* Invoice Code */}
           <div style={field}>
-            <label style={label}>PO Number *</label>
-            <input style={input} type="text" required value={form.po_number}
-              onChange={e => setForm(f => ({ ...f, po_number: e.target.value }))}
-              placeholder="e.g. PO-2026-001" autoFocus />
+            <label style={label}>Invoice Code (V-INV) *</label>
+            <input style={{ ...input, fontFamily: 'var(--font-mono)', fontWeight: 600, textTransform: 'uppercase' }}
+              type="text" required value={form.invoice_code} autoFocus
+              onChange={e => setForm(f => ({ ...f, invoice_code: e.target.value }))}
+              placeholder="e.g. P60501" />
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 4 }}>
+              Mã invoice duy nhất — ví dụ: P60501, CH2-001
+            </div>
           </div>
 
-          {/* MR Number */}
+          {/* Template Type */}
           <div style={field}>
-            <label style={label}>MR Number</label>
-            <input style={input} type="text" value={form.mr_number}
-              onChange={e => setForm(f => ({ ...f, mr_number: e.target.value }))}
-              placeholder="Optional" />
-          </div>
-
-          {/* Metal Rate */}
-          <div style={field}>
-            <label style={label}>Metal Rate *</label>
-            <select style={input} required value={form.metal_rate_id}
-              onChange={e => setForm(f => ({ ...f, metal_rate_id: e.target.value }))}>
-              <option value="">— Select rate date —</option>
-              {defaults?.rates.map(r => (
-                <option key={r.id} value={r.id}>{r.rate_date}</option>
-              ))}
+            <label style={label}>Template Type *</label>
+            <select style={input} required value={form.template_type}
+              onChange={e => setForm(f => ({ ...f, template_type: e.target.value }))}>
+              {TEMPLATE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 4 }}>
+              CH1/CH2 = 2F có xoàn · ADM = 2F có xoàn gộp · CH1_AG3/VNSI_AG3 = không xoàn
+            </div>
           </div>
 
-          {/* Pricing Rule */}
+          {/* Channel */}
           <div style={field}>
-            <label style={label}>Pricing Rule</label>
-            <select style={input} value={form.pricing_rule_id}
-              onChange={e => setForm(f => ({ ...f, pricing_rule_id: e.target.value }))}>
-              <option value="">— None —</option>
-              {defaults?.rules.map(r => (
-                <option key={r.id} value={r.id}>{r.name}{r.is_active ? ' (active)' : ''}</option>
-              ))}
-            </select>
+            <label style={label}>Channel (TÊN KHÁCH)</label>
+            <input style={input} type="text" value={form.channel}
+              onChange={e => setForm(f => ({ ...f, channel: e.target.value }))}
+              placeholder="e.g. CH1-Khách, ADM1, CH2…" />
           </div>
 
-          {/* Store */}
-          <div style={field}>
-            <label style={label}>Store</label>
-            <input style={input} type="text" value={form.store}
-              onChange={e => setForm(f => ({ ...f, store: e.target.value }))}
-              placeholder="e.g. US ONL, VN SR" />
-          </div>
-
-          {/* Notes */}
-          <div style={field}>
-            <label style={label}>Notes</label>
-            <textarea
-              style={{ ...input, height: 80, resize: 'vertical' }}
-              value={form.notes}
-              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-            />
-          </div>
+          {/* NVL snapshot preview */}
+          {nvlDefaults && (
+            <div style={{ background: 'var(--bg-base)', border: '1px solid var(--border-light)', padding: '0.75rem', marginBottom: '1.25rem' }}>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
+                NVL Snapshot (auto từ bảng giá mới nhất)
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+                {[
+                  ['Gold 24K',  nvlDefaults.gold_24k,  '$/oz'],
+                  ['Platinum',  nvlDefaults.pt_price,  '$/oz'],
+                  ['Silver',    nvlDefaults.ag_price,  '$/oz'],
+                  ['Palladium', nvlDefaults.pd_price,  '$/oz'],
+                  ['Loss Gold', nvlDefaults.loss_gold != null ? `${(nvlDefaults.loss_gold * 100).toFixed(0)}%` : null, ''],
+                  ['Loss Pt',   nvlDefaults.loss_pt   != null ? `${(nvlDefaults.loss_pt   * 100).toFixed(0)}%` : null, ''],
+                ].map(([lbl, val, unit]) => (
+                  <div key={String(lbl)}>
+                    <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{lbl}</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 600 }}>
+                      {val != null ? `${val} ${unit}`.trim() : '—'}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {error && (
             <p style={{ color: 'var(--color-danger)', fontSize: 'var(--text-sm)', marginBottom: '1rem' }}>{error}</p>

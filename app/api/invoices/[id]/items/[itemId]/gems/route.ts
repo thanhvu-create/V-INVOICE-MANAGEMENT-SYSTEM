@@ -1,23 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole, AuthContext } from '@/lib/auth/getRole'
-import { recalcItem } from '@/lib/formulas/pricing'
+import { recalcItem, recalcDiamond, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 
 type Params = { params: { id: string; itemId: string } }
 
 async function guardAndCheck(db: ReturnType<typeof createServiceClient>, invoiceId: string, ctx: AuthContext) {
   const { data } = await db
-    .from('invoice_headers')
-    .select('is_locked, status, created_by_user_id, daily_metal_rates(*), pricing_rules(*)')
+    .from('invoices')
+    .select('status, created_by')
     .eq('id', invoiceId)
     .single()
   if (!data) throw { status: 404, message: 'Not found' }
   const editError = checkEditPermission({
-    isLocked:  data.is_locked,
+    isLocked:  data.status === 'finalized',
     status:    data.status,
     role:      ctx.role,
-    createdBy: (data as any).created_by_user_id,
+    createdBy: data.created_by,
     userId:    ctx.userId,
   })
   if (editError) throw { status: 403, message: editError }
@@ -25,17 +25,23 @@ async function guardAndCheck(db: ReturnType<typeof createServiceClient>, invoice
 }
 
 async function triggerRecalc(db: ReturnType<typeof createServiceClient>, itemId: string, invoiceId: string) {
-  const [{ data: item }, { data: gems }, { data: invoice }, { data: tiers }] = await Promise.all([
-    db.from('invoice_items').select('*').eq('id', itemId).single(),
-    db.from('item_gem_details').select('*').eq('invoice_item_id', itemId),
-    db.from('invoice_headers').select('daily_metal_rates(*), pricing_rules(*)').eq('id', invoiceId).single(),
-    db.from('mk_store_markup').select('value_from, value_to, markups').order('sort_order'),
+  const [{ data: item }, { data: diamonds }, { data: invoice }] = await Promise.all([
+    db.from('invoice_products').select('*').eq('id', itemId).single(),
+    db.from('invoice_diamonds').select('*').eq('product_id', itemId),
+    db.from('invoices').select('template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt').eq('id', invoiceId).single(),
   ])
-  const rate = (invoice as any)?.daily_metal_rates
-  const rule = (invoice as any)?.pricing_rules
-  if (item && rate && rule) {
-    const updates = recalcItem(item, gems ?? [], rate, rule, tiers ?? [])
-    await db.from('invoice_items').update(updates).eq('id', itemId)
+  if (item && invoice) {
+    const gemList = diamonds ?? []
+    if (gemList.length) {
+      await Promise.all(gemList.map(d =>
+        db.from('invoice_diamonds').update(recalcDiamond(d)).eq('id', d.id)
+      ))
+    }
+    const updatedGems = gemList.map(d => ({ ...d, ...recalcDiamond(d) }))
+    const nvl      = nvlFromInvoice(invoice)
+    const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
+    const updates  = recalcItem(item, updatedGems as any, nvl, template)
+    await db.from('invoice_products').update(updates).eq('id', itemId)
   }
 }
 
@@ -44,7 +50,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   try {
     await requireRole('user')
     const db = createServiceClient()
-    const { data, error } = await db.from('item_gem_details').select('*').eq('invoice_item_id', params.itemId).order('id')
+    const { data, error } = await db.from('invoice_diamonds').select('*').eq('product_id', params.itemId).order('seq')
     if (error) throw error
     return NextResponse.json({ success: true, data: data ?? [] })
   } catch (err: any) {
@@ -62,32 +68,46 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     await guardAndCheck(db, params.id, ctx)
 
+    // Get next seq
+    const { data: maxRow } = await db
+      .from('invoice_diamonds')
+      .select('seq')
+      .eq('product_id', params.itemId)
+      .order('seq', { ascending: false })
+      .limit(1)
+      .single()
+
+    const seq = (maxRow?.seq ?? 0) + 1
+
+    const tl_truoc = body.tl_truoc_xu_ly_ct ?? null
+    const don_gia  = body.don_gia           ?? 0
+    const sl_hot   = body.sl_hot            ?? 1
+
     const { error } = await db
-      .from('item_gem_details')
+      .from('invoice_diamonds')
       .insert({
-        invoice_item_id:     params.itemId,
-        gem_code:            body.gem_code            ?? null,
-        price_unit:          body.price_unit          ?? 'per_ct',
-        gem_type:            body.gem_type            ?? null,
-        quality:             body.quality             ?? null,
-        shape:               body.shape               ?? null,
-        size_mm:             body.size_mm             ?? null,
-        qty_pcs:             body.qty_pcs             ?? 1,
-        weight_ct_before:    body.weight_ct_before    ?? null,
-        weight_ct_after:     body.weight_ct_after     ?? 0,
-        unit_price_per_ct:   body.unit_price_per_ct   ?? 0,
-        setting_type:        body.setting_type        ?? null,
-        setting_fee_per_pcs: body.setting_fee_per_pcs ?? 0,
-        sort_order:          body.sort_order          ?? 0,
+        product_id:          params.itemId,
+        seq,
+        ma_xoan:             body.ma_xoan             ?? null,
+        p_chat:              body.p_chat              ?? 'VVS1',
+        size_xoan_range:     body.size_xoan_range     ?? null,
+        sl_hot,
+        tl_truoc_xu_ly_ct:   tl_truoc,
+        tl_sau_xu_ly_ct:     body.tl_sau_xu_ly_ct    ?? null,
+        don_gia,
+        don_gia_phi:         1,
+        // Computed immediately on insert
+        tl_xoan_gr:          tl_truoc != null ? tl_truoc / 5 : null,
+        t_gia_xoan:          tl_truoc != null ? tl_truoc * don_gia : null,
+        t_phi:               sl_hot * 1,
       })
 
     if (error) throw error
     await triggerRecalc(db, params.itemId, params.id)
 
-    // Return the recalculated parent item (with updated gems) for local state update
     const { data: updatedItem } = await db
-      .from('invoice_items')
-      .select('*, item_gem_details(*)')
+      .from('invoice_products')
+      .select('*, invoice_diamonds(*)')
       .eq('id', params.itemId)
       .single()
 

@@ -4,35 +4,36 @@ import { useState, useEffect, useRef } from 'react'
 import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 
-const METAL_TYPES = ['18KW', '18KY', '14KY', 'PT950', 'PT', '24K', 'AG', 'PD']
-const CLASS_OPTIONS = ['24K', '18MTG', 'DIAJE', 'DIAMT', '18KJE', 'LGRI', 'SILJE']
+const LOAI_VANG_OPTIONS = ['24K', '23K', '22K', '18KW', '18KY', '17K', '16K', '15K', '14K', '10K', 'PT950', 'AG', 'PD']
+const CLASS_OPTIONS     = ['24K', '18MTG', 'DIAJE', 'DIAMT', '18KJE', 'LGRI', 'SILJE']
 
 interface Form {
-  sku_jwmold:      string
-  qty_pcs:         string
-  description:     string
-  class:           string
-  sub_class:       string
-  size:            string
-  metal_type:      string
-  store:           string
-  location_store:  string
-  weight_total_gr: string
-  labor_fee:       string
-  casting_fee:     string
-  design_fee:      string
-  resin_fee:       string
-  misc_fee:        string
-  notes:           string
-  image_url:       string
+  sku:          string
+  so_mo:        string
+  description:  string
+  class:        string
+  sub_class:    string
+  kich_thuoc:   string
+  loai_vang:    string
+  store:        string
+  location:     string
+  qt_pcs:       string
+  wt_gr:        string
+  gia_cong:     string
+  duc:          string
+  thiet_ke:     string
+  resin:        string
+  phi_phu_kien: string
+  nini_adm:     string
+  image_url:    string
 }
 
 const EMPTY: Form = {
-  sku_jwmold: '', qty_pcs: '1', description: '', class: '', sub_class: '',
-  size: '', metal_type: '', store: 'HP', location_store: 'Safe 1',
-  weight_total_gr: '',
-  labor_fee: '0', casting_fee: '0', design_fee: '0', resin_fee: '0', misc_fee: '0',
-  notes: '', image_url: '',
+  sku: '', so_mo: '', description: '', class: '', sub_class: '',
+  kich_thuoc: '', loai_vang: '', store: 'HP', location: 'Safe 1',
+  qt_pcs: '1', wt_gr: '',
+  gia_cong: '0', duc: '0', thiet_ke: '0', resin: '0', phi_phu_kien: '0',
+  nini_adm: '', image_url: '',
 }
 
 interface Props {
@@ -43,15 +44,13 @@ interface Props {
 }
 
 export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
-  const [form,        setForm]        = useState<Form>(EMPTY)
-  const [saving,      setSaving]      = useState(false)
-  const [looking,     setLooking]     = useState(false)
-  const [skuError,    setSkuError]    = useState('')
-  const [skuResolved, setSkuResolved] = useState(false)
+  const [form,   setForm]   = useState<Form>(EMPTY)
+  const [saving, setSaving] = useState(false)
+  const [error,  setError]  = useState('')
   const skuRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    if (open) { setForm(EMPTY); setSkuError(''); setSkuResolved(false) }
+    if (open) { setForm(EMPTY); setError('') }
   }, [open])
 
   useEffect(() => {
@@ -63,62 +62,31 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
   const f = (key: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(v => ({ ...v, [key]: e.target.value }))
 
-  async function lookupSku() {
-    const sku = form.sku_jwmold.trim().toUpperCase()
-    if (!sku) { setSkuError('SKU is required'); return }
-    setLooking(true)
-    setSkuError('')
-    try {
-      const res  = await fetch(`/api/products?skus=${encodeURIComponent(sku)}`)
-      const json = await res.json()
-      if (!json.success || !json.data?.length) {
-        setSkuError(`SKU "${sku}" not found in product catalog`)
-        setSkuResolved(false)
-        return
-      }
-      const prod = json.data[0]
-      setForm(v => ({
-        ...v,
-        sku_jwmold:  sku,
-        description: prod.description ?? v.description,
-        class:       prod.class       ?? v.class,
-        sub_class:   prod.sub_class   ?? v.sub_class,
-        metal_type:  prod.metal_type  ?? v.metal_type,
-        labor_fee:   String(prod.labor_fee   ?? 0),
-        casting_fee: String(prod.casting_fee ?? 0),
-        design_fee:  String(prod.design_fee  ?? 0),
-        resin_fee:   String(prod.resin_fee   ?? 0),
-        misc_fee:    String(prod.misc_fee    ?? 0),
-        image_url:   prod.image_url          ?? '',
-      }))
-      setSkuResolved(true)
-    } finally {
-      setLooking(false)
-    }
-  }
-
   async function handleSave() {
-    if (!form.sku_jwmold.trim()) { setSkuError('SKU is required'); return }
+    if (!form.sku.trim()) { setError('SKU is required'); return }
     setSaving(true)
+    setError('')
+    const wt = parseFloat(form.wt_gr) || 0
     const body = {
-      sku_jwmold:      form.sku_jwmold.trim().toUpperCase(),
-      qty_pcs:         parseInt(form.qty_pcs)           || 1,
-      description:     form.description.trim()          || null,
-      class:           form.class.trim()                || null,
-      sub_class:       form.sub_class.trim()            || null,
-      size:            form.size.trim()                 || null,
-      metal_type:      form.metal_type                  || null,
-      store:           form.store.trim()                || null,
-      location_store:  form.location_store.trim()       || null,
-      weight_total_gr: parseFloat(form.weight_total_gr) || 0,
-      // weight_gold_actual_gr omitted — recalcItem auto-syncs = weight_total - gem_weight
-      labor_fee:       parseFloat(form.labor_fee)       || 0,
-      casting_fee:     parseFloat(form.casting_fee)     || 0,
-      design_fee:      parseFloat(form.design_fee)      || 0,
-      resin_fee:       parseFloat(form.resin_fee)       || 0,
-      misc_fee:        parseFloat(form.misc_fee)        || 0,
-      notes:           form.notes.trim()                || null,
-      image_url:       form.image_url                   || null,
+      sku:              form.sku.trim().toUpperCase(),
+      so_mo:            form.so_mo.trim()       || null,
+      description:      form.description.trim() || null,
+      class:            form.class.trim()        || null,
+      sub_class:        form.sub_class.trim()    || null,
+      kich_thuoc:       form.kich_thuoc.trim()   || null,
+      loai_vang:        form.loai_vang           || null,
+      store:            form.store.trim()        || null,
+      location:         form.location.trim()     || null,
+      qt_pcs:           parseInt(form.qt_pcs)    || 1,
+      wt_gr:            wt,
+      t_pham_co_nvl_da: wt,
+      gia_cong:         parseFloat(form.gia_cong)     || 0,
+      duc:              parseFloat(form.duc)           || 0,
+      thiet_ke:         parseFloat(form.thiet_ke)      || 0,
+      resin:            parseFloat(form.resin)         || 0,
+      phi_phu_kien:     parseFloat(form.phi_phu_kien)  || 0,
+      nini_adm:         form.nini_adm.trim()    || null,
+      image_url:        form.image_url.trim()   || null,
     }
     const data = await apiCall(
       () => fetch(`/api/invoices/${invoiceId}/items`, {
@@ -149,12 +117,12 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
       onClick={onClose}
     >
       <div
-        style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-base)', width: 560, maxHeight: '90vh', overflowY: 'auto' }}
+        style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-base)', width: 580, maxHeight: '90vh', overflowY: 'auto' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-xl)', fontWeight: 400, margin: 0 }}>Add Item</h3>
+          <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-xl)', fontWeight: 400, margin: 0 }}>Thêm SP</h3>
           <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 16 }}>
             <i className="fa-solid fa-xmark" />
           </button>
@@ -163,32 +131,23 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
         {/* Body */}
         <div style={{ padding: '1.25rem' }}>
 
-          {/* SKU lookup row */}
-          <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>SKU JWMold *</label>
-            <div style={{ display: 'flex', gap: 6 }}>
+          {/* SKU + SO-MO */}
+          <div style={grid2}>
+            <div>
+              <label style={labelStyle}>SKU *</label>
               <input
                 ref={skuRef}
-                style={{ ...inputStyle, flex: 1, fontFamily: 'var(--font-mono)', fontWeight: 600, textTransform: 'uppercase' }}
+                style={{ ...inputStyle, fontFamily: 'var(--font-mono)', fontWeight: 600, textTransform: 'uppercase' }}
                 placeholder="RING-001"
-                value={form.sku_jwmold}
-                onChange={e => { setForm(v => ({ ...v, sku_jwmold: e.target.value.toUpperCase() })); setSkuResolved(false); setSkuError('') }}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); lookupSku() } }}
+                value={form.sku}
+                onChange={e => { setForm(v => ({ ...v, sku: e.target.value.toUpperCase() })); setError('') }}
               />
-              <button
-                onClick={lookupSku}
-                disabled={looking}
-                style={{
-                  padding: '6px 14px', border: '1px solid var(--border-base)', borderRadius: 0, background: 'var(--bg-base)',
-                  cursor: looking ? 'not-allowed' : 'pointer', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {looking ? <i className="fa-solid fa-circle-notch fa-spin" /> : <><i className="fa-solid fa-magnifying-glass" style={{ marginRight: 4 }} />Lookup</>}
-              </button>
+              {error && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)', marginTop: 3 }}>{error}</div>}
             </div>
-            {skuError && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)', marginTop: 4 }}>{skuError}</div>}
-            {skuResolved && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-success)', marginTop: 4 }}><i className="fa-solid fa-check" style={{ marginRight: 4 }} />SKU found — fields auto-filled from catalog</div>}
+            <div>
+              <label style={labelStyle}>SO-MO</label>
+              <input style={inputStyle} placeholder="SO26.10628-MO26.36160" value={form.so_mo} onChange={f('so_mo')} />
+            </div>
           </div>
 
           {/* Description */}
@@ -198,17 +157,15 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
           </div>
 
           <div style={grid2}>
-            {/* Store + Location */}
             <div>
               <label style={labelStyle}>Store</label>
               <input style={inputStyle} placeholder="HP" value={form.store} onChange={f('store')} />
             </div>
             <div>
               <label style={labelStyle}>Location</label>
-              <input style={inputStyle} placeholder="Safe 1" value={form.location_store} onChange={f('location_store')} />
+              <input style={inputStyle} placeholder="Safe 1" value={form.location} onChange={f('location')} />
             </div>
 
-            {/* Class + Sub Class */}
             <div>
               <label style={labelStyle}>Class</label>
               <select style={inputStyle} value={form.class} onChange={f('class')}>
@@ -222,37 +179,35 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
               <input style={inputStyle} placeholder="BL, RI, ER, PD…" value={form.sub_class} onChange={f('sub_class')} />
             </div>
 
-            {/* Metal + Qty */}
             <div>
-              <label style={labelStyle}>Metal Type</label>
-              <select style={inputStyle} value={form.metal_type} onChange={f('metal_type')}>
+              <label style={labelStyle}>Loại Vàng</label>
+              <select style={inputStyle} value={form.loai_vang} onChange={f('loai_vang')}>
                 <option value="">—</option>
-                {METAL_TYPES.map(m => <option key={m} value={m}>{m}</option>)}
+                {LOAI_VANG_OPTIONS.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
             </div>
             <div>
-              <label style={labelStyle}>Qty Pcs</label>
-              <input type="number" min="1" step="1" style={inputStyle} value={form.qty_pcs} onChange={f('qty_pcs')} />
+              <label style={labelStyle}>Qty (pcs)</label>
+              <input type="number" min="1" step="1" style={inputStyle} value={form.qt_pcs} onChange={f('qt_pcs')} />
             </div>
 
-            {/* Total Weight + Size */}
             <div>
-              <label style={labelStyle}>Total Weight (g)</label>
-              <input type="number" min="0" step="0.0001" style={inputStyle} placeholder="0.0000" value={form.weight_total_gr} onChange={f('weight_total_gr')} />
+              <label style={labelStyle}>T.Phẩm có NVL đá (g)</label>
+              <input type="number" min="0" step="0.0001" style={inputStyle} placeholder="0.0000" value={form.wt_gr} onChange={f('wt_gr')} />
             </div>
             <div>
-              <label style={labelStyle}>Size (Kích thước)</label>
-              <input style={inputStyle} placeholder='e.g. "6in", "7mm"' value={form.size} onChange={f('size')} />
+              <label style={labelStyle}>Kích Thước</label>
+              <input style={inputStyle} placeholder='e.g. "8in", "Size 5"' value={form.kich_thuoc} onChange={f('kich_thuoc')} />
             </div>
           </div>
 
           {/* Fees */}
           <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem', marginBottom: '0.75rem' }}>
-            <div style={{ fontSize: 'var(--text-xs)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Fees (USD)</div>
+            <div style={{ fontSize: 'var(--text-xs)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Chi phí (USD)</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
-              {(['labor_fee', 'casting_fee', 'design_fee', 'resin_fee', 'misc_fee'] as const).map(key => (
+              {(['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien'] as const).map(key => (
                 <div key={key}>
-                  <label style={{ ...labelStyle, fontSize: 10 }}>{key.replace('_fee', '')}</label>
+                  <label style={{ ...labelStyle, fontSize: 10 }}>{key.replace('_', ' ')}</label>
                   <input type="number" min="0" step="0.01" style={{ ...inputStyle, padding: '4px 6px' }} value={form[key]} onChange={f(key)} />
                 </div>
               ))}
@@ -261,14 +216,14 @@ export function AddItemModal({ open, invoiceId, onClose, onSaved }: Props) {
 
           {/* Notes */}
           <div style={{ marginBottom: '1rem' }}>
-            <label style={labelStyle}>Notes</label>
-            <input style={inputStyle} placeholder='e.g. "ba sao"' value={form.notes} onChange={f('notes')} />
+            <label style={labelStyle}>Ghi chú</label>
+            <input style={inputStyle} placeholder='e.g. "ba sao"' value={form.nini_adm} onChange={f('nini_adm')} />
           </div>
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-            <button onClick={onClose} style={{ padding: '0.5rem 1.25rem', border: '1px solid var(--border-base)', background: 'transparent', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', cursor: 'pointer', borderRadius: 0 }}>Cancel</button>
+            <button onClick={onClose} style={{ padding: '0.5rem 1.25rem', border: '1px solid var(--border-base)', background: 'transparent', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', cursor: 'pointer', borderRadius: 0 }}>Hủy</button>
             <button onClick={handleSave} disabled={saving} style={{ padding: '0.5rem 1.5rem', background: 'var(--text-primary)', color: 'var(--text-inverse)', border: 'none', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: saving ? 'not-allowed' : 'pointer', opacity: saving ? 0.7 : 1, borderRadius: 0 }}>
-              {saving ? 'Adding…' : 'Add Item'}
+              {saving ? 'Đang thêm…' : 'Thêm SP'}
             </button>
           </div>
         </div>

@@ -4,21 +4,16 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from '@/components/ui/Toast'
 
-const STEPS = ['draft', 'pending_approval', 'approved', 'invoiced'] as const
+const STEPS = ['draft', 'finalized'] as const
 
 const STEP_LABELS: Record<string, string> = {
-  draft:            'Draft',
-  pending_approval: 'Pending',
-  approved:         'Approved',
-  invoiced:         'Invoiced',
+  draft:     'Draft',
+  finalized: 'Finalized',
 }
 
 function getActionLabel(from: string, to: string): string {
-  if (from === 'draft'            && to === 'pending_approval') return 'Submit for Approval'
-  if (from === 'pending_approval' && to === 'approved')         return 'Approve'
-  if (from === 'pending_approval' && to === 'draft')            return 'Return to Draft'
-  if (from === 'approved'         && to === 'invoiced')         return 'Mark as Invoiced'
-  if (from === 'approved'         && to === 'pending_approval') return 'Return for Review'
+  if (from === 'draft'     && to === 'finalized') return 'Finalize Invoice'
+  if (from === 'finalized' && to === 'draft')     return 'Reopen as Draft'
   return to.replace(/_/g, ' ')
 }
 
