@@ -84,14 +84,18 @@ function ImportContent() {
 
   const [mode,    setMode]    = useState<ImportMode>('template')
   const [state,   setState]   = useState<Stage>({ stage: 'idle' })
-  const [invoice, setInvoice] = useState<{ invoice_code: string; status: string } | null>(null)
+  const [invoice, setInvoice] = useState<{ invoice_code: string; status: string; template_type: string } | null>(null)
 
   useEffect(() => {
     if (!invoiceId) return
     fetch(`/api/invoices/${invoiceId}`)
       .then(r => r.json())
       .then(json => {
-        if (json.success) setInvoice({ invoice_code: json.data.header.invoice_code, status: json.data.header.status })
+        if (json.success) setInvoice({
+          invoice_code:  json.data.header.invoice_code,
+          status:        json.data.header.status,
+          template_type: json.data.header.template_type ?? 'CH1',
+        })
       })
   }, [invoiceId])
 
@@ -197,6 +201,7 @@ function ImportContent() {
       {mode === 'spht' && (
         <SPHTImport
           invoiceId={invoiceId}
+          template={invoice?.template_type ?? 'CH1'}
           locked={!!locked}
           onDone={count => {
             toast(`${count} sản phẩm đã import từ SPHT.`, 'success')

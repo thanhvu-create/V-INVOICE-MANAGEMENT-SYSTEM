@@ -7,10 +7,29 @@ import { DropZone } from '@/components/import/DropZone'
 import type { ImportRow } from '@/types'
 
 // ── Column indices in SPHT file ────────────────────────────────────────────
-// After header row is found (row where col[0] = "CH"):
 // [3]  SKU         [4]  SO        [5]  MO
 // [6]  Description [7]  Loại vàng [8]  Qty  [9] Weight(gr)
 // [15] Tên khách   [16] Hiện trạng (filter = "Đã ship")  [17] V-INV code
+
+// ── Template → allowed TÊN KHÁCH channels ─────────────────────────────────
+export const TEMPLATE_CHANNELS: Record<string, string[]> = {
+  CH1:      ['CH1-Khách', 'CH1-SR'],
+  CH2:      ['CH2', 'CH3'],
+  ADM:      ['ADM', 'ADM1', 'ADM2'],
+  CH1_AG3:  ['CH1-AG3', 'CH2-AG3', 'CH3-AG3'],
+  VNSI_AG3: ['KENH-SI', 'KÊNH SỈ', 'Kênh sỉ', 'Kênh Sỉ'],
+  MANUAL:   [],   // no filter
+}
+
+function channelsForTemplate(template: string): string[] {
+  return TEMPLATE_CHANNELS[template] ?? []
+}
+
+function rowMatchesTemplate(tenKhach: string, template: string): boolean {
+  const allowed = channelsForTemplate(template)
+  if (allowed.length === 0) return true   // MANUAL — accept all
+  return allowed.some(ch => tenKhach.trim().toLowerCase() === ch.toLowerCase())
+}
 
 interface VinvOption {
   code:     string
@@ -166,6 +185,7 @@ function PreviewTable({ rows }: { rows: ImportRow[] }) {
 
 interface Props {
   invoiceId: string
+  template:  string
   locked:    boolean
   onDone:    (count: number) => void
 }
@@ -176,7 +196,7 @@ type Stage =
   | { s: 'ready';   parsed: ParsedSPHT; selected: string | null }
   | { s: 'importing' }
 
-export function SPHTImport({ invoiceId, locked, onDone }: Props) {
+export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
   const [stage,   setStage]   = useState<Stage>({ s: 'idle' })
   const [manualCode, setManualCode] = useState('')
 
@@ -249,12 +269,19 @@ export function SPHTImport({ invoiceId, locked, onDone }: Props) {
 
   // ── Ready: show V-INV picker + preview ──
   const { parsed, selected } = stage
-  const previewRows = selected ? (parsed.rowsByVinv[selected] ?? []) : []
-  const manualRows  = manualCode.trim()
-    ? (parsed.rowsByVinv[manualCode.trim()] ?? [])
-    : []
-  const activeCode  = selected ?? (manualCode.trim() || null)
-  const activeRows  = selected ? previewRows : manualRows
+  const allowedChannels = channelsForTemplate(template)
+
+  function filterByTemplate(rows: ImportRow[]) {
+    if (allowedChannels.length === 0) return rows   // MANUAL — no filter
+    return rows.filter(r => rowMatchesTemplate(r.niniAdm, template))
+  }
+
+  const allForSelected   = selected ? (parsed.rowsByVinv[selected] ?? []) : []
+  const allForManual     = manualCode.trim() ? (parsed.rowsByVinv[manualCode.trim()] ?? []) : []
+  const activeCode       = selected ?? (manualCode.trim() || null)
+  const allActiveRows    = selected ? allForSelected : allForManual
+  const activeRows       = filterByTemplate(allActiveRows)
+  const skippedRows      = allActiveRows.filter(r => !rowMatchesTemplate(r.niniAdm, template))
 
   return (
     <div>
@@ -280,22 +307,27 @@ export function SPHTImport({ invoiceId, locked, onDone }: Props) {
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
           {parsed.vinvOptions.map(opt => {
-            const isActive = selected === opt.code
+            const isActive    = selected === opt.code
+            const matchCount  = filterByTemplate(parsed.rowsByVinv[opt.code] ?? []).length
+            const hasMatch    = matchCount > 0
             return (
               <button
                 key={opt.code}
                 onClick={() => { setStage({ ...stage, selected: isActive ? null : opt.code }); setManualCode('') }}
                 style={{
-                  padding: '6px 14px', border: `1.5px solid ${isActive ? 'var(--text-primary)' : 'var(--border-base)'}`,
+                  padding: '6px 14px',
+                  border: `1.5px solid ${isActive ? 'var(--text-primary)' : hasMatch ? 'var(--border-base)' : 'var(--border-light)'}`,
                   background: isActive ? 'var(--text-primary)' : 'var(--bg-surface)',
-                  color: isActive ? 'var(--text-inverse)' : 'var(--text-primary)',
-                  cursor: 'pointer', fontFamily: 'var(--font-mono)', fontWeight: 700,
+                  color: isActive ? 'var(--text-inverse)' : hasMatch ? 'var(--text-primary)' : 'var(--text-muted)',
+                  cursor: hasMatch ? 'pointer' : 'default',
+                  fontFamily: 'var(--font-mono)', fontWeight: 700,
                   fontSize: 'var(--text-sm)', borderRadius: 2, transition: 'all 0.1s',
+                  opacity: hasMatch ? 1 : 0.45,
                 }}
               >
                 {opt.code}
-                <span style={{ marginLeft: 6, fontSize: 'var(--text-xs)', fontWeight: 400, opacity: 0.75 }}>
-                  ({opt.count} SP)
+                <span style={{ marginLeft: 6, fontSize: 'var(--text-xs)', fontWeight: 400, opacity: 0.8 }}>
+                  {hasMatch ? `(${matchCount} SP)` : `(0/${opt.count})`}
                 </span>
               </button>
             )
@@ -320,15 +352,32 @@ export function SPHTImport({ invoiceId, locked, onDone }: Props) {
       {/* Preview */}
       {activeCode && activeRows.length > 0 && (
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-            <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-info)' }}>{activeCode}</span>
-              {' — '}{activeRows.length} sản phẩm
-            </div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-              Kênh: {Array.from(new Set(activeRows.map(r => r.niniAdm).filter(Boolean))).join(', ') || '—'}
-            </div>
+          {/* Filter info bar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem',
+            padding: '0.5rem 0.75rem', background: 'var(--bg-base)', border: '1px solid var(--border-light)',
+            flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+              Lọc theo template <strong>{template}</strong>:
+            </span>
+            {allowedChannels.map(ch => (
+              <span key={ch} style={{ fontSize: 'var(--text-xs)', fontWeight: 700,
+                color: TEMPLATE_COLOR[ch] ?? 'var(--text-secondary)',
+                background: `${TEMPLATE_COLOR[ch] ?? '#888'}18`,
+                padding: '2px 7px', borderRadius: 2 }}>
+                {ch}
+              </span>
+            ))}
+            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-success)', marginLeft: 'auto' }}>
+              ✓ {activeRows.length} SP sẽ import
+            </span>
+            {skippedRows.length > 0 && (
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                (bỏ qua {skippedRows.length} SP kênh khác:&nbsp;
+                {Array.from(new Set(skippedRows.map(r => r.niniAdm).filter(Boolean))).join(', ')})
+              </span>
+            )}
           </div>
+
           <PreviewTable rows={activeRows} />
 
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
@@ -353,7 +402,21 @@ export function SPHTImport({ invoiceId, locked, onDone }: Props) {
         </div>
       )}
 
-      {activeCode && activeRows.length === 0 && (
+      {activeCode && activeRows.length === 0 && allActiveRows.length > 0 && (
+        <div style={{ padding: '1.5rem', border: '1px solid var(--border-base)', background: 'var(--bg-surface)' }}>
+          <div style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}>
+            Không có sản phẩm nào khớp template <strong>{template}</strong>
+          </div>
+          <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+            Mã <strong>{activeCode}</strong> có {allActiveRows.length} SP nhưng thuộc kênh:{' '}
+            {Array.from(new Set(allActiveRows.map(r => r.niniAdm).filter(Boolean))).join(', ')}.
+            <br />
+            Template <strong>{template}</strong> chỉ nhận kênh: {allowedChannels.join(', ') || '(tất cả)'}.
+          </div>
+        </div>
+      )}
+
+      {activeCode && allActiveRows.length === 0 && (
         <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-base)', fontSize: 'var(--text-sm)' }}>
           Mã "{activeCode}" không có dòng "Đã ship" trong file.
         </div>
