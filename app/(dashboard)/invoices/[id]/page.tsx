@@ -10,6 +10,7 @@ import { JMFormView } from '@/components/invoice/JMFormView'
 import { DetailView } from '@/components/invoice/DetailView'
 import { AddItemModal } from '@/components/invoice/AddItemModal'
 import { XoanUrlConfig } from '@/components/invoice/XoanUrlConfig'
+import { ExportFolderConfig } from '@/components/invoice/ExportFolderConfig'
 
 type InvoiceView = 'jm-form' | 'detail'
 
@@ -42,6 +43,7 @@ export default function InvoiceDetailPage() {
       const res  = await fetch(`/api/invoices/${id}/export-sheets`, { method: 'POST' })
       const json = await res.json()
       if (json.success && json.spreadsheetUrl) {
+        if (json.warning) alert(json.warning)
         window.open(json.spreadsheetUrl, '_blank')
       } else {
         alert(json.message ?? 'Không thể export lên Google Sheets.')
@@ -130,17 +132,20 @@ export default function InvoiceDetailPage() {
           <a href={`/api/invoices/${id}/export`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', color: 'var(--text-primary)', textDecoration: 'none', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)' }}>
             <i className="fa-solid fa-file-export" style={{ fontSize: 11 }} /> Export
           </a>
-          <button
-            onClick={handleExportSheets}
-            disabled={exportingSheets}
-            title="Tạo Google Sheet mới với cấu trúc JM FORM + SUMMARY"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', background: 'transparent', color: exportingSheets ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)', cursor: exportingSheets ? 'not-allowed' : 'pointer', opacity: exportingSheets ? 0.6 : 1 }}
-          >
-            {exportingSheets
-              ? <><i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 11 }} /> Đang tạo…</>
-              : <><i className="fa-brands fa-google-drive" style={{ fontSize: 11, color: '#34A853' }} /> Google Sheets</>
-            }
-          </button>
+          <div style={{ display: 'inline-flex', alignItems: 'stretch' }}>
+            <button
+              onClick={handleExportSheets}
+              disabled={exportingSheets}
+              title="Tạo Google Sheet mới với cấu trúc JM FORM + SUMMARY"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', borderRight: 'none', background: 'transparent', color: exportingSheets ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)', cursor: exportingSheets ? 'not-allowed' : 'pointer', opacity: exportingSheets ? 0.6 : 1 }}
+            >
+              {exportingSheets
+                ? <><i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 11 }} /> Đang tạo…</>
+                : <><i className="fa-brands fa-google-drive" style={{ fontSize: 11, color: '#34A853' }} /> Google Sheets</>
+              }
+            </button>
+            <ExportFolderConfig />
+          </div>
           <a href={`/invoices/${id}/print`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', color: 'var(--text-primary)', textDecoration: 'none', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)' }}>
             <i className="fa-solid fa-print" style={{ fontSize: 11 }} /> Print
           </a>

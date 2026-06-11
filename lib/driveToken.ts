@@ -89,7 +89,7 @@ export function requestCodeWithConsent(): Promise<string | null> {
   return new Promise(resolve => {
     const client = g.accounts.oauth2.initCodeClient({
       client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
-      scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/spreadsheets',
+      scope: 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/spreadsheets',
       ux_mode: 'popup',
       callback: async (res: any) => {
         if (!res?.code) { resolve(null); return }

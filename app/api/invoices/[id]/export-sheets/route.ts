@@ -28,6 +28,39 @@ async function sheetsPut(accessToken: string, path: string, body: unknown) {
   return data
 }
 
+function extractFolderId(url: string): string | null {
+  const m = url.match(/\/folders\/([a-zA-Z0-9_-]+)/)
+  return m ? m[1] : null
+}
+
+async function moveFileToDriveFolder(
+  accessToken: string,
+  fileId: string,
+  folderId: string,
+): Promise<void> {
+  // First get current parents
+  const metaRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=parents`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+  const meta = await metaRes.json()
+  const currentParents = ((meta.parents ?? []) as string[]).join(',')
+
+  const moveRes = await fetch(
+    `https://www.googleapis.com/drive/v3/files/${fileId}` +
+    `?addParents=${folderId}&removeParents=${currentParents}&fields=id,parents`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      body: '{}',
+    },
+  )
+  if (!moveRes.ok) {
+    const err = await moveRes.json().catch(() => ({}))
+    throw new Error(err?.error?.message ?? `Drive move ${moveRes.status}`)
+  }
+}
+
 function n(v: unknown): number | string {
   if (v == null || v === '') return ''
   const f = parseFloat(String(v))
@@ -208,13 +241,17 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const db           = createServiceClient()
     const canSeePrice  = ctx.role === 'admin' || ctx.role === 'manager'
 
-    const [{ data: invoice }, { data: items }] = await Promise.all([
+    const [{ data: invoice }, { data: items }, { data: folderSetting }] = await Promise.all([
       db.from('invoices').select('*').eq('id', params.id).single(),
       db.from('invoice_products')
         .select('*, invoice_diamonds(*)')
         .eq('invoice_id', params.id)
         .order('seq', { ascending: true }),
+      db.from('app_settings').select('value').eq('key', 'export_drive_folder_url').maybeSingle(),
     ])
+
+    const folderUrl = folderSetting?.value?.trim() ?? ''
+    const folderId  = folderUrl ? extractFolderId(folderUrl) : null
 
     if (!invoice) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
 
@@ -248,7 +285,18 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       { values: summaryRows },
     )
 
-    // 4. Basic formatting: bold headers, freeze rows
+    // 4. Move to configured Drive folder (if set)
+    let folderWarning: string | null = null
+    if (folderId) {
+      try {
+        await moveFileToDriveFolder(accessToken, spreadsheetId, folderId)
+      } catch (moveErr: any) {
+        // Don't fail the whole export — just warn
+        folderWarning = `Không thể di chuyển vào folder: ${moveErr.message}. File đã tạo ở root Drive.`
+      }
+    }
+
+    // 5. Basic formatting: bold headers, freeze rows
     await sheetsPost(accessToken, `${spreadsheetId}:batchUpdate`, {
       requests: [
         // Bold row 2 of JM FORM (col headers)
@@ -284,7 +332,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       ],
     })
 
-    return NextResponse.json({ success: true, spreadsheetUrl })
+    return NextResponse.json({
+      success: true,
+      spreadsheetUrl,
+      folderUrl: folderId ? folderUrl : null,
+      warning: folderWarning,
+    })
   } catch (err: any) {
     const msg = String(err?.message ?? err)
     // Detect scope/permission errors
