@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ctx = await getAuthContext()
   if (!ctx) return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-  if (ctx.role !== 'admin') return NextResponse.json({ success: false, message: 'Admin only' }, { status: 403 })
+  if (!['admin', 'manager'].includes(ctx.role)) return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
   const db   = createServiceClient()
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const ctx = await getAuthContext()
   if (!ctx) return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-  if (ctx.role !== 'admin') return NextResponse.json({ success: false, message: 'Admin only' }, { status: 403 })
+  if (!['admin', 'manager'].includes(ctx.role)) return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 })
 
   const body = await req.json()
   const { id, ...rest } = body
@@ -59,7 +59,7 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const ctx = await getAuthContext()
   if (!ctx) return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-  if (ctx.role !== 'admin') return NextResponse.json({ success: false, message: 'Admin only' }, { status: 403 })
+  if (!['admin', 'manager'].includes(ctx.role)) return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 })
 
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ success: false, message: 'id required' }, { status: 400 })

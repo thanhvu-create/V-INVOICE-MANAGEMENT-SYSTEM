@@ -7,7 +7,7 @@ import { apiCall } from '@/lib/api'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 
-const STONE_TYPES = ['RD', 'PR', 'BG', 'MQ', 'OV', 'PS', 'RDL', 'RD-LG']
+const STONE_TYPE_SUGGESTIONS = ['RD', 'PR', 'BG', 'MQ', 'OV', 'PS', 'RDL', 'RD-LG', 'EM', 'SAP', 'RUB', 'CZ']
 
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 'var(--text-xs)', textTransform: 'uppercase',
@@ -29,7 +29,7 @@ const tdStyle: React.CSSProperties = {
   fontSize: 'var(--text-sm)', verticalAlign: 'middle',
 }
 
-const EMPTY = { stone_type: 'RD', grade: '', size_range: '', mk_price: '' }
+const EMPTY = { stone_type: '', grade: '', size_range: '', mk_price: '' }
 
 export default function GemCatalogPage() {
   const { canDo } = useUser()
@@ -62,7 +62,7 @@ export default function GemCatalogPage() {
   function openAdd() { setForm(EMPTY); setModal({ open: true }) }
   function openEdit(gem: any) {
     setForm({
-      stone_type: gem.stone_type ?? 'RD',
+      stone_type: gem.stone_type ?? '',
       grade:      gem.grade      ?? '',
       size_range: gem.size_range ?? '',
       mk_price:   gem.mk_price   != null ? String(gem.mk_price) : '',
@@ -122,7 +122,7 @@ export default function GemCatalogPage() {
 
       {/* Filter by type */}
       <div style={{ display: 'flex', gap: 6, marginBottom: '1rem', flexWrap: 'wrap' }}>
-        {['', ...STONE_TYPES].map(t => (
+        {['', ...STONE_TYPE_SUGGESTIONS].map(t => (
           <button key={t} onClick={() => setFilterType(t)}
             style={{ padding: '4px 12px', border: '1px solid var(--border-base)', borderRadius: 0, background: filterType === t ? 'var(--text-primary)' : 'transparent', color: filterType === t ? 'var(--text-inverse)' : 'var(--text-primary)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.06em', cursor: 'pointer' }}>
             {t || 'All'}
@@ -180,9 +180,17 @@ export default function GemCatalogPage() {
             <div style={{ padding: '1.25rem 1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div>
                 <label style={labelStyle}>Stone Type *</label>
-                <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.stone_type} onChange={f('stone_type')}>
-                  {STONE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <input
+                  list="stone-type-list"
+                  style={{ ...inputStyle, textTransform: 'uppercase' }}
+                  value={form.stone_type}
+                  onChange={e => setForm(v => ({ ...v, stone_type: e.target.value.toUpperCase() }))}
+                  placeholder="RD, PR, BG, EM…"
+                  autoComplete="off"
+                />
+                <datalist id="stone-type-list">
+                  {STONE_TYPE_SUGGESTIONS.map(t => <option key={t} value={t} />)}
+                </datalist>
               </div>
               <div>
                 <label style={labelStyle}>Grade</label>
