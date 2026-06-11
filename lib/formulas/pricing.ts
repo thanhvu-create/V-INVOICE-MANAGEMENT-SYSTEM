@@ -45,7 +45,15 @@ export function goldPricePerGram(loai_vang: string, nvl: NVLSnapshot): number | 
     case 'PT': return spot_pt * (1 + loss_pt) / OUNCE_PER_GRAM
     case 'AG': return spot_ag * (1 + loss_gold) * (1 + loss_pt) / OUNCE_PER_GRAM  // AG = cả 2 loss (×1.06 × 1.17)
     case 'PD': return spot_pd * (1 + loss_pt) / OUNCE_PER_GRAM
-    default:   return null
+    default: {
+      // Handle any numeric karat e.g. "8K", "9KY", "12K", "8" → karat/24 with loss
+      const num = parseInt(k)
+      if (!isNaN(num) && num > 0 && num <= 24) {
+        if (num >= 23) return spot_gold_24k * (num / 24) / OUNCE_PER_GRAM
+        return spot_gold_24k * (1 + loss_gold) * (num / 24) / OUNCE_PER_GRAM
+      }
+      return null
+    }
   }
 }
 

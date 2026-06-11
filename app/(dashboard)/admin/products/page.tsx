@@ -1,9 +1,23 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { AdminModal, fieldStyle, labelStyle, inputStyle, btnPrimary, btnSecondary } from '@/components/admin/AdminModal'
 import { toast } from '@/components/ui/Toast'
 import { goldPricePerGram, type NVLSnapshot } from '@/lib/formulas/pricing'
+
+const LS_KEY = 'nvl_custom_karats'
+
+const DEFAULT_KARATS = ['24K','23K','22K','18K','17K','16K','15K','14K','10K','AG','PD','PT950']
+
+function loadCustomKarats(): string[] {
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    return raw ? JSON.parse(raw) : []
+  } catch { return [] }
+}
+function saveCustomKarats(list: string[]) {
+  localStorage.setItem(LS_KEY, JSON.stringify(list))
+}
 
 interface NVLPrice {
   id:             string
@@ -35,33 +49,60 @@ const EMPTY_FORM: Record<string, string> = {
   tag_multiplier: '', fr_multiplier: '',
 }
 
-// Derived $/gram rows shown below the table
-const DERIVED_ROWS: { loai: string; label: string; sub?: string }[] = [
-  { loai: '24K',  label: '24K',    sub: 'spot ÷ 31.103' },
-  { loai: '23K',  label: '23K',    sub: 'spot × (23/24) ÷ 31.103' },
-  { loai: '22K',  label: '22K',    sub: 'spot × (22/24) ÷ 31.103' },
-  { loai: '18KY', label: '18K',    sub: 'spot × (1+loss) × (18/24) ÷ 31.103' },
-  { loai: '17K',  label: '17K',    sub: 'spot × (1+loss) × (17/24) ÷ 31.103' },
-  { loai: '16K',  label: '16K',    sub: 'spot × (1+loss) × (16/24) ÷ 31.103' },
-  { loai: '15K',  label: '15K',    sub: 'spot × (1+loss) × (15/24) ÷ 31.103' },
-  { loai: '14K',  label: '14K',    sub: 'spot × (1+loss) × (14/24) ÷ 31.103' },
-  { loai: '10K',  label: '10K',    sub: 'spot × (1+loss) × (10/24) ÷ 31.103' },
-  { loai: 'AG',   label: 'AG',     sub: 'spot_ag × (1+loss_gold) × (1+loss_pt) ÷ 31.103' },
-  { loai: 'PD',   label: 'PD',     sub: 'spot_pd × (1+loss_pt) ÷ 31.103' },
-  { loai: 'PT',   label: 'PT950',  sub: 'spot_pt × (1+loss_pt) ÷ 31.103' },
-]
+function karatFormula(loai: string): string {
+  const k = loai.substring(0, 2).toUpperCase()
+  if (k === 'AG')  return 'spot_ag × (1+loss_gold) × (1+loss_pt) ÷ 31.103'
+  if (k === 'PD')  return 'spot_pd × (1+loss_pt) ÷ 31.103'
+  if (k === 'PT')  return 'spot_pt × (1+loss_pt) ÷ 31.103'
+  const num = parseInt(k)
+  if (!isNaN(num)) {
+    if (num >= 23) return `spot × (${num}/24) ÷ 31.103`
+    if (num === 24) return 'spot ÷ 31.103'
+    return `spot × (1+loss) × (${num}/24) ÷ 31.103`
+  }
+  return ''
+}
 
 const th: React.CSSProperties = { padding: '0.5rem 0.75rem', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '2px solid var(--border-base)', background: 'var(--bg-surface)', whiteSpace: 'nowrap' }
 const td: React.CSSProperties = { padding: '0.55rem 0.75rem', borderBottom: '1px solid var(--border-light)', fontSize: 'var(--text-sm)', verticalAlign: 'middle' }
 
 export default function NVLPricesPage() {
-  const [rows,    setRows]    = useState<NVLPrice[]>([])
-  const [loading, setLoading] = useState(true)
-  const [modal,   setModal]   = useState<'add' | 'edit' | null>(null)
-  const [editing, setEditing] = useState<NVLPrice | null>(null)
-  const [form,    setForm]    = useState<Record<string, string>>(EMPTY_FORM)
-  const [error,   setError]   = useState('')
-  const [saving,  setSaving]  = useState(false)
+  const [rows,         setRows]         = useState<NVLPrice[]>([])
+  const [loading,      setLoading]      = useState(true)
+  const [modal,        setModal]        = useState<'add' | 'edit' | null>(null)
+  const [editing,      setEditing]      = useState<NVLPrice | null>(null)
+  const [form,         setForm]         = useState<Record<string, string>>(EMPTY_FORM)
+  const [error,        setError]        = useState('')
+  const [saving,       setSaving]       = useState(false)
+  const [customKarats, setCustomKarats] = useState<string[]>([])
+  const [newKarat,     setNewKarat]     = useState('')
+  const newKaratRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    setCustomKarats(loadCustomKarats())
+  }, [])
+
+  function addKarat() {
+    const raw = newKarat.trim().toUpperCase().replace(/\s/g, '')
+    if (!raw) return
+    // Normalize: "8" → "8K", "8k" → "8K", "8K" → "8K"
+    const label = /^\d+$/.test(raw) ? `${raw}K` : raw
+    const allKarats = [...DEFAULT_KARATS, ...customKarats]
+    if (allKarats.some(k => k.toUpperCase() === label)) {
+      toast('Karat này đã có trong danh sách.', 'warn'); setNewKarat(''); return
+    }
+    const updated = [...customKarats, label]
+    setCustomKarats(updated)
+    saveCustomKarats(updated)
+    setNewKarat('')
+    newKaratRef.current?.focus()
+  }
+
+  function removeKarat(label: string) {
+    const updated = customKarats.filter(k => k !== label)
+    setCustomKarats(updated)
+    saveCustomKarats(updated)
+  }
 
   async function fetchRows() {
     setLoading(true)
@@ -188,30 +229,71 @@ export default function NVLPricesPage() {
       {/* Derived $/gram section */}
       {nvlSnap && (
         <div>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '0.75rem' }}>
-            <span style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
-              Giá $/gram (tính từ spot LATEST)
-            </span>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-              Gold 24K: ${nvlSnap.spot_gold_24k.toFixed(2)}/oz · Loss Gold: {(nvlSnap.loss_gold * 100).toFixed(1)}% · Loss Pt: {(nvlSnap.loss_pt * 100).toFixed(1)}%
-            </span>
+          {/* Section header + spot summary */}
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem' }}>
+              <span style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+                Giá $/gram (tính từ spot LATEST)
+              </span>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                Gold: ${nvlSnap.spot_gold_24k.toFixed(2)}/oz · Loss Gold: {(nvlSnap.loss_gold * 100).toFixed(1)}% · Loss Pt: {(nvlSnap.loss_pt * 100).toFixed(1)}%
+              </span>
+            </div>
+
+            {/* Add custom karat */}
+            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+              <input
+                ref={newKaratRef}
+                type="text"
+                value={newKarat}
+                onChange={e => setNewKarat(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') addKarat() }}
+                placeholder="VD: 8K, 9K, 12K"
+                style={{
+                  padding: '0.3rem 0.6rem', border: '1px solid var(--border-base)',
+                  fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
+                  background: 'var(--bg-surface)', color: 'var(--text-primary)',
+                  width: 120, outline: 'none',
+                }}
+              />
+              <button
+                onClick={addKarat}
+                style={{ padding: '0.3rem 0.75rem', background: 'var(--text-primary)', color: 'var(--bg-base)', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.06em' }}
+              >
+                + Thêm
+              </button>
+            </div>
           </div>
 
+          {/* Karat grid */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '1px', background: 'var(--border-light)', border: '1px solid var(--border-light)' }}>
-            {DERIVED_ROWS.map(({ loai, label, sub }) => {
-              const pricePerGram = goldPricePerGram(loai, nvlSnap)
+            {[...DEFAULT_KARATS, ...customKarats].map(label => {
+              const loai          = label === 'PT950' ? 'PT' : label
+              const pricePerGram  = goldPricePerGram(loai, nvlSnap)
+              const isCustom      = customKarats.includes(label)
               return (
-                <div key={loai} style={{ background: 'var(--bg-surface)', padding: '0.9rem 1rem' }}>
+                <div key={label} style={{ background: 'var(--bg-surface)', padding: '0.9rem 1rem', position: 'relative' }}>
+                  {/* Remove button for custom karats */}
+                  {isCustom && (
+                    <button
+                      onClick={() => removeKarat(label)}
+                      title="Xóa karat này"
+                      style={{ position: 'absolute', top: 4, right: 4, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 10, lineHeight: 1, padding: 2 }}
+                    >
+                      ✕
+                    </button>
+                  )}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
-                    <span style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-primary)' }}>
+                    <span style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.08em', color: isCustom ? '#6B21A8' : 'var(--text-primary)' }}>
                       {label}
+                      {isCustom && <span style={{ fontSize: 8, marginLeft: 4, color: '#6B21A8', fontWeight: 400 }}>custom</span>}
                     </span>
                     <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
                       {pricePerGram != null ? `$${pricePerGram.toFixed(4)}` : '—'}
                     </span>
                   </div>
                   <div style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', letterSpacing: 0 }}>
-                    {sub}
+                    {karatFormula(loai)}
                   </div>
                 </div>
               )
