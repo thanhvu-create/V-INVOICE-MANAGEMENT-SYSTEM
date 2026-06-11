@@ -3,29 +3,30 @@
 import { useEffect, useState } from 'react'
 import { AdminModal, fieldStyle, labelStyle, inputStyle, btnPrimary, btnSecondary } from '@/components/admin/AdminModal'
 import { toast } from '@/components/ui/Toast'
+import { goldPricePerGram, type NVLSnapshot } from '@/lib/formulas/pricing'
 
 interface NVLPrice {
-  id:              string
-  gold_24k:        number | null
-  pt_price:        number | null
-  ag_price:        number | null
-  pd_price:        number | null
-  loss_gold:       number | null
-  loss_pt:         number | null
-  tag_multiplier:  number | null
-  fr_multiplier:   number | null
-  updated_at:      string
+  id:             string
+  gold_24k:       number | null
+  pt_price:       number | null
+  ag_price:       number | null
+  pd_price:       number | null
+  loss_gold:      number | null
+  loss_pt:        number | null
+  tag_multiplier: number | null
+  fr_multiplier:  number | null
+  updated_at:     string
 }
 
 const FIELDS: { key: keyof Omit<NVLPrice, 'id' | 'created_at'>; label: string; unit: string; step: string }[] = [
-  { key: 'gold_24k',       label: 'Gold 24K',       unit: '$/oz', step: '0.01'  },
-  { key: 'pt_price',       label: 'Platinum',       unit: '$/oz', step: '0.01'  },
-  { key: 'ag_price',       label: 'Silver',         unit: '$/oz', step: '0.01'  },
-  { key: 'pd_price',       label: 'Palladium',      unit: '$/oz', step: '0.01'  },
-  { key: 'loss_gold',      label: 'Loss Gold',      unit: '%',    step: '0.001' },
-  { key: 'loss_pt',        label: 'Loss Pt',        unit: '%',    step: '0.001' },
-  { key: 'tag_multiplier', label: 'Tag Multiplier', unit: '×',    step: '0.01'  },
-  { key: 'fr_multiplier',  label: 'FB/FR Multiplier', unit: '×',  step: '0.01'  },
+  { key: 'gold_24k',       label: 'Gold 24K',          unit: '$/oz', step: '0.01'  },
+  { key: 'pt_price',       label: 'Platinum',          unit: '$/oz', step: '0.01'  },
+  { key: 'ag_price',       label: 'Silver',            unit: '$/oz', step: '0.01'  },
+  { key: 'pd_price',       label: 'Palladium',         unit: '$/oz', step: '0.01'  },
+  { key: 'loss_gold',      label: 'Loss Gold',         unit: '%',    step: '0.001' },
+  { key: 'loss_pt',        label: 'Loss Pt/Ag/Pd',     unit: '%',    step: '0.001' },
+  { key: 'tag_multiplier', label: 'Tag Multiplier',    unit: '×',    step: '0.01'  },
+  { key: 'fr_multiplier',  label: 'FB/FR Multiplier',  unit: '×',    step: '0.01'  },
 ]
 
 const EMPTY_FORM: Record<string, string> = {
@@ -34,17 +35,33 @@ const EMPTY_FORM: Record<string, string> = {
   tag_multiplier: '', fr_multiplier: '',
 }
 
+// Derived $/gram rows shown below the table
+const DERIVED_ROWS: { loai: string; label: string; sub?: string }[] = [
+  { loai: '24K',  label: '24K',    sub: 'spot ÷ 31.103' },
+  { loai: '23K',  label: '23K',    sub: 'spot × (23/24) ÷ 31.103' },
+  { loai: '22K',  label: '22K',    sub: 'spot × (22/24) ÷ 31.103' },
+  { loai: '18KY', label: '18K',    sub: 'spot × (1+loss) × (18/24) ÷ 31.103' },
+  { loai: '17K',  label: '17K',    sub: 'spot × (1+loss) × (17/24) ÷ 31.103' },
+  { loai: '16K',  label: '16K',    sub: 'spot × (1+loss) × (16/24) ÷ 31.103' },
+  { loai: '15K',  label: '15K',    sub: 'spot × (1+loss) × (15/24) ÷ 31.103' },
+  { loai: '14K',  label: '14K',    sub: 'spot × (1+loss) × (14/24) ÷ 31.103' },
+  { loai: '10K',  label: '10K',    sub: 'spot × (1+loss) × (10/24) ÷ 31.103' },
+  { loai: 'AG',   label: 'AG',     sub: 'spot_ag × (1+loss_gold) × (1+loss_pt) ÷ 31.103' },
+  { loai: 'PD',   label: 'PD',     sub: 'spot_pd × (1+loss_pt) ÷ 31.103' },
+  { loai: 'PT',   label: 'PT950',  sub: 'spot_pt × (1+loss_pt) ÷ 31.103' },
+]
+
 const th: React.CSSProperties = { padding: '0.5rem 0.75rem', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', borderBottom: '2px solid var(--border-base)', background: 'var(--bg-surface)', whiteSpace: 'nowrap' }
 const td: React.CSSProperties = { padding: '0.55rem 0.75rem', borderBottom: '1px solid var(--border-light)', fontSize: 'var(--text-sm)', verticalAlign: 'middle' }
 
 export default function NVLPricesPage() {
-  const [rows,   setRows]   = useState<NVLPrice[]>([])
+  const [rows,    setRows]    = useState<NVLPrice[]>([])
   const [loading, setLoading] = useState(true)
-  const [modal,   setModal]  = useState<'add' | 'edit' | null>(null)
+  const [modal,   setModal]   = useState<'add' | 'edit' | null>(null)
   const [editing, setEditing] = useState<NVLPrice | null>(null)
-  const [form,    setForm]   = useState<Record<string, string>>(EMPTY_FORM)
-  const [error,   setError]  = useState('')
-  const [saving,  setSaving] = useState(false)
+  const [form,    setForm]    = useState<Record<string, string>>(EMPTY_FORM)
+  const [error,   setError]   = useState('')
+  const [saving,  setSaving]  = useState(false)
 
   async function fetchRows() {
     setLoading(true)
@@ -69,7 +86,6 @@ export default function NVLPricesPage() {
     setSaving(true); setError('')
     const body: Record<string, unknown> = {}
     FIELDS.forEach(f => { body[f.key] = form[f.key] !== '' ? parseFloat(form[f.key]) : null })
-
     const url    = modal === 'edit' ? `/api/metal-rates/${editing!.id}` : '/api/metal-rates'
     const method = modal === 'edit' ? 'PATCH' : 'POST'
     const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
@@ -87,8 +103,22 @@ export default function NVLPricesPage() {
     else { toast('NVL row deleted.', 'success'); fetchRows() }
   }
 
+  // Build NVL snapshot from latest row for derived prices
+  const latest = rows[0] ?? null
+  const nvlSnap: NVLSnapshot | null = latest ? {
+    spot_gold_24k:  latest.gold_24k  ?? 0,
+    spot_pt:        latest.pt_price  ?? 0,
+    spot_ag:        latest.ag_price  ?? 0,
+    spot_pd:        latest.pd_price  ?? 0,
+    loss_gold:      latest.loss_gold ?? 0.06,
+    loss_pt:        latest.loss_pt   ?? 0.17,
+    tag_multiplier: latest.tag_multiplier ?? 0,
+    fr_multiplier:  latest.fr_multiplier  ?? 0,
+  } : null
+
   return (
     <div>
+      {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <div>
           <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', fontWeight: 400, margin: 0 }}>NVL Prices</h1>
@@ -99,7 +129,8 @@ export default function NVLPricesPage() {
         </button>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
+      {/* Spot price table */}
+      <div style={{ overflowX: 'auto', marginBottom: '2.5rem' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr>
@@ -108,7 +139,7 @@ export default function NVLPricesPage() {
                   {f.label} <span style={{ fontWeight: 400, opacity: 0.6 }}>({f.unit})</span>
                 </th>
               ))}
-              <th style={th}>Created</th>
+              <th style={th}>Updated</th>
               <th style={th} />
             </tr>
           </thead>
@@ -154,8 +185,44 @@ export default function NVLPricesPage() {
         </table>
       </div>
 
+      {/* Derived $/gram section */}
+      {nvlSnap && (
+        <div>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.75rem', marginBottom: '0.75rem' }}>
+            <span style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+              Giá $/gram (tính từ spot LATEST)
+            </span>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+              Gold 24K: ${nvlSnap.spot_gold_24k.toFixed(2)}/oz · Loss Gold: {(nvlSnap.loss_gold * 100).toFixed(1)}% · Loss Pt: {(nvlSnap.loss_pt * 100).toFixed(1)}%
+            </span>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: '1px', background: 'var(--border-light)', border: '1px solid var(--border-light)' }}>
+            {DERIVED_ROWS.map(({ loai, label, sub }) => {
+              const pricePerGram = goldPricePerGram(loai, nvlSnap)
+              return (
+                <div key={loai} style={{ background: 'var(--bg-surface)', padding: '0.9rem 1rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
+                    <span style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.08em', color: 'var(--text-primary)' }}>
+                      {label}
+                    </span>
+                    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--text-primary)' }}>
+                      {pricePerGram != null ? `$${pricePerGram.toFixed(4)}` : '—'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 9, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', letterSpacing: 0 }}>
+                    {sub}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Modal */}
       {modal && (
-        <AdminModal title={modal === 'add' ? 'Add NVL Prices' : `Edit NVL Prices`} onClose={closeModal} width={480}>
+        <AdminModal title={modal === 'add' ? 'Add NVL Prices' : 'Edit NVL Prices'} onClose={closeModal} width={480}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '1rem' }}>
             {FIELDS.map(f => (
               <div key={f.key} style={fieldStyle}>
