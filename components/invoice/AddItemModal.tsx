@@ -31,15 +31,7 @@ interface Form {
   image_url:    string
 }
 
-const LOAI_VANG_OPTIONS = [
-  '18KY', '18KW', '18KR', '18KG',
-  '22KY', '22KW',
-  '24K',
-  '14KY', '14KW', '14KR',
-  '10KY', '10KW',
-  'PT950', 'PT850',
-  'AG', 'PD',
-]
+const BASE_LOAI_VANG = ['18KY', '18KW', '18KR', '18KG', '22KY', '22KW', '24K', '14KY', '14KW', '14KR', '10KY', '10KW', 'PT950', 'PT850', 'AG', 'PD']
 
 const EMPTY: Form = {
   sku: '', vendor_model: '', so_mo: '', po_number: '', sku_ag: '',
@@ -60,10 +52,18 @@ interface Props {
 }
 
 export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Props) {
-  const [form,   setForm]   = useState<Form>(EMPTY)
-  const [saving, setSaving] = useState(false)
-  const [error,  setError]  = useState('')
+  const [form,       setForm]       = useState<Form>(EMPTY)
+  const [saving,     setSaving]     = useState(false)
+  const [error,      setError]      = useState('')
+  const [metalTypes, setMetalTypes] = useState<string[]>(BASE_LOAI_VANG)
   const skuRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetch('/api/metal-types')
+      .then(r => r.json())
+      .then(j => { if (j.success) setMetalTypes(j.data) })
+      .catch(() => {})
+  }, [])
 
   const isAG3    = template === 'CH1_AG3' || template === 'VNSI_AG3'
   const isAdm    = template === 'ADM'
@@ -232,7 +232,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
                 autoComplete="off"
               />
               <datalist id="loai-vang-list">
-                {LOAI_VANG_OPTIONS.map(o => <option key={o} value={o} />)}
+                {metalTypes.map(o => <option key={o} value={o} />)}
               </datalist>
             </div>
             <div>

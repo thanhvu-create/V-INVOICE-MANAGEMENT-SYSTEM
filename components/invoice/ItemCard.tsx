@@ -11,15 +11,6 @@ import type { InvoiceTemplate } from '@/lib/formulas/pricing'
 
 const BASE_METAL_TYPES = ['18KY', '18KW', '18KR', '18KG', '22KY', '22KW', '24K', '14KY', '14KW', '14KR', '10KY', '10KW', 'PT950', 'PT850', 'AG', 'PD']
 
-function getMetalTypes(): string[] {
-  try {
-    const custom: string[] = JSON.parse(localStorage.getItem('nvl_custom_karats') || '[]')
-    const all = [...BASE_METAL_TYPES]
-    custom.forEach(k => { if (!all.includes(k)) all.push(k) })
-    return all
-  } catch { return BASE_METAL_TYPES }
-}
-
 function fmt2(n: number | null | undefined) { return n != null ? `$${n.toFixed(2)}` : '—' }
 function fmt4(n: number | null | undefined) { return n != null ? n.toFixed(4) : '—' }
 
@@ -57,7 +48,12 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   const [saving, setSaving] = useState(false)
   const [metalTypes, setMetalTypes] = useState<string[]>(BASE_METAL_TYPES)
 
-  useEffect(() => { setMetalTypes(getMetalTypes()) }, [])
+  useEffect(() => {
+    fetch('/api/metal-types')
+      .then(r => r.json())
+      .then(j => { if (j.success) setMetalTypes(j.data) })
+      .catch(() => {})
+  }, [])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [gemModal, setGemModal] = useState<{ open: boolean; gem?: any }>({ open: false })
