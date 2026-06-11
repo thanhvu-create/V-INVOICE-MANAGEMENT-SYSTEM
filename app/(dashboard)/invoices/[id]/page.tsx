@@ -9,6 +9,7 @@ import { AuditTimeline } from '@/components/invoice/AuditTimeline'
 import { JMFormView } from '@/components/invoice/JMFormView'
 import { DetailView } from '@/components/invoice/DetailView'
 import { AddItemModal } from '@/components/invoice/AddItemModal'
+import { XoanUrlConfig } from '@/components/invoice/XoanUrlConfig'
 
 type InvoiceView = 'jm-form' | 'detail'
 
@@ -114,6 +115,7 @@ export default function InvoiceDetailPage() {
           <a href={`/invoices/${id}/print`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', color: 'var(--text-primary)', textDecoration: 'none', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)' }}>
             <i className="fa-solid fa-print" style={{ fontSize: 11 }} /> Print
           </a>
+          <XoanUrlConfig template={header.template_type ?? 'CH1'} />
         </div>
       </div>
 

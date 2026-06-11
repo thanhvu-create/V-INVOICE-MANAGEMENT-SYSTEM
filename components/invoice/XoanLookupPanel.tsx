@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { apiCall } from '@/lib/api'
-import { useUser } from '@/contexts/UserContext'
 
 interface GemRow {
   ma_xoan:      string
@@ -58,52 +57,36 @@ function parseAndFilter(buf: ArrayBuffer, mo: string | null): GemRow[] {
 }
 
 export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: Props) {
-  const { canDo } = useUser()
-  const canManage = canDo('manage_rates') // manager+ can update the URL
-
   const mo = soMo ? extractMO(soMo) : null
 
-  // Saved URL from DB
-  const [savedUrl,    setSavedUrl]    = useState<string | null>(null)
-  const [urlLoading,  setUrlLoading]  = useState(true)
-
-  // Edit URL state
-  const [editMode,    setEditMode]    = useState(false)
-  const [editInput,   setEditInput]   = useState('')
-  const [urlSaving,   setUrlSaving]   = useState(false)
-
-  // Data state
-  const [rows,        setRows]        = useState<GemRow[] | null>(null)
-  const [fetching,    setFetching]    = useState(false)
-  const [fetchError,  setFetchError]  = useState('')
-  const [addedIds,    setAddedIds]    = useState<Set<number>>(new Set())
-  const [adding,      setAdding]      = useState(false)
-
+  const [rows,       setRows]       = useState<GemRow[] | null>(null)
+  const [fetching,   setFetching]   = useState(false)
+  const [fetchError, setFetchError] = useState('')
+  const [addedIds,   setAddedIds]   = useState<Set<number>>(new Set())
+  const [adding,     setAdding]     = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Load saved URL on mount, then auto-fetch if MO available
+  // Auto-fetch from saved URL on mount
   useEffect(() => {
     async function init() {
-      setUrlLoading(true)
+      setFetching(true)
       try {
-        const res = await fetch(`/api/settings?key=${SETTINGS_KEY}`)
+        const res  = await fetch(`/api/settings?key=${SETTINGS_KEY}`)
         const json = await res.json()
         const url: string | null = json.success ? json.value : null
-        setSavedUrl(url)
-        if (url && mo) {
-          await fetchFromUrl(url, mo)
-        }
+        if (url) await fetchFromUrl(url)
+        else setFetchError('Chưa cấu hình link Google Sheet — dùng nút "Link Hột" ở trên.')
       } catch {
-        setSavedUrl(null)
+        setFetchError('Không tải được cấu hình.')
       } finally {
-        setUrlLoading(false)
+        setFetching(false)
       }
     }
     init()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  async function fetchFromUrl(url: string, currentMO: string | null) {
+  async function fetchFromUrl(url: string) {
     setFetching(true)
     setFetchError('')
     setRows(null)
@@ -114,9 +97,7 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
         const j = await res.json().catch(() => ({}))
         throw new Error(j.error ?? `HTTP ${res.status}`)
       }
-      const buf     = await res.arrayBuffer()
-      const matched = parseAndFilter(buf, currentMO)
-      setRows(matched)
+      setRows(parseAndFilter(await res.arrayBuffer(), mo))
     } catch (e) {
       setFetchError(String(e))
     } finally {
@@ -130,34 +111,12 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
     setRows(null)
     setAddedIds(new Set())
     try {
-      const buf     = await file.arrayBuffer()
-      const matched = parseAndFilter(buf, mo)
-      setRows(matched)
+      setRows(parseAndFilter(await file.arrayBuffer(), mo))
     } catch (e) {
       setFetchError(`Không đọc được file: ${String(e)}`)
     } finally {
       setFetching(false)
     }
-  }
-
-  async function handleSaveUrl() {
-    const url = editInput.trim()
-    if (!url) return
-    setUrlSaving(true)
-    await fetch('/api/settings', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: SETTINGS_KEY, value: url }),
-    })
-    setSavedUrl(url)
-    setEditMode(false)
-    setUrlSaving(false)
-    // Auto-fetch with new URL
-    await fetchFromUrl(url, mo)
-  }
-
-  function openEdit() {
-    setEditInput(savedUrl ?? '')
-    setEditMode(true)
   }
 
   async function handleAddOne(idx: number) {
@@ -208,14 +167,6 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
 
   const pending = rows ? rows.filter((_, i) => !addedIds.has(i)) : []
 
-  // Truncate URL for display
-  function shortUrl(url: string) {
-    try {
-      const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{6,12})/)
-      return m ? `docs.google.com/…/${m[1]}…` : url.slice(0, 48) + '…'
-    } catch { return url.slice(0, 48) + '…' }
-  }
-
   return (
     <div style={{ borderTop: '1px solid var(--border-light)', padding: '0.75rem 1rem', background: 'var(--bg-base)' }}>
 
@@ -224,117 +175,31 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
         <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
           Tra hột — THEO DÕI XOÀN
         </span>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 13 }}>
-          <i className="fa-solid fa-xmark" />
-        </button>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {/* Re-fetch trigger */}
+          {!fetching && (
+            <button onClick={async () => {
+              const res  = await fetch(`/api/settings?key=${SETTINGS_KEY}`)
+              const json = await res.json()
+              if (json.value) fetchFromUrl(json.value)
+            }}
+              title="Tải lại" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12 }}>
+              <i className="fa-solid fa-rotate-right" />
+            </button>
+          )}
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 13 }}>
+            <i className="fa-solid fa-xmark" />
+          </button>
+        </div>
       </div>
 
       {/* MO info */}
-      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>
+      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
         {mo
-          ? <>Lọc MO: <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{mo}</strong> + trạng thái <strong>Nhập</strong></>
+          ? <>Lọc MO: <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{mo}</strong> · trạng thái <strong>Nhập</strong></>
           : <span style={{ color: 'var(--color-warning)' }}><i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 4 }} />Chưa có MO trong SO-MO</span>
         }
       </div>
-
-      {/* URL config row */}
-      {urlLoading ? (
-        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
-          <i className="fa-solid fa-circle-notch fa-spin" style={{ marginRight: 5 }} />Đang tải cấu hình…
-        </div>
-      ) : editMode ? (
-        <div style={{ display: 'flex', gap: 4, marginBottom: '0.6rem' }}>
-          <input
-            autoFocus
-            value={editInput}
-            onChange={e => setEditInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleSaveUrl(); if (e.key === 'Escape') setEditMode(false) }}
-            placeholder="https://docs.google.com/spreadsheets/d/…"
-            style={{
-              flex: 1, border: '1px solid var(--border-base)', background: 'var(--bg-surface)',
-              padding: '4px 7px', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)',
-              color: 'var(--text-primary)', outline: 'none',
-            }}
-          />
-          <button onClick={handleSaveUrl} disabled={urlSaving || !editInput.trim()}
-            style={{ padding: '4px 12px', background: 'var(--text-primary)', color: 'var(--text-inverse)', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, whiteSpace: 'nowrap' }}>
-            {urlSaving ? <i className="fa-solid fa-circle-notch fa-spin" /> : 'Lưu'}
-          </button>
-          <button onClick={() => setEditMode(false)}
-            style={{ padding: '4px 8px', border: '1px solid var(--border-base)', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-            Hủy
-          </button>
-        </div>
-      ) : savedUrl ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.5rem', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-          <i className="fa-brands fa-google-drive" style={{ color: '#34A853', fontSize: 11 }} />
-          <span style={{ fontFamily: 'var(--font-mono)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {shortUrl(savedUrl)}
-          </span>
-          {canManage && (
-            <button onClick={openEdit} title="Đổi link Google Sheet"
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, padding: 2, flexShrink: 0 }}>
-              <i className="fa-solid fa-pen" />
-            </button>
-          )}
-          <button
-            onClick={() => fetchFromUrl(savedUrl, mo)}
-            title="Tải lại dữ liệu"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, padding: 2, flexShrink: 0 }}>
-            <i className="fa-solid fa-rotate-right" />
-          </button>
-        </div>
-      ) : (
-        /* No URL saved yet — show setup UI */
-        <div style={{ marginBottom: '0.6rem' }}>
-          {canManage ? (
-            <div style={{ display: 'flex', gap: 4 }}>
-              <input
-                autoFocus
-                value={editInput}
-                onChange={e => setEditInput(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handleSaveUrl()}
-                placeholder="Paste link Google Sheet THEO DÕI XOÀN…"
-                style={{
-                  flex: 1, border: '1px solid var(--border-base)', background: 'var(--bg-surface)',
-                  padding: '4px 7px', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)',
-                  color: 'var(--text-primary)', outline: 'none',
-                }}
-              />
-              <button onClick={handleSaveUrl} disabled={urlSaving || !editInput.trim()}
-                style={{ padding: '4px 12px', background: 'var(--text-primary)', color: 'var(--text-inverse)', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>
-                Lưu & Tải
-              </button>
-            </div>
-          ) : (
-            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)', margin: 0 }}>
-              <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 4 }} />
-              Chưa cấu hình link Google Sheet. Liên hệ admin.
-            </p>
-          )}
-          {/* Fallback: file upload always available */}
-          <div style={{ marginTop: 6 }}>
-            <button onClick={() => fileRef.current?.click()}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 'var(--text-xs)', textDecoration: 'underline', padding: 0 }}>
-              <i className="fa-solid fa-file-excel" style={{ marginRight: 4, color: '#22c55e' }} />Hoặc upload file thủ công
-            </button>
-            <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
-              onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
-          </div>
-        </div>
-      )}
-
-      {/* File upload fallback when URL is set but user wants override */}
-      {savedUrl && !editMode && !fetching && !rows && (
-        <div style={{ marginBottom: '0.4rem' }}>
-          <button onClick={() => fileRef.current?.click()}
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 'var(--text-xs)', textDecoration: 'underline', padding: 0 }}>
-            <i className="fa-solid fa-file-excel" style={{ marginRight: 4, color: '#22c55e' }} />Upload file thủ công
-          </button>
-          <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
-            onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
-        </div>
-      )}
 
       {/* Loading */}
       {fetching && (
@@ -345,14 +210,22 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
 
       {/* Error */}
       {fetchError && !fetching && (
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)', margin: '4px 0' }}>{fetchError}</p>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)', marginBottom: '0.4rem' }}>
+          {fetchError}
+          <button onClick={() => fileRef.current?.click()}
+            style={{ marginLeft: 8, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-info)', fontSize: 'var(--text-xs)', textDecoration: 'underline' }}>
+            <i className="fa-solid fa-file-excel" style={{ marginRight: 3, color: '#22c55e' }} />Upload file thủ công
+          </button>
+          <input ref={fileRef} type="file" accept=".xlsx,.xls" style={{ display: 'none' }}
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleFileUpload(f) }} />
+        </div>
       )}
 
       {/* Results */}
       {rows !== null && !fetching && (
         <div>
           {rows.length === 0 ? (
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', padding: '0.4rem 0' }}>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', padding: '0.2rem 0' }}>
               Không tìm thấy dòng nào (MO={mo ?? '—'}, trạng thái=Nhập).
             </div>
           ) : (
