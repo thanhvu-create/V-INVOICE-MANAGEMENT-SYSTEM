@@ -8,14 +8,12 @@ import type { ImportRow } from '@/types'
 
 const SPHT_URL_KEY = 'spht_sheet_url'
 
-// SPHT file structure: header row 102 (1-indexed), data from row 103
+// SPHT file structure: header row 102 (1-indexed), data from row 103, columns A–R
 const DATA_START_1IDX = 103
 
-// Column indices (0-based, columns A–R)
-// A[0]=CH  B[1]=SỐ PHIẾU  C[2]=NGÀY  D[3]=SKU  E[4]=SO  F[5]=MO
-// G[6]=CHI TIẾT SP  H[7]=LOẠI VÀNG  I[8]=SỐ LƯỢNG  J[9]=TỔNG TL(gr)
-// K[10]=TÊN SP  L[11]=QUI CÁCH  M[12]=SL HỘT  N[13]=TL HỘT  O[14]=TL VÀNG
-// P[15]=TÊN KHÁCH  Q[16]=SỐ PO ("Đã ship")  R[17]=V-INV
+// Column indices (0-based)
+// A[0]=CH  D[3]=SKU  E[4]=SO  F[5]=MO  G[6]=CHI TIẾT SP  H[7]=LOẠI VÀNG
+// I[8]=SỐ LƯỢNG  J[9]=TỔNG TL(gr)  P[15]=TÊN KHÁCH  Q[16]=SỐ PO  R[17]=V-INV
 
 export const TEMPLATE_CHANNELS: Record<string, string[]> = {
   CH1:      ['CH1-Khách', 'CH1-SR'],
@@ -26,9 +24,7 @@ export const TEMPLATE_CHANNELS: Record<string, string[]> = {
   MANUAL:   [],
 }
 
-function channelsForTemplate(t: string): string[] {
-  return TEMPLATE_CHANNELS[t] ?? []
-}
+function channelsForTemplate(t: string): string[] { return TEMPLATE_CHANNELS[t] ?? [] }
 
 function rowMatchesTemplate(tenKhach: string, template: string): boolean {
   const allowed = channelsForTemplate(template)
@@ -46,18 +42,18 @@ function getHTSheets(buf: ArrayBuffer): string[] {
 interface VinvOption { code: string; count: number; channels: string[] }
 
 interface ParsedSPHT {
-  sheetName:   string
+  sheetNames:  string[]
   vinvOptions: VinvOption[]
   rowsByVinv:  Record<string, ImportRow[]>
 }
 
-function parseSPHTSheet(buf: ArrayBuffer, sheetName: string): ParsedSPHT {
+function parseSingleSheet(buf: ArrayBuffer, sheetName: string): Record<string, ImportRow[]> {
   const wb    = XLSX.read(new Uint8Array(buf), { type: 'array', sheets: sheetName })
   const sheet = wb.Sheets[sheetName]
-  if (!sheet) return { sheetName, vinvOptions: [], rowsByVinv: {} }
+  if (!sheet) return {}
 
-  const all: any[][]  = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
-  const dataRows      = all.slice(DATA_START_1IDX - 1)   // convert to 0-indexed
+  const all: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+  const dataRows     = all.slice(DATA_START_1IDX - 1)
   const rowsByVinv: Record<string, ImportRow[]> = {}
 
   dataRows.forEach((row, i) => {
@@ -69,11 +65,9 @@ function parseSPHTSheet(buf: ArrayBuffer, sheetName: string): ParsedSPHT {
     const skuRaw = String(row[3] ?? '').trim()
     const soRaw  = String(row[4] ?? '').trim()
     const moRaw  = String(row[5] ?? '').trim()
-    const soMo   = soRaw && moRaw
-      ? `SO${soRaw}-MO${moRaw}`
-      : soRaw ? `SO${soRaw}` : ''
-    const qty = parseInt(String(row[8])) || 1
-    const wt  = parseFloat(String(row[9])) || 0
+    const soMo   = soRaw && moRaw ? `SO${soRaw}-MO${moRaw}` : soRaw ? `SO${soRaw}` : ''
+    const qty    = parseInt(String(row[8])) || 1
+    const wt     = parseFloat(String(row[9])) || 0
 
     const importRow: ImportRow = {
       rowNum:      DATA_START_1IDX + i,
@@ -94,7 +88,21 @@ function parseSPHTSheet(buf: ArrayBuffer, sheetName: string): ParsedSPHT {
     rowsByVinv[vinv].push(importRow)
   })
 
-  const vinvOptions = Object.entries(rowsByVinv)
+  return rowsByVinv
+}
+
+function parseSPHTSheets(buf: ArrayBuffer, sheetNames: string[]): ParsedSPHT {
+  const merged: Record<string, ImportRow[]> = {}
+
+  for (const name of sheetNames) {
+    const rows = parseSingleSheet(buf, name)
+    for (const [vinv, items] of Object.entries(rows)) {
+      if (!merged[vinv]) merged[vinv] = []
+      merged[vinv].push(...items)
+    }
+  }
+
+  const vinvOptions = Object.entries(merged)
     .map(([code, rows]) => ({
       code,
       count:    rows.length,
@@ -102,7 +110,7 @@ function parseSPHTSheet(buf: ArrayBuffer, sheetName: string): ParsedSPHT {
     }))
     .sort((a, b) => a.code.localeCompare(b.code))
 
-  return { sheetName, vinvOptions, rowsByVinv }
+  return { sheetNames, vinvOptions, rowsByVinv: merged }
 }
 
 // ── Preview table ───────────────────────────────────────────────────────────
@@ -177,18 +185,18 @@ interface Props {
 }
 
 type ReadyStage = {
-  s:           'ready'
-  buf:         ArrayBuffer
-  sheets:      string[]
-  activeSheet: string
-  parsed:      ParsedSPHT
-  selected:    string | null
+  s:              'ready'
+  buf:            ArrayBuffer
+  sheets:         string[]
+  selectedSheets: string[]
+  parsed:         ParsedSPHT
+  selected:       string | null
 }
 
 type Stage =
   | { s: 'idle' }
   | { s: 'fetching' }
-  | { s: 'pickSheet'; buf: ArrayBuffer; sheets: string[] }
+  | { s: 'pickSheet'; buf: ArrayBuffer; sheets: string[]; checked: string[] }
   | ReadyStage
   | { s: 'importing'; prev: ReadyStage }
 
@@ -227,11 +235,12 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
     setEditUrl(false)
   }
 
-  function selectSheet(buf: ArrayBuffer, sheets: string[], sheetName: string) {
+  function confirmSheets(buf: ArrayBuffer, sheets: string[], checked: string[]) {
+    if (checked.length === 0) { toast('Vui lòng chọn ít nhất 1 sheet.', 'warn', 3000); return }
     try {
-      const parsed = parseSPHTSheet(buf, sheetName)
+      const parsed = parseSPHTSheets(buf, checked)
       setManualCode('')
-      setStage({ s: 'ready', buf, sheets, activeSheet: sheetName, parsed, selected: null })
+      setStage({ s: 'ready', buf, sheets, selectedSheets: checked, parsed, selected: null })
     } catch (err) {
       toast(`Lỗi đọc sheet: ${String(err)}`, 'error', 5000)
     }
@@ -252,11 +261,8 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
         toast('Không tìm thấy tab sheet nào dạng HT06.26, HT07.26,...', 'warn', 5000)
         setStage({ s: 'idle' }); return
       }
-      if (sheets.length === 1) {
-        selectSheet(buf, sheets, sheets[0])
-      } else {
-        setStage({ s: 'pickSheet', buf, sheets })
-      }
+      // Default: check all sheets
+      setStage({ s: 'pickSheet', buf, sheets, checked: [...sheets] })
     } catch (err) {
       toast(String(err), 'error', 6000)
       setStage({ s: 'idle' })
@@ -287,7 +293,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
     } catch { return url.slice(0, 48) + '…' }
   }
 
-  // ── Loading states ──────────────────────────────────────────────────────
+  // ── Loading ─────────────────────────────────────────────────────────────
 
   if (stage.s === 'fetching' || stage.s === 'importing') {
     return (
@@ -298,7 +304,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
     )
   }
 
-  // ── Idle: URL input ─────────────────────────────────────────────────────
+  // ── Idle ─────────────────────────────────────────────────────────────────
 
   if (stage.s === 'idle') {
     return (
@@ -374,8 +380,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
               disabled={locked}
               style={{
                 padding: '5px 18px', background: 'var(--text-primary)', color: 'var(--text-inverse)',
-                border: 'none', cursor: locked ? 'not-allowed' : 'pointer',
-                opacity: locked ? 0.6 : 1,
+                border: 'none', cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? 0.6 : 1,
                 fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600,
                 flexShrink: 0, whiteSpace: 'nowrap',
               }}>
@@ -387,12 +392,21 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
     )
   }
 
-  // ── Sheet picker ────────────────────────────────────────────────────────
+  // ── Pick sheets (multi-select) ───────────────────────────────────────────
 
   if (stage.s === 'pickSheet') {
-    const { buf, sheets } = stage
+    const { buf, sheets, checked } = stage
+
+    function toggle(name: string) {
+      const next = checked.includes(name)
+        ? checked.filter(s => s !== name)
+        : [...checked, name]
+      setStage({ ...stage, checked: next })
+    }
+
     return (
       <div>
+        {/* Header */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem',
           padding: '0.75rem 1rem', background: 'var(--bg-surface)', border: '1px solid var(--border-base)',
@@ -401,7 +415,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
           <div>
             <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>Google Sheet SPHT</div>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-              Tìm thấy {sheets.length} tab — chọn tháng cần lấy dữ liệu
+              Tìm thấy {sheets.length} tab dữ liệu — tích chọn tháng cần lấy dữ liệu
             </div>
           </div>
           <button onClick={() => setStage({ s: 'idle' })}
@@ -414,48 +428,86 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
           </button>
         </div>
 
-        <div style={{
-          fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em',
-          textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.75rem',
-        }}>
-          Chọn tab sheet (tháng)
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
-          {sheets.map(name => (
-            <button key={name}
-              onClick={() => selectSheet(buf, sheets, name)}
+        {/* Select all / none */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)' }}>
+            Tab sheet (tháng)
+          </span>
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+            <button
+              onClick={() => setStage({ ...stage, checked: [...sheets] })}
               style={{
-                padding: '8px 22px',
-                border: '1.5px solid var(--border-base)',
-                background: 'var(--bg-surface)',
-                color: 'var(--text-primary)',
-                cursor: 'pointer',
-                fontFamily: 'var(--font-mono)', fontWeight: 700,
-                fontSize: 'var(--text-sm)', borderRadius: 2, transition: 'all 0.1s',
-              }}
-              onMouseEnter={e => {
-                const b = e.currentTarget
-                b.style.borderColor = 'var(--text-primary)'
-                b.style.background  = 'var(--bg-hover)'
-              }}
-              onMouseLeave={e => {
-                const b = e.currentTarget
-                b.style.borderColor = 'var(--border-base)'
-                b.style.background  = 'var(--bg-surface)'
+                padding: '3px 10px', border: '1px solid var(--border-base)', background: 'transparent',
+                cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)',
               }}>
-              <i className="fa-solid fa-table-cells" style={{ marginRight: 7, fontSize: 11, opacity: 0.5 }} />
-              {name}
+              Chọn tất cả
             </button>
-          ))}
+            <button
+              onClick={() => setStage({ ...stage, checked: [] })}
+              style={{
+                padding: '3px 10px', border: '1px solid var(--border-base)', background: 'transparent',
+                cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)',
+              }}>
+              Bỏ chọn tất cả
+            </button>
+          </div>
         </div>
+
+        {/* Checkbox list */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+          gap: '0.5rem', marginBottom: '1.5rem',
+        }}>
+          {sheets.map(name => {
+            const isChecked = checked.includes(name)
+            return (
+              <label key={name}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '9px 14px',
+                  border: `1.5px solid ${isChecked ? 'var(--text-primary)' : 'var(--border-base)'}`,
+                  background: isChecked ? 'var(--bg-hover)' : 'var(--bg-surface)',
+                  cursor: 'pointer', userSelect: 'none', transition: 'all 0.1s',
+                }}>
+                <input
+                  type="checkbox"
+                  checked={isChecked}
+                  onChange={() => toggle(name)}
+                  style={{ width: 14, height: 14, accentColor: 'var(--text-primary)', cursor: 'pointer', flexShrink: 0 }}
+                />
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontWeight: isChecked ? 700 : 400,
+                  fontSize: 'var(--text-sm)',
+                  color: isChecked ? 'var(--text-primary)' : 'var(--text-secondary)',
+                }}>
+                  {name}
+                </span>
+              </label>
+            )
+          })}
+        </div>
+
+        {/* Confirm button */}
+        <button
+          onClick={() => confirmSheets(buf, sheets, checked)}
+          disabled={checked.length === 0}
+          style={{
+            padding: '0.6rem 1.75rem', background: 'var(--text-primary)', color: 'var(--bg-base)',
+            border: 'none', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)',
+            fontWeight: 600, cursor: checked.length === 0 ? 'not-allowed' : 'pointer',
+            opacity: checked.length === 0 ? 0.45 : 1, letterSpacing: '0.05em',
+          }}>
+          <i className="fa-solid fa-check" style={{ marginRight: 7 }} />
+          Xác nhận {checked.length > 0 ? `(${checked.length} sheet)` : ''}
+        </button>
       </div>
     )
   }
 
-  // ── Ready: sheet tabs + V-INV picker + preview ──────────────────────────
+  // ── Ready: selected sheets header + V-INV picker + preview ──────────────
 
   const readyStage = stage as ReadyStage
-  const { buf, sheets, activeSheet, parsed, selected } = readyStage
+  const { buf, sheets, selectedSheets, parsed, selected } = readyStage
   const allowedChannels = channelsForTemplate(template)
 
   function filterByTemplate(rows: ImportRow[]) {
@@ -472,60 +524,56 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
 
   return (
     <div>
-      {/* URL bar + sheet tabs */}
-      <div style={{ marginBottom: '1.25rem' }}>
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: 0,
-          padding: '0.5rem 0.75rem', background: 'var(--bg-surface)', border: '1px solid var(--border-base)',
-          borderBottom: 'none',
+      {/* Source header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap',
+        padding: '0.6rem 1rem', marginBottom: '1.25rem',
+        background: 'var(--bg-surface)', border: '1px solid var(--border-base)',
+      }}>
+        <i className="fa-brands fa-google-drive" style={{ color: '#34A853', fontSize: 14 }} />
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
+          color: 'var(--text-muted)',
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 260,
         }}>
-          <i className="fa-brands fa-google-drive" style={{ color: '#34A853', fontSize: 14 }} />
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
-            color: 'var(--text-muted)', flex: 1,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>
-            {shortUrl(savedUrl ?? '')}
-          </span>
-          <button onClick={() => setStage({ s: 'idle' })}
-            style={{
-              background: 'none', border: '1px solid var(--border-base)',
-              padding: '3px 10px', cursor: 'pointer',
-              fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)',
+          {shortUrl(savedUrl ?? '')}
+        </span>
+
+        {/* Selected sheet chips */}
+        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', flex: 1 }}>
+          {selectedSheets.map(name => (
+            <span key={name} style={{
+              padding: '2px 8px',
+              background: 'var(--bg-hover)', border: '1px solid var(--border-base)',
+              fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 700,
+              color: 'var(--text-primary)', borderRadius: 2,
             }}>
-            <i className="fa-solid fa-arrows-rotate" style={{ marginRight: 5 }} />Đổi nguồn
-          </button>
+              {name}
+            </span>
+          ))}
         </div>
 
-        {/* Sheet tab bar */}
-        <div style={{
-          display: 'flex', gap: 0,
-          borderBottom: '2px solid var(--border-base)',
-          background: 'var(--bg-surface)',
-          border: '1px solid var(--border-base)',
-          borderTop: 'none',
-          flexWrap: 'wrap',
-        }}>
-          {sheets.map(name => {
-            const isActive = name === activeSheet
-            return (
-              <button key={name}
-                onClick={() => { if (!isActive) selectSheet(buf, sheets, name) }}
-                style={{
-                  padding: '7px 18px', border: 'none', background: 'transparent',
-                  cursor: isActive ? 'default' : 'pointer',
-                  fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)',
-                  fontWeight: isActive ? 700 : 400,
-                  color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
-                  borderBottom: `2px solid ${isActive ? 'var(--text-primary)' : 'transparent'}`,
-                  marginBottom: -2, transition: 'all 0.1s',
-                  letterSpacing: '0.03em',
-                }}>
-                {name}
-              </button>
-            )
-          })}
-        </div>
+        {/* Edit selection button */}
+        <button
+          onClick={() => setStage({ s: 'pickSheet', buf, sheets, checked: [...selectedSheets] })}
+          style={{
+            background: 'none', border: '1px solid var(--border-base)',
+            padding: '3px 10px', cursor: 'pointer',
+            fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)',
+            whiteSpace: 'nowrap',
+          }}>
+          <i className="fa-solid fa-pen" style={{ marginRight: 5 }} />Sửa chọn
+        </button>
+        <button
+          onClick={() => setStage({ s: 'idle' })}
+          style={{
+            background: 'none', border: '1px solid var(--border-base)',
+            padding: '3px 10px', cursor: 'pointer',
+            fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)',
+            whiteSpace: 'nowrap',
+          }}>
+          <i className="fa-solid fa-arrows-rotate" style={{ marginRight: 5 }} />Đổi nguồn
+        </button>
       </div>
 
       {/* V-INV picker */}
@@ -542,7 +590,8 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
             padding: '1rem', color: 'var(--text-muted)', fontSize: 'var(--text-sm)',
             background: 'var(--bg-surface)', border: '1px solid var(--border-base)',
           }}>
-            Không có dòng CH="US" và HIỆN TRẠNG="Đã ship" trong sheet <strong>{activeSheet}</strong>.
+            Không tìm thấy dòng CH="US" và HIỆN TRẠNG="Đã ship" trong{' '}
+            {selectedSheets.length === 1 ? `sheet ${selectedSheets[0]}` : `${selectedSheets.length} sheet đã chọn`}.
           </div>
         ) : (
           <>
@@ -594,7 +643,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
               />
               {manualCode.trim() && !parsed.rowsByVinv[manualCode.trim()] && (
                 <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }}>
-                  Mã "{manualCode.trim()}" không có trong file
+                  Mã "{manualCode.trim()}" không có trong dữ liệu đã chọn
                 </span>
               )}
             </div>
@@ -680,7 +729,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
           padding: '2rem', textAlign: 'center', color: 'var(--text-muted)',
           border: '1px dashed var(--border-base)', fontSize: 'var(--text-sm)',
         }}>
-          Mã "{activeCode}" không có dòng "Đã ship" trong sheet {activeSheet}.
+          Mã "{activeCode}" không có dòng "Đã ship" trong dữ liệu đã chọn.
         </div>
       )}
 
