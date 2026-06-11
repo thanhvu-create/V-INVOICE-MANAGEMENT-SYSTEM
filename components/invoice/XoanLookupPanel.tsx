@@ -44,7 +44,7 @@ function parseAndFilter(buf: ArrayBuffer, mo: string | null): GemRow[] {
     const status = String(r[12] ?? '').trim().toLowerCase()
     if (!rowMO) continue
     if (mo && rowMO !== mo) continue
-    if (status !== 'nhập') continue
+    if (status !== 'xuất') continue
     out.push({
       ma_xoan:      String(r[6]  ?? '').trim(),
       p_chat:       'VVS1',
@@ -196,7 +196,7 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
       {/* MO info */}
       <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
         {mo
-          ? <>Lọc MO: <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{mo}</strong> · trạng thái <strong>Nhập</strong></>
+          ? <>Lọc MO: <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{mo}</strong> · trạng thái <strong>Xuất</strong></>
           : <span style={{ color: 'var(--color-warning)' }}><i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 4 }} />Chưa có MO trong SO-MO</span>
         }
       </div>
@@ -226,7 +226,7 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
         <div>
           {rows.length === 0 ? (
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', padding: '0.2rem 0' }}>
-              Không tìm thấy dòng nào (MO={mo ?? '—'}, trạng thái=Nhập).
+              Không tìm thấy dòng nào (MO={mo ?? '—'}, trạng thái=Xuất).
             </div>
           ) : (
             <>
