@@ -9,7 +9,10 @@ import { toast } from '@/components/ui/Toast'
 import { DropZone } from '@/components/import/DropZone'
 import { ImportPreview } from '@/components/import/ImportPreview'
 import { ImportErrorTable } from '@/components/import/ImportErrorTable'
+import { SPHTImport } from '@/components/import/SPHTImport'
 import type { ImportRow, ValidationError } from '@/types'
+
+type ImportMode = 'template' | 'spht'
 
 type Stage =
   | { stage: 'idle' }
@@ -79,7 +82,8 @@ function ImportContent() {
   const sp        = useSearchParams()
   const invoiceId = sp.get('invoiceId') ?? ''
 
-  const [state, setState] = useState<Stage>({ stage: 'idle' })
+  const [mode,    setMode]    = useState<ImportMode>('template')
+  const [state,   setState]   = useState<Stage>({ stage: 'idle' })
   const [invoice, setInvoice] = useState<{ invoice_code: string; status: string } | null>(null)
 
   useEffect(() => {
@@ -165,6 +169,43 @@ function ImportContent() {
         </div>
       )}
 
+      {/* Mode tabs */}
+      <div style={{ display: 'flex', gap: 0, marginBottom: '1.5rem', borderBottom: '2px solid var(--border-base)' }}>
+        {([
+          { key: 'template', label: 'Template Import', icon: 'fa-table' },
+          { key: 'spht',     label: 'SPHT Nhập Kho',   icon: 'fa-file-excel' },
+        ] as { key: ImportMode; label: string; icon: string }[]).map(tab => {
+          const active = mode === tab.key
+          return (
+            <button key={tab.key} onClick={() => setMode(tab.key)}
+              style={{
+                padding: '0.6rem 1.25rem', border: 'none', background: 'transparent', cursor: 'pointer',
+                fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: active ? 700 : 400,
+                color: active ? 'var(--text-primary)' : 'var(--text-muted)',
+                borderBottom: `2px solid ${active ? 'var(--text-primary)' : 'transparent'}`,
+                marginBottom: -2, transition: 'all 0.1s',
+                letterSpacing: '0.04em',
+              }}>
+              <i className={`fa-solid ${tab.icon}`} style={{ marginRight: 6, fontSize: 12 }} />
+              {tab.label}
+            </button>
+          )
+        })}
+      </div>
+
+      {/* SPHT mode */}
+      {mode === 'spht' && (
+        <SPHTImport
+          invoiceId={invoiceId}
+          locked={!!locked}
+          onDone={count => {
+            toast(`${count} sản phẩm đã import từ SPHT.`, 'success')
+            router.push(`/invoices/${invoiceId}`)
+          }}
+        />
+      )}
+
+      {mode === 'template' && <>
       {/* IDLE */}
       {state.stage === 'idle' && (
         <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-base)', padding: '2rem' }}>
@@ -297,6 +338,7 @@ function ImportContent() {
           </button>
         </div>
       )}
+      </>}
     </div>
   )
 }
