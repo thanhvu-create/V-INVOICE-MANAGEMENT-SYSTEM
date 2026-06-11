@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { apiCall } from '@/lib/api'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { GemModal } from './GemModal'
@@ -9,7 +9,16 @@ import { DriveImageInput } from '@/components/ui/DriveImageInput'
 
 import type { InvoiceTemplate } from '@/lib/formulas/pricing'
 
-const METAL_TYPES = ['18KW', '18KY', '18K', '17K', '16K', '15K', '14KY', '14K', '10K', 'PT950', 'PT', 'AG', 'PD', '24K', '22K', '23K']
+const BASE_METAL_TYPES = ['18KY', '18KW', '18KR', '18KG', '22KY', '22KW', '24K', '14KY', '14KW', '14KR', '10KY', '10KW', 'PT950', 'PT850', 'AG', 'PD']
+
+function getMetalTypes(): string[] {
+  try {
+    const custom: string[] = JSON.parse(localStorage.getItem('nvl_custom_karats') || '[]')
+    const all = [...BASE_METAL_TYPES]
+    custom.forEach(k => { if (!all.includes(k)) all.push(k) })
+    return all
+  } catch { return BASE_METAL_TYPES }
+}
 
 function fmt2(n: number | null | undefined) { return n != null ? `$${n.toFixed(2)}` : '—' }
 function fmt4(n: number | null | undefined) { return n != null ? n.toFixed(4) : '—' }
@@ -46,6 +55,9 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   const [editMode, setEditMode] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
+  const [metalTypes, setMetalTypes] = useState<string[]>(BASE_METAL_TYPES)
+
+  useEffect(() => { setMetalTypes(getMetalTypes()) }, [])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [gemModal, setGemModal] = useState<{ open: boolean; gem?: any }>({ open: false })
@@ -240,10 +252,17 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
             <div><label style={labelStyle}>Kích thước</label>
               <input style={inputStyle} value={form.kich_thuoc ?? ''} onChange={f('kich_thuoc')} placeholder="e.g. 8in, Size 5" /></div>
             <div><label style={labelStyle}>Loại vàng</label>
-              <select style={{ ...inputStyle, cursor: 'pointer' }} value={form.loai_vang} onChange={f('loai_vang')}>
-                <option value="">—</option>
-                {METAL_TYPES.map(m => <option key={m} value={m}>{m}</option>)}
-              </select></div>
+              <input
+                list="item-loai-vang-list"
+                style={{ ...inputStyle, textTransform: 'uppercase' }}
+                value={form.loai_vang}
+                onChange={e => setForm(v => ({ ...v, loai_vang: e.target.value.toUpperCase() }))}
+                placeholder="18KY, PT950…"
+                autoComplete="off"
+              />
+              <datalist id="item-loai-vang-list">
+                {metalTypes.map(m => <option key={m} value={m} />)}
+              </datalist></div>
             <div><label style={labelStyle}>Description</label>
               <input style={inputStyle} value={form.description} onChange={f('description')} /></div>
             <div><label style={labelStyle}>Class</label>
