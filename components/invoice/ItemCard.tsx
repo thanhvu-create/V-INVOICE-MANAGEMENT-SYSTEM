@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { apiCall } from '@/lib/api'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { GemModal } from './GemModal'
+import { XoanLookupPanel } from './XoanLookupPanel'
 import { DriveImage } from './DriveImage'
 import { DriveImageInput } from '@/components/ui/DriveImageInput'
 import { ComboInput } from '@/components/ui/ComboInput'
@@ -60,6 +61,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   const [gemModal, setGemModal] = useState<{ open: boolean; gem?: any }>({ open: false })
   const [confirmDeleteGem, setConfirmDeleteGem] = useState<any | null>(null)
   const [deletingGem, setDeletingGem] = useState(false)
+  const [xoanPanel, setXoanPanel] = useState(false)
 
   const gems: any[] = item.invoice_diamonds ?? []
   const notesVal = isAG3 ? item.chi_tiet_tap : (!isAdm ? item.nini_adm : null)
@@ -369,13 +371,20 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
         <div style={{ borderTop: '1px solid var(--border-light)', padding: '0.75rem 1rem' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
             <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-              Xoàn / Hột {gems.length > 0 && `(${gems.length}/${template === 'CH2' ? 10 : 5})`}
+              Xoàn / Hột {gems.length > 0 && `(${gems.length})`}
             </span>
             {canEdit && !isLocked && (
-              <button onClick={() => setGemModal({ open: true, gem: undefined })}
-                style={{ background: 'none', border: '1px solid var(--border-base)', cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', padding: '2px 8px', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 4 }}>
-                <i className="fa-solid fa-plus" style={{ fontSize: 9 }} /> Thêm xoàn
-              </button>
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button onClick={() => setGemModal({ open: true, gem: undefined })}
+                  style={{ background: 'none', border: '1px solid var(--border-base)', cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', padding: '2px 8px', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <i className="fa-solid fa-plus" style={{ fontSize: 9 }} /> Thêm xoàn
+                </button>
+                <button onClick={() => setXoanPanel(v => !v)}
+                  title="Tra hột từ file TỔNG HỢP THEO DÕI XOÀN"
+                  style={{ background: xoanPanel ? 'var(--text-primary)' : 'none', border: '1px solid var(--border-base)', cursor: 'pointer', fontSize: 'var(--text-xs)', color: xoanPanel ? 'var(--text-inverse)' : 'var(--text-secondary)', padding: '2px 8px', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <i className="fa-solid fa-magnifying-glass" style={{ fontSize: 9 }} /> Tra hột
+                </button>
+              </div>
             )}
           </div>
 
@@ -442,6 +451,17 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
             </div>
           )}
         </div>
+      )}
+
+      {/* Xoan lookup panel */}
+      {hasGems && xoanPanel && (
+        <XoanLookupPanel
+          invoiceId={invoiceId}
+          itemId={item.id}
+          soMo={item.so_mo}
+          onSaved={onRefresh}
+          onClose={() => setXoanPanel(false)}
+        />
       )}
 
       {/* Dialogs */}
