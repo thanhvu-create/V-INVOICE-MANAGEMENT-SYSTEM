@@ -8,12 +8,16 @@ import type { ImportRow } from '@/types'
 
 const SPHT_URL_KEY = 'spht_sheet_url'
 
-// SPHT file structure: header row 102 (1-indexed), data from row 103, columns A–R
-const DATA_START_1IDX = 103
-
-// Column indices (0-based)
+// Column indices (0-based), columns A–R
 // A[0]=CH  D[3]=SKU  E[4]=SO  F[5]=MO  G[6]=CHI TIẾT SP  H[7]=LOẠI VÀNG
 // I[8]=SỐ LƯỢNG  J[9]=TỔNG TL(gr)  P[15]=TÊN KHÁCH  Q[16]=SỐ PO  R[17]=V-INV
+
+function findHeaderRowIndex(rows: any[][]): number {
+  for (let i = 0; i < Math.min(30, rows.length); i++) {
+    if (String(rows[i]?.[0] ?? '').trim().toUpperCase() === 'CH') return i
+  }
+  return 0
+}
 
 export const TEMPLATE_CHANNELS: Record<string, string[]> = {
   CH1:      ['CH1-Khách', 'CH1-SR'],
@@ -52,8 +56,9 @@ function parseSingleSheet(buf: ArrayBuffer, sheetName: string): Record<string, I
   const sheet = wb.Sheets[sheetName]
   if (!sheet) return {}
 
-  const all: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
-  const dataRows     = all.slice(DATA_START_1IDX - 1)
+  const all: any[][]  = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+  const headerIdx     = findHeaderRowIndex(all)
+  const dataRows      = all.slice(headerIdx + 1)
   const rowsByVinv: Record<string, ImportRow[]> = {}
 
   dataRows.forEach((row, i) => {
@@ -70,7 +75,7 @@ function parseSingleSheet(buf: ArrayBuffer, sheetName: string): Record<string, I
     const wt     = parseFloat(String(row[9])) || 0
 
     const importRow: ImportRow = {
-      rowNum:      DATA_START_1IDX + i,
+      rowNum:      headerIdx + 2 + i,
       store:       '',
       location:    '',
       sku:         skuRaw ? String(Number(skuRaw) || skuRaw).toUpperCase() : `SKU-${i + 1}`,
