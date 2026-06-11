@@ -6,9 +6,7 @@ function buildExportUrl(url: string): string {
   const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)
   if (!m) throw new Error('Không đọc được Sheet ID từ URL')
   const id = m[1]
-  const gidMatch = url.match(/[#&?]gid=(\d+)/)
-  const gid = gidMatch ? gidMatch[1] : '0'
-  return `https://docs.google.com/spreadsheets/d/${id}/export?format=xlsx&gid=${gid}`
+  return `https://docs.google.com/spreadsheets/d/${id}/export?format=xlsx`
 }
 
 export async function GET(req: NextRequest) {
