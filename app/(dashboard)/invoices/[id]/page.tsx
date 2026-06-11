@@ -24,16 +24,34 @@ export default function InvoiceDetailPage() {
   const { user, canDo } = useUser()
   const router          = useRouter()
 
-  const [data,         setData]         = useState<{ header: any; items: any[] } | null>(null)
-  const [loading,      setLoading]      = useState(true)
-  const [view,         setView]         = useState<InvoiceView>('jm-form')
-  const [addItemOpen,  setAddItemOpen]  = useState(false)
+  const [data,            setData]         = useState<{ header: any; items: any[] } | null>(null)
+  const [loading,         setLoading]      = useState(true)
+  const [view,            setView]         = useState<InvoiceView>('jm-form')
+  const [addItemOpen,     setAddItemOpen]  = useState(false)
+  const [exportingSheets, setExportingSheets] = useState(false)
 
   const canSeePrice = canDo('see_prices')
   const isLocked    = data?.header?.status === 'finalized'
   const status      = data?.header?.status ?? ''
   const canEdit     = canDo('edit') && !isLocked
   const availTrans  = ALLOWED_TRANSITIONS[user.role]?.[status] ?? []
+
+  async function handleExportSheets() {
+    setExportingSheets(true)
+    try {
+      const res  = await fetch(`/api/invoices/${id}/export-sheets`, { method: 'POST' })
+      const json = await res.json()
+      if (json.success && json.spreadsheetUrl) {
+        window.open(json.spreadsheetUrl, '_blank')
+      } else {
+        alert(json.message ?? 'Không thể export lên Google Sheets.')
+      }
+    } catch {
+      alert('Lỗi kết nối.')
+    } finally {
+      setExportingSheets(false)
+    }
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -112,6 +130,17 @@ export default function InvoiceDetailPage() {
           <a href={`/api/invoices/${id}/export`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', color: 'var(--text-primary)', textDecoration: 'none', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)' }}>
             <i className="fa-solid fa-file-export" style={{ fontSize: 11 }} /> Export
           </a>
+          <button
+            onClick={handleExportSheets}
+            disabled={exportingSheets}
+            title="Tạo Google Sheet mới với cấu trúc JM FORM + SUMMARY"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', background: 'transparent', color: exportingSheets ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)', cursor: exportingSheets ? 'not-allowed' : 'pointer', opacity: exportingSheets ? 0.6 : 1 }}
+          >
+            {exportingSheets
+              ? <><i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 11 }} /> Đang tạo…</>
+              : <><i className="fa-brands fa-google-drive" style={{ fontSize: 11, color: '#34A853' }} /> Google Sheets</>
+            }
+          </button>
           <a href={`/invoices/${id}/print`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', color: 'var(--text-primary)', textDecoration: 'none', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)' }}>
             <i className="fa-solid fa-print" style={{ fontSize: 11 }} /> Print
           </a>

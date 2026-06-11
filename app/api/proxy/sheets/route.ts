@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServiceClient } from '@/lib/supabase/server'
 import { getAuthContext } from '@/lib/auth/getRole'
-import { decrypt } from '@/lib/encrypt.server'
+import { getGoogleAccessToken } from '@/lib/google/getAccessToken'
 
 function buildExportUrl(url: string): string {
   const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]+)/)
@@ -10,32 +9,6 @@ function buildExportUrl(url: string): string {
   const gidMatch = url.match(/[#&?]gid=(\d+)/)
   const gid = gidMatch ? gidMatch[1] : '0'
   return `https://docs.google.com/spreadsheets/d/${id}/export?format=xlsx&gid=${gid}`
-}
-
-async function getAccessToken(userId: string): Promise<string | null> {
-  const db = createServiceClient()
-  const { data: row } = await db
-    .from('app_users')
-    .select('google_refresh_token')
-    .eq('id', userId)
-    .single()
-
-  if (!row?.google_refresh_token) return null
-
-  const refreshToken = decrypt(row.google_refresh_token)
-  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      refresh_token: refreshToken,
-      client_id:     process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-      grant_type:    'refresh_token',
-    }),
-  })
-
-  const tokenData = await tokenRes.json()
-  return tokenData.access_token ?? null
 }
 
 export async function GET(req: NextRequest) {
@@ -55,7 +28,7 @@ export async function GET(req: NextRequest) {
   }
 
   // Try with Google Drive access token first (for org-restricted sheets)
-  const accessToken = await getAccessToken(ctx.userId)
+  const accessToken = await getGoogleAccessToken(ctx.userId)
   const headers: Record<string, string> = { 'User-Agent': 'Mozilla/5.0' }
   if (accessToken) headers['Authorization'] = `Bearer ${accessToken}`
 
