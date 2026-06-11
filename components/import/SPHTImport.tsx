@@ -25,25 +25,10 @@ function channelsForTemplate(template: string): string[] {
   return TEMPLATE_CHANNELS[template] ?? []
 }
 
-// All channels that belong to a specific template (used to detect "belongs to other template")
-const ALL_KNOWN_CHANNELS = new Set(
-  Object.values(TEMPLATE_CHANNELS).flat().map(c => c.toLowerCase())
-)
-
 function rowMatchesTemplate(tenKhach: string, template: string): boolean {
   const allowed = channelsForTemplate(template)
   if (allowed.length === 0) return true   // MANUAL — accept all
-
-  const normalized = tenKhach.trim().toLowerCase()
-
-  // Matches this template's channels → include
-  if (allowed.some(ch => normalized === ch.toLowerCase())) return true
-
-  // Belongs to a different known template → exclude
-  if (ALL_KNOWN_CHANNELS.has(normalized)) return false
-
-  // Unrecognized channel (e.g. "Ba sao") → include as exception
-  return true
+  return allowed.some(ch => tenKhach.trim().toLowerCase() === ch.toLowerCase())
 }
 
 interface VinvOption {
@@ -390,19 +375,6 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
                 — bỏ qua {skippedRows.length} SP ({Array.from(new Set(skippedRows.map(r => r.niniAdm).filter(Boolean))).join(', ')})
               </span>
             )}
-            {(() => {
-              const exceptions = activeRows.filter(r => {
-                const n = r.niniAdm.trim().toLowerCase()
-                return n && !channelsForTemplate(template).some(c => c.toLowerCase() === n)
-              })
-              if (exceptions.length === 0) return null
-              const exChannels = Array.from(new Set(exceptions.map(r => r.niniAdm).filter(Boolean)))
-              return (
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontStyle: 'italic' }}>
-                  + {exceptions.length} SP ngoại lệ ({exChannels.join(', ')})
-                </span>
-              )
-            })()}
           </div>
 
           <PreviewTable rows={activeRows} />
