@@ -397,11 +397,11 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
   if (stage.s === 'pickSheet') {
     const { buf, sheets, checked } = stage
 
-    function toggle(name: string) {
+    const toggle = (name: string) => {
       const next = checked.includes(name)
         ? checked.filter(s => s !== name)
         : [...checked, name]
-      setStage({ ...stage, checked: next })
+      setStage({ s: 'pickSheet', buf, sheets, checked: next })
     }
 
     return (
@@ -435,7 +435,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
           </span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
             <button
-              onClick={() => setStage({ ...stage, checked: [...sheets] })}
+              onClick={() => setStage({ s: 'pickSheet', buf, sheets, checked: [...sheets] })}
               style={{
                 padding: '3px 10px', border: '1px solid var(--border-base)', background: 'transparent',
                 cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)',
@@ -443,7 +443,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
               Chọn tất cả
             </button>
             <button
-              onClick={() => setStage({ ...stage, checked: [] })}
+              onClick={() => setStage({ s: 'pickSheet', buf, sheets, checked: [] })}
               style={{
                 padding: '3px 10px', border: '1px solid var(--border-base)', background: 'transparent',
                 cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)',
