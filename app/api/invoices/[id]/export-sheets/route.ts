@@ -291,8 +291,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       try {
         await moveFileToDriveFolder(accessToken, spreadsheetId, folderId)
       } catch (moveErr: any) {
-        // Don't fail the whole export — just warn
-        folderWarning = `Không thể di chuyển vào folder: ${moveErr.message}. File đã tạo ở root Drive.`
+        const msg = String(moveErr.message ?? '')
+        if (msg.includes('insufficient') || msg.includes('scope')) {
+          folderWarning = 'Token Google chưa có quyền "Drive files". Vào Settings → ngắt kết nối Google Drive → kết nối lại để cấp quyền mới. File đã tạo ở root Drive.'
+        } else {
+          folderWarning = `Không thể di chuyển vào folder (${msg}). Kiểm tra lại link folder và quyền truy cập. File đã tạo ở root Drive.`
+        }
       }
     }
 
