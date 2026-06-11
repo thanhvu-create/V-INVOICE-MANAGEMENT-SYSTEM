@@ -6,6 +6,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { GemModal } from './GemModal'
 import { DriveImage } from './DriveImage'
 import { DriveImageInput } from '@/components/ui/DriveImageInput'
+import { ComboInput } from '@/components/ui/ComboInput'
 
 import type { InvoiceTemplate } from '@/lib/formulas/pricing'
 
@@ -248,17 +249,14 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
             <div><label style={labelStyle}>Kích thước</label>
               <input style={inputStyle} value={form.kich_thuoc ?? ''} onChange={f('kich_thuoc')} placeholder="e.g. 8in, Size 5" /></div>
             <div><label style={labelStyle}>Loại vàng</label>
-              <input
-                list="item-loai-vang-list"
-                style={{ ...inputStyle, textTransform: 'uppercase' }}
+              <ComboInput
                 value={form.loai_vang}
-                onChange={e => setForm(v => ({ ...v, loai_vang: e.target.value.toUpperCase() }))}
+                onChange={v => setForm(prev => ({ ...prev, loai_vang: v }))}
+                options={metalTypes}
                 placeholder="18KY, PT950…"
-                autoComplete="off"
-              />
-              <datalist id="item-loai-vang-list">
-                {metalTypes.map(m => <option key={m} value={m} />)}
-              </datalist></div>
+                uppercase
+                style={inputStyle}
+              /></div>
             <div><label style={labelStyle}>Description</label>
               <input style={inputStyle} value={form.description} onChange={f('description')} /></div>
             <div><label style={labelStyle}>Class</label>

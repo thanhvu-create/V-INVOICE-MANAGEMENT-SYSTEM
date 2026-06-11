@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
+import { ComboInput } from '@/components/ui/ComboInput'
 
 
 interface Form {
@@ -223,17 +224,14 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
 
             <div>
               <label style={labelStyle}>Loại Vàng</label>
-              <input
-                list="loai-vang-list"
-                style={{ ...inputStyle, textTransform: 'uppercase' }}
-                placeholder="18KY, 18KW, PT950…"
+              <ComboInput
                 value={form.loai_vang}
-                onChange={e => setForm(v => ({ ...v, loai_vang: e.target.value.toUpperCase() }))}
-                autoComplete="off"
+                onChange={v => setForm(prev => ({ ...prev, loai_vang: v }))}
+                options={metalTypes}
+                placeholder="18KY, 18KW, PT950…"
+                uppercase
+                style={inputStyle}
               />
-              <datalist id="loai-vang-list">
-                {metalTypes.map(o => <option key={o} value={o} />)}
-              </datalist>
             </div>
             <div>
               <label style={labelStyle}>Qty (pcs)</label>

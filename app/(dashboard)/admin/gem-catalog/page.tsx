@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { apiCall } from '@/lib/api'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { ModalPortal } from '@/components/ui/ModalPortal'
+import { ComboInput } from '@/components/ui/ComboInput'
 
 const STONE_TYPE_SUGGESTIONS = ['RD', 'PR', 'BG', 'MQ', 'OV', 'PS', 'RDL', 'RD-LG', 'EM', 'SAP', 'RUB', 'CZ']
 
@@ -180,17 +181,14 @@ export default function GemCatalogPage() {
             <div style={{ padding: '1.25rem 1.5rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
               <div>
                 <label style={labelStyle}>Stone Type *</label>
-                <input
-                  list="stone-type-list"
-                  style={{ ...inputStyle, textTransform: 'uppercase' }}
+                <ComboInput
                   value={form.stone_type}
-                  onChange={e => setForm(v => ({ ...v, stone_type: e.target.value.toUpperCase() }))}
+                  onChange={v => setForm(prev => ({ ...prev, stone_type: v }))}
+                  options={STONE_TYPE_SUGGESTIONS}
                   placeholder="RD, PR, BG, EM…"
-                  autoComplete="off"
+                  uppercase
+                  style={inputStyle}
                 />
-                <datalist id="stone-type-list">
-                  {STONE_TYPE_SUGGESTIONS.map(t => <option key={t} value={t} />)}
-                </datalist>
               </div>
               <div>
                 <label style={labelStyle}>Grade</label>
