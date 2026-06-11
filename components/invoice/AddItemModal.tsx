@@ -31,6 +31,16 @@ interface Form {
   image_url:    string
 }
 
+const LOAI_VANG_OPTIONS = [
+  '18KY', '18KW', '18KR', '18KG',
+  '22KY', '22KW',
+  '24K',
+  '14KY', '14KW', '14KR',
+  '10KY', '10KW',
+  'PT950', 'PT850',
+  'AG', 'PD',
+]
+
 const EMPTY: Form = {
   sku: '', vendor_model: '', so_mo: '', po_number: '', sku_ag: '',
   description: '', class: '', sub_class: '',
@@ -213,7 +223,17 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
 
             <div>
               <label style={labelStyle}>Loại Vàng</label>
-              <input style={inputStyle} placeholder="18KW, 18KY, PT950…" value={form.loai_vang} onChange={f('loai_vang')} />
+              <input
+                list="loai-vang-list"
+                style={{ ...inputStyle, textTransform: 'uppercase' }}
+                placeholder="18KY, 18KW, PT950…"
+                value={form.loai_vang}
+                onChange={e => setForm(v => ({ ...v, loai_vang: e.target.value.toUpperCase() }))}
+                autoComplete="off"
+              />
+              <datalist id="loai-vang-list">
+                {LOAI_VANG_OPTIONS.map(o => <option key={o} value={o} />)}
+              </datalist>
             </div>
             <div>
               <label style={labelStyle}>Qty (pcs)</label>
