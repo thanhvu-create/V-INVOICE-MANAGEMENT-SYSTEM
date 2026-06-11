@@ -3,18 +3,20 @@
 import { useState, useEffect, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { toast } from '@/components/ui/Toast'
-import { DropZone } from '@/components/import/DropZone'
 import { useUser } from '@/contexts/UserContext'
 import type { ImportRow } from '@/types'
 
-// ── Column indices in SPHT file ────────────────────────────────────────────
-// [3]  SKU         [4]  SO        [5]  MO
-// [6]  Description [7]  Loại vàng [8]  Qty  [9] Weight(gr)
-// [15] Tên khách   [16] Hiện trạng (filter = "Đã ship")  [17] V-INV code
-
 const SPHT_URL_KEY = 'spht_sheet_url'
 
-// ── Template → allowed TÊN KHÁCH channels ─────────────────────────────────
+// SPHT file structure: header row 102 (1-indexed), data from row 103
+const DATA_START_1IDX = 103
+
+// Column indices (0-based, columns A–R)
+// A[0]=CH  B[1]=SỐ PHIẾU  C[2]=NGÀY  D[3]=SKU  E[4]=SO  F[5]=MO
+// G[6]=CHI TIẾT SP  H[7]=LOẠI VÀNG  I[8]=SỐ LƯỢNG  J[9]=TỔNG TL(gr)
+// K[10]=TÊN SP  L[11]=QUI CÁCH  M[12]=SL HỘT  N[13]=TL HỘT  O[14]=TL VÀNG
+// P[15]=TÊN KHÁCH  Q[16]=SỐ PO ("Đã ship")  R[17]=V-INV
+
 export const TEMPLATE_CHANNELS: Record<string, string[]> = {
   CH1:      ['CH1-Khách', 'CH1-SR'],
   CH2:      ['CH2', 'CH3'],
@@ -24,73 +26,67 @@ export const TEMPLATE_CHANNELS: Record<string, string[]> = {
   MANUAL:   [],
 }
 
-function channelsForTemplate(template: string): string[] {
-  return TEMPLATE_CHANNELS[template] ?? []
+function channelsForTemplate(t: string): string[] {
+  return TEMPLATE_CHANNELS[t] ?? []
 }
 
 function rowMatchesTemplate(tenKhach: string, template: string): boolean {
   const allowed = channelsForTemplate(template)
-  if (allowed.length === 0) return true
+  if (!allowed.length) return true
   return allowed.some(ch => tenKhach.trim().toLowerCase() === ch.toLowerCase())
 }
 
-interface VinvOption {
-  code:     string
-  count:    number
-  channels: string[]
+// ── Sheet helpers ───────────────────────────────────────────────────────────
+
+function getHTSheets(buf: ArrayBuffer): string[] {
+  const wb = XLSX.read(new Uint8Array(buf), { type: 'array', bookSheets: true })
+  return (wb.SheetNames ?? []).filter(n => /^HT\d{2}\.\d{2}$/i.test(n))
 }
+
+interface VinvOption { code: string; count: number; channels: string[] }
 
 interface ParsedSPHT {
-  sourceName:   string
-  sheetName:    string
-  vinvOptions:  VinvOption[]
-  rowsByVinv:   Record<string, ImportRow[]>
+  sheetName:   string
+  vinvOptions: VinvOption[]
+  rowsByVinv:  Record<string, ImportRow[]>
 }
 
-// ── Parser (from ArrayBuffer) ──────────────────────────────────────────────
+function parseSPHTSheet(buf: ArrayBuffer, sheetName: string): ParsedSPHT {
+  const wb    = XLSX.read(new Uint8Array(buf), { type: 'array', sheets: sheetName })
+  const sheet = wb.Sheets[sheetName]
+  if (!sheet) return { sheetName, vinvOptions: [], rowsByVinv: {} }
 
-function findHeaderRowIndex(rows: any[][]): number {
-  for (let i = 0; i < Math.min(20, rows.length); i++) {
-    if (String(rows[i]?.[0] ?? '').trim().toUpperCase() === 'CH') return i
-  }
-  return 0
-}
-
-function parseSPHTBuffer(buf: ArrayBuffer, sourceName: string): ParsedSPHT {
-  const wb = XLSX.read(new Uint8Array(buf), { type: 'array' })
-
-  const sheetName = wb.SheetNames.find(n => /^HT/i.test(n)) ?? wb.SheetNames[0]
-  const sheet     = wb.Sheets[sheetName]
-  const all: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
-
-  const headerIdx  = findHeaderRowIndex(all)
-  const dataRows   = all.slice(headerIdx + 1)
+  const all: any[][]  = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+  const dataRows      = all.slice(DATA_START_1IDX - 1)   // convert to 0-indexed
   const rowsByVinv: Record<string, ImportRow[]> = {}
 
   dataRows.forEach((row, i) => {
+    const ch        = String(row[0]  ?? '').trim()
     const hientrang = String(row[16] ?? '').trim()
     const vinv      = String(row[17] ?? '').trim()
-    if (!vinv || hientrang !== 'Đã ship') return
+    if (ch !== 'US' || !vinv || hientrang !== 'Đã ship') return
 
     const skuRaw = String(row[3] ?? '').trim()
     const soRaw  = String(row[4] ?? '').trim()
     const moRaw  = String(row[5] ?? '').trim()
-    const soMo   = soRaw && moRaw ? `SO${soRaw}-MO${moRaw}` : soRaw ? `SO${soRaw}` : ''
-    const qty    = parseInt(String(row[8])) || 1
-    const wt     = parseFloat(String(row[9])) || 0
+    const soMo   = soRaw && moRaw
+      ? `SO${soRaw}-MO${moRaw}`
+      : soRaw ? `SO${soRaw}` : ''
+    const qty = parseInt(String(row[8])) || 1
+    const wt  = parseFloat(String(row[9])) || 0
 
     const importRow: ImportRow = {
-      rowNum:      headerIdx + 1 + i + 2,
+      rowNum:      DATA_START_1IDX + i,
       store:       '',
       location:    '',
       sku:         skuRaw ? String(Number(skuRaw) || skuRaw).toUpperCase() : `SKU-${i + 1}`,
       soMo,
-      description: String(row[6] ?? '').trim(),
+      description: String(row[6]  ?? '').trim(),
       qty,
       weightTotal: wt,
-      loaiVang:    String(row[7] ?? '').trim().toUpperCase(),
-      class:       String(row[10] ?? '').trim(),
-      subClass:    String(row[11] ?? '').trim(),
+      loaiVang:    String(row[7]  ?? '').trim().toUpperCase(),
+      class:       '',
+      subClass:    '',
       niniAdm:     String(row[15] ?? '').trim(),
     }
 
@@ -98,7 +94,7 @@ function parseSPHTBuffer(buf: ArrayBuffer, sourceName: string): ParsedSPHT {
     rowsByVinv[vinv].push(importRow)
   })
 
-  const vinvOptions: VinvOption[] = Object.entries(rowsByVinv)
+  const vinvOptions = Object.entries(rowsByVinv)
     .map(([code, rows]) => ({
       code,
       count:    rows.length,
@@ -106,10 +102,10 @@ function parseSPHTBuffer(buf: ArrayBuffer, sourceName: string): ParsedSPHT {
     }))
     .sort((a, b) => a.code.localeCompare(b.code))
 
-  return { sourceName, sheetName, vinvOptions, rowsByVinv }
+  return { sheetName, vinvOptions, rowsByVinv }
 }
 
-// ── Preview table ──────────────────────────────────────────────────────────
+// ── Preview table ───────────────────────────────────────────────────────────
 
 const TEMPLATE_COLOR: Record<string, string> = {
   'CH1-Khách': '#92400E', 'CH1-SR': '#B45309',
@@ -154,8 +150,11 @@ function PreviewTable({ rows }: { rows: ImportRow[] }) {
                 <td style={{ ...td, fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{r.qty}</td>
                 <td style={{ ...td, fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{r.weightTotal.toFixed(4)}</td>
                 <td style={{ ...td }}>
-                  <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: kenhColor,
-                    background: `${kenhColor}18`, padding: '2px 6px', borderRadius: 2 }}>
+                  <span style={{
+                    fontSize: 'var(--text-xs)', fontWeight: 600,
+                    color: kenhColor, background: `${kenhColor}18`,
+                    padding: '2px 6px', borderRadius: 2,
+                  }}>
                     {r.niniAdm || '—'}
                   </span>
                 </td>
@@ -168,7 +167,7 @@ function PreviewTable({ rows }: { rows: ImportRow[] }) {
   )
 }
 
-// ── Main component ─────────────────────────────────────────────────────────
+// ── Main component ──────────────────────────────────────────────────────────
 
 interface Props {
   invoiceId: string
@@ -177,11 +176,21 @@ interface Props {
   onDone:    (count: number) => void
 }
 
+type ReadyStage = {
+  s:           'ready'
+  buf:         ArrayBuffer
+  sheets:      string[]
+  activeSheet: string
+  parsed:      ParsedSPHT
+  selected:    string | null
+}
+
 type Stage =
   | { s: 'idle' }
   | { s: 'fetching' }
-  | { s: 'ready';    parsed: ParsedSPHT; selected: string | null }
-  | { s: 'importing' }
+  | { s: 'pickSheet'; buf: ArrayBuffer; sheets: string[] }
+  | ReadyStage
+  | { s: 'importing'; prev: ReadyStage }
 
 export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
   const { canDo } = useUser()
@@ -189,12 +198,10 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
 
   const [stage,      setStage]      = useState<Stage>({ s: 'idle' })
   const [manualCode, setManualCode] = useState('')
-
-  // Saved URL state
-  const [savedUrl,  setSavedUrl]  = useState<string | null>(null)
-  const [urlInput,  setUrlInput]  = useState('')
-  const [editUrl,   setEditUrl]   = useState(false)
-  const [urlSaving, setUrlSaving] = useState(false)
+  const [savedUrl,   setSavedUrl]   = useState<string | null>(null)
+  const [urlInput,   setUrlInput]   = useState('')
+  const [editUrl,    setEditUrl]    = useState(false)
+  const [urlSaving,  setUrlSaving]  = useState(false)
   const editInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -211,25 +218,22 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
   async function saveUrl(url: string) {
     setUrlSaving(true)
     await fetch('/api/settings', {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: SPHT_URL_KEY, value: url }),
+      method:  'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ key: SPHT_URL_KEY, value: url }),
     })
     setSavedUrl(url)
     setUrlSaving(false)
     setEditUrl(false)
   }
 
-  async function loadFromBuffer(buf: ArrayBuffer, sourceName: string) {
+  function selectSheet(buf: ArrayBuffer, sheets: string[], sheetName: string) {
     try {
-      const parsed = parseSPHTBuffer(buf, sourceName)
-      if (parsed.vinvOptions.length === 0) {
-        toast('Không tìm thấy dòng nào có HIỆN TRẠNG = "Đã ship".', 'warn', 5000)
-        setStage({ s: 'idle' }); return
-      }
-      setStage({ s: 'ready', parsed, selected: null })
+      const parsed = parseSPHTSheet(buf, sheetName)
+      setManualCode('')
+      setStage({ s: 'ready', buf, sheets, activeSheet: sheetName, parsed, selected: null })
     } catch (err) {
-      toast(`Lỗi đọc dữ liệu: ${String(err)}`, 'error', 5000)
-      setStage({ s: 'idle' })
+      toast(`Lỗi đọc sheet: ${String(err)}`, 'error', 5000)
     }
   }
 
@@ -242,164 +246,220 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
         const j = await res.json().catch(() => ({}))
         throw new Error(j.error ?? `HTTP ${res.status}`)
       }
-      await loadFromBuffer(await res.arrayBuffer(), 'Google Sheet')
+      const buf    = await res.arrayBuffer()
+      const sheets = getHTSheets(buf)
+      if (sheets.length === 0) {
+        toast('Không tìm thấy tab sheet nào dạng HT06.26, HT07.26,...', 'warn', 5000)
+        setStage({ s: 'idle' }); return
+      }
+      if (sheets.length === 1) {
+        selectSheet(buf, sheets, sheets[0])
+      } else {
+        setStage({ s: 'pickSheet', buf, sheets })
+      }
     } catch (err) {
       toast(String(err), 'error', 6000)
       setStage({ s: 'idle' })
     }
   }
 
-  async function handleFile(file: File) {
-    setStage({ s: 'fetching' })
-    await loadFromBuffer(await file.arrayBuffer(), file.name)
-  }
-
-  async function handleImport(rows: ImportRow[]) {
-    setStage({ s: 'importing' })
+  async function handleImport(rows: ImportRow[], prevStage: ReadyStage) {
+    setStage({ s: 'importing', prev: prevStage })
     try {
       const res  = await fetch('/api/import', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoiceId, rows }),
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ invoiceId, rows }),
       })
       const json = await res.json()
       if (!json.success) throw new Error(json.message || 'Import failed')
-      toast(`${rows.length} sản phẩm đã được import.`, 'success')
       onDone(rows.length)
     } catch (err) {
       toast(String(err), 'error', 5000)
-      setStage({ s: 'idle' })
+      setStage(prevStage)
     }
   }
 
   function shortUrl(url: string) {
     try {
-      const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{6,10})/)
-      return m ? `docs.google.com/…/${m[1]}…` : url.slice(0, 44) + '…'
-    } catch { return url.slice(0, 44) + '…' }
+      const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{6,44})/)
+      return m ? `docs.google.com/…/${m[1].slice(0, 10)}…` : url.slice(0, 48) + '…'
+    } catch { return url.slice(0, 48) + '…' }
   }
 
-  // ── Fetching ──
-  if (stage.s === 'fetching') {
+  // ── Loading states ──────────────────────────────────────────────────────
+
+  if (stage.s === 'fetching' || stage.s === 'importing') {
     return (
       <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
         <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 24, display: 'block', marginBottom: '1rem' }} />
-        Đang tải dữ liệu...
+        {stage.s === 'fetching' ? 'Đang tải dữ liệu...' : 'Đang import...'}
       </div>
     )
   }
 
-  // ── Importing ──
-  if (stage.s === 'importing') {
-    return (
-      <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-        <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 24, display: 'block', marginBottom: '1rem' }} />
-        Đang import...
-      </div>
-    )
-  }
+  // ── Idle: URL input ─────────────────────────────────────────────────────
 
-  // ── Idle ──
   if (stage.s === 'idle') {
     return (
       <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-base)', padding: '1.5rem 2rem' }}>
+        <div style={{
+          fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em',
+          textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.6rem',
+        }}>
+          <i className="fa-brands fa-google-drive" style={{ marginRight: 6, color: '#34A853' }} />
+          Google Sheet SPHT Nhập Kho
+        </div>
 
-        {/* Google Sheet section */}
-        <div style={{ marginBottom: '1.25rem' }}>
-          <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.6rem' }}>
-            <i className="fa-brands fa-google-drive" style={{ marginRight: 6, color: '#34A853' }} />
-            Google Sheet SPHT Nhập Kho
+        {editUrl || !savedUrl ? (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              ref={editInputRef}
+              value={urlInput}
+              onChange={e => setUrlInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && urlInput.trim()) saveUrl(urlInput).then(() => handleFetchUrl(urlInput))
+                if (e.key === 'Escape') setEditUrl(false)
+              }}
+              placeholder="https://docs.google.com/spreadsheets/d/…"
+              style={{
+                flex: 1, border: '1px solid var(--border-base)', background: 'var(--bg-base)',
+                padding: '6px 10px', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)',
+                color: 'var(--text-primary)', outline: 'none',
+              }}
+            />
+            <button
+              onClick={async () => { if (!urlInput.trim()) return; await saveUrl(urlInput); handleFetchUrl(urlInput) }}
+              disabled={urlSaving || !urlInput.trim() || locked}
+              style={{
+                padding: '6px 18px', background: 'var(--text-primary)', color: 'var(--text-inverse)',
+                border: 'none',
+                cursor: urlSaving || !urlInput.trim() || locked ? 'not-allowed' : 'pointer',
+                opacity: urlSaving || !urlInput.trim() || locked ? 0.6 : 1,
+                fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600, whiteSpace: 'nowrap',
+              }}>
+              {urlSaving ? <i className="fa-solid fa-circle-notch fa-spin" /> : 'Lưu & Tải'}
+            </button>
+            {savedUrl && editUrl && (
+              <button onClick={() => setEditUrl(false)}
+                style={{
+                  padding: '6px 10px', border: '1px solid var(--border-base)',
+                  background: 'transparent', cursor: 'pointer',
+                  color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)',
+                }}>
+                Hủy
+              </button>
+            )}
           </div>
-
-          {editUrl || !savedUrl ? (
-            /* URL input */
-            <div style={{ display: 'flex', gap: 6 }}>
-              <input
-                ref={editInputRef}
-                value={urlInput}
-                onChange={e => setUrlInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' && urlInput.trim()) {
-                    saveUrl(urlInput).then(() => handleFetchUrl(urlInput))
-                  }
-                  if (e.key === 'Escape') setEditUrl(false)
-                }}
-                placeholder="https://docs.google.com/spreadsheets/d/…"
-                style={{
-                  flex: 1, border: '1px solid var(--border-base)', background: 'var(--bg-base)',
-                  padding: '6px 10px', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)',
-                  color: 'var(--text-primary)', outline: 'none',
-                }}
-              />
-              <button
-                onClick={async () => {
-                  if (!urlInput.trim()) return
-                  await saveUrl(urlInput)
-                  handleFetchUrl(urlInput)
-                }}
-                disabled={urlSaving || !urlInput.trim() || locked}
-                style={{
-                  padding: '6px 18px', background: 'var(--text-primary)', color: 'var(--text-inverse)',
-                  border: 'none', cursor: urlSaving || !urlInput.trim() || locked ? 'not-allowed' : 'pointer',
-                  opacity: urlSaving || !urlInput.trim() || locked ? 0.6 : 1,
-                  fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600, whiteSpace: 'nowrap',
-                }}>
-                {urlSaving ? <i className="fa-solid fa-circle-notch fa-spin" /> : 'Lưu & Tải'}
+        ) : (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '0.6rem 0.75rem', background: 'var(--bg-base)', border: '1px solid var(--border-base)',
+          }}>
+            <i className="fa-solid fa-circle-check" style={{ color: '#34A853', fontSize: 12, flexShrink: 0 }} />
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
+              flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+            }}>
+              {shortUrl(savedUrl)}
+            </span>
+            {canManage && (
+              <button onClick={() => setEditUrl(true)} title="Đổi link"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12, padding: 2, flexShrink: 0 }}>
+                <i className="fa-solid fa-pen" />
               </button>
-              {savedUrl && editUrl && (
-                <button onClick={() => setEditUrl(false)}
-                  style={{ padding: '6px 10px', border: '1px solid var(--border-base)', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)' }}>
-                  Hủy
-                </button>
-              )}
-            </div>
-          ) : (
-            /* Saved URL display + action buttons */
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.6rem 0.75rem', background: 'var(--bg-base)', border: '1px solid var(--border-base)' }}>
-              <i className="fa-solid fa-circle-check" style={{ color: '#34A853', fontSize: 12, flexShrink: 0 }} />
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {shortUrl(savedUrl)}
-              </span>
-              {canManage && (
-                <button onClick={() => setEditUrl(true)}
-                  title="Đổi link"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12, padding: 2, flexShrink: 0 }}>
-                  <i className="fa-solid fa-pen" />
-                </button>
-              )}
-              <button
-                onClick={() => handleFetchUrl(savedUrl)}
-                disabled={locked}
-                style={{
-                  padding: '5px 18px', background: 'var(--text-primary)', color: 'var(--text-inverse)',
-                  border: 'none', cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? 0.6 : 1,
-                  fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600,
-                  flexShrink: 0, whiteSpace: 'nowrap',
-                }}>
-                <i className="fa-solid fa-rotate-right" style={{ marginRight: 6 }} />Tải dữ liệu
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Divider */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
-          <div style={{ flex: 1, borderTop: '1px solid var(--border-light)' }} />
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>hoặc upload file</span>
-          <div style={{ flex: 1, borderTop: '1px solid var(--border-light)' }} />
-        </div>
-
-        {/* File upload fallback */}
-        <DropZone onFile={handleFile} disabled={locked} />
+            )}
+            <button
+              onClick={() => handleFetchUrl(savedUrl)}
+              disabled={locked}
+              style={{
+                padding: '5px 18px', background: 'var(--text-primary)', color: 'var(--text-inverse)',
+                border: 'none', cursor: locked ? 'not-allowed' : 'pointer',
+                opacity: locked ? 0.6 : 1,
+                fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600,
+                flexShrink: 0, whiteSpace: 'nowrap',
+              }}>
+              <i className="fa-solid fa-rotate-right" style={{ marginRight: 6 }} />Tải dữ liệu
+            </button>
+          </div>
+        )}
       </div>
     )
   }
 
-  // ── Ready: V-INV picker + preview ──
-  const { parsed, selected } = stage
+  // ── Sheet picker ────────────────────────────────────────────────────────
+
+  if (stage.s === 'pickSheet') {
+    const { buf, sheets } = stage
+    return (
+      <div>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem',
+          padding: '0.75rem 1rem', background: 'var(--bg-surface)', border: '1px solid var(--border-base)',
+        }}>
+          <i className="fa-brands fa-google-drive" style={{ color: '#34A853', fontSize: 18 }} />
+          <div>
+            <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>Google Sheet SPHT</div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+              Tìm thấy {sheets.length} tab — chọn tháng cần lấy dữ liệu
+            </div>
+          </div>
+          <button onClick={() => setStage({ s: 'idle' })}
+            style={{
+              marginLeft: 'auto', background: 'none', border: '1px solid var(--border-base)',
+              padding: '4px 12px', cursor: 'pointer',
+              fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)',
+            }}>
+            <i className="fa-solid fa-arrows-rotate" style={{ marginRight: 5 }} />Đổi nguồn
+          </button>
+        </div>
+
+        <div style={{
+          fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em',
+          textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.75rem',
+        }}>
+          Chọn tab sheet (tháng)
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+          {sheets.map(name => (
+            <button key={name}
+              onClick={() => selectSheet(buf, sheets, name)}
+              style={{
+                padding: '8px 22px',
+                border: '1.5px solid var(--border-base)',
+                background: 'var(--bg-surface)',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-mono)', fontWeight: 700,
+                fontSize: 'var(--text-sm)', borderRadius: 2, transition: 'all 0.1s',
+              }}
+              onMouseEnter={e => {
+                const b = e.currentTarget
+                b.style.borderColor = 'var(--text-primary)'
+                b.style.background  = 'var(--bg-hover)'
+              }}
+              onMouseLeave={e => {
+                const b = e.currentTarget
+                b.style.borderColor = 'var(--border-base)'
+                b.style.background  = 'var(--bg-surface)'
+              }}>
+              <i className="fa-solid fa-table-cells" style={{ marginRight: 7, fontSize: 11, opacity: 0.5 }} />
+              {name}
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Ready: sheet tabs + V-INV picker + preview ──────────────────────────
+
+  const readyStage = stage as ReadyStage
+  const { buf, sheets, activeSheet, parsed, selected } = readyStage
   const allowedChannels = channelsForTemplate(template)
 
   function filterByTemplate(rows: ImportRow[]) {
-    if (allowedChannels.length === 0) return rows
+    if (!allowedChannels.length) return rows
     return rows.filter(r => rowMatchesTemplate(r.niniAdm, template))
   }
 
@@ -412,82 +472,154 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
 
   return (
     <div>
-      {/* Source info */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', padding: '0.75rem 1rem', background: 'var(--bg-surface)', border: '1px solid var(--border-base)' }}>
-        <i className={parsed.sourceName === 'Google Sheet' ? 'fa-brands fa-google-drive' : 'fa-solid fa-file-excel'}
-          style={{ color: parsed.sourceName === 'Google Sheet' ? '#34A853' : '#16a34a', fontSize: 18 }} />
-        <div>
-          <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>{parsed.sourceName}</div>
-          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-            Sheet: <strong>{parsed.sheetName}</strong> — {parsed.vinvOptions.length} mã V-INV có hàng "Đã ship"
-          </div>
-        </div>
-        <button onClick={() => { setStage({ s: 'idle' }); setManualCode('') }}
-          style={{ marginLeft: 'auto', background: 'none', border: '1px solid var(--border-base)', padding: '4px 12px', cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}>
-          <i className="fa-solid fa-arrows-rotate" style={{ marginRight: 5 }} />Đổi nguồn
-        </button>
-      </div>
-
-      {/* V-INV code picker */}
+      {/* URL bar + sheet tabs */}
       <div style={{ marginBottom: '1.25rem' }}>
-        <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
-          Chọn mã V-INV cần import
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: 0,
+          padding: '0.5rem 0.75rem', background: 'var(--bg-surface)', border: '1px solid var(--border-base)',
+          borderBottom: 'none',
+        }}>
+          <i className="fa-brands fa-google-drive" style={{ color: '#34A853', fontSize: 14 }} />
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
+            color: 'var(--text-muted)', flex: 1,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>
+            {shortUrl(savedUrl ?? '')}
+          </span>
+          <button onClick={() => setStage({ s: 'idle' })}
+            style={{
+              background: 'none', border: '1px solid var(--border-base)',
+              padding: '3px 10px', cursor: 'pointer',
+              fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)',
+            }}>
+            <i className="fa-solid fa-arrows-rotate" style={{ marginRight: 5 }} />Đổi nguồn
+          </button>
         </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
-          {parsed.vinvOptions.map(opt => {
-            const isActive   = selected === opt.code
-            const matchCount = filterByTemplate(parsed.rowsByVinv[opt.code] ?? []).length
-            const hasMatch   = matchCount > 0
+
+        {/* Sheet tab bar */}
+        <div style={{
+          display: 'flex', gap: 0,
+          borderBottom: '2px solid var(--border-base)',
+          background: 'var(--bg-surface)',
+          border: '1px solid var(--border-base)',
+          borderTop: 'none',
+          flexWrap: 'wrap',
+        }}>
+          {sheets.map(name => {
+            const isActive = name === activeSheet
             return (
-              <button key={opt.code}
-                onClick={() => { setStage({ ...stage, selected: isActive ? null : opt.code }); setManualCode('') }}
+              <button key={name}
+                onClick={() => { if (!isActive) selectSheet(buf, sheets, name) }}
                 style={{
-                  padding: '6px 14px',
-                  border: `1.5px solid ${isActive ? 'var(--text-primary)' : hasMatch ? 'var(--border-base)' : 'var(--border-light)'}`,
-                  background: isActive ? 'var(--text-primary)' : 'var(--bg-surface)',
-                  color: isActive ? 'var(--text-inverse)' : hasMatch ? 'var(--text-primary)' : 'var(--text-muted)',
-                  cursor: hasMatch ? 'pointer' : 'default',
-                  fontFamily: 'var(--font-mono)', fontWeight: 700,
-                  fontSize: 'var(--text-sm)', borderRadius: 2, transition: 'all 0.1s',
-                  opacity: hasMatch ? 1 : 0.45,
+                  padding: '7px 18px', border: 'none', background: 'transparent',
+                  cursor: isActive ? 'default' : 'pointer',
+                  fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)',
+                  fontWeight: isActive ? 700 : 400,
+                  color: isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+                  borderBottom: `2px solid ${isActive ? 'var(--text-primary)' : 'transparent'}`,
+                  marginBottom: -2, transition: 'all 0.1s',
+                  letterSpacing: '0.03em',
                 }}>
-                {opt.code}
-                <span style={{ marginLeft: 6, fontSize: 'var(--text-xs)', fontWeight: 400, opacity: 0.8 }}>
-                  {hasMatch ? `(${matchCount} SP)` : `(0/${opt.count})`}
-                </span>
+                {name}
               </button>
             )
           })}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Hoặc nhập thủ công:</span>
-          <input
-            value={manualCode}
-            onChange={e => { setManualCode(e.target.value.toUpperCase()); setStage({ ...stage, selected: null }) }}
-            placeholder="P60501"
-            style={{ border: '1px solid var(--border-base)', background: 'var(--bg-surface)', padding: '5px 10px', fontFamily: 'var(--font-mono)', fontWeight: 600, fontSize: 'var(--text-sm)', width: 140, outline: 'none', color: 'var(--text-primary)' }}
-          />
-          {manualCode.trim() && !parsed.rowsByVinv[manualCode.trim()] && (
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }}>
-              Mã "{manualCode.trim()}" không có trong file
-            </span>
-          )}
+      </div>
+
+      {/* V-INV picker */}
+      <div style={{ marginBottom: '1.25rem' }}>
+        <div style={{
+          fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em',
+          textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.5rem',
+        }}>
+          Chọn mã V-INV cần import
         </div>
+
+        {parsed.vinvOptions.length === 0 ? (
+          <div style={{
+            padding: '1rem', color: 'var(--text-muted)', fontSize: 'var(--text-sm)',
+            background: 'var(--bg-surface)', border: '1px solid var(--border-base)',
+          }}>
+            Không có dòng CH="US" và HIỆN TRẠNG="Đã ship" trong sheet <strong>{activeSheet}</strong>.
+          </div>
+        ) : (
+          <>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+              {parsed.vinvOptions.map(opt => {
+                const isActive   = selected === opt.code
+                const matchCount = filterByTemplate(parsed.rowsByVinv[opt.code] ?? []).length
+                const hasMatch   = matchCount > 0
+                return (
+                  <button key={opt.code}
+                    onClick={() => {
+                      if (!hasMatch) return
+                      setStage({ ...readyStage, selected: isActive ? null : opt.code })
+                      setManualCode('')
+                    }}
+                    style={{
+                      padding: '6px 14px',
+                      border: `1.5px solid ${isActive ? 'var(--text-primary)' : hasMatch ? 'var(--border-base)' : 'var(--border-light)'}`,
+                      background: isActive ? 'var(--text-primary)' : 'var(--bg-surface)',
+                      color: isActive ? 'var(--text-inverse)' : hasMatch ? 'var(--text-primary)' : 'var(--text-muted)',
+                      cursor: hasMatch ? 'pointer' : 'default',
+                      fontFamily: 'var(--font-mono)', fontWeight: 700,
+                      fontSize: 'var(--text-sm)', borderRadius: 2, transition: 'all 0.1s',
+                      opacity: hasMatch ? 1 : 0.45,
+                    }}>
+                    {opt.code}
+                    <span style={{ marginLeft: 6, fontSize: 'var(--text-xs)', fontWeight: 400, opacity: 0.8 }}>
+                      {hasMatch ? `(${matchCount} SP)` : `(0/${opt.count})`}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Hoặc nhập thủ công:</span>
+              <input
+                value={manualCode}
+                onChange={e => {
+                  setManualCode(e.target.value.toUpperCase())
+                  setStage({ ...readyStage, selected: null })
+                }}
+                placeholder="P60501"
+                style={{
+                  border: '1px solid var(--border-base)', background: 'var(--bg-surface)',
+                  padding: '5px 10px', fontFamily: 'var(--font-mono)', fontWeight: 600,
+                  fontSize: 'var(--text-sm)', width: 140, outline: 'none', color: 'var(--text-primary)',
+                }}
+              />
+              {manualCode.trim() && !parsed.rowsByVinv[manualCode.trim()] && (
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }}>
+                  Mã "{manualCode.trim()}" không có trong file
+                </span>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Preview */}
       {activeCode && activeRows.length > 0 && (
         <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem',
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem',
             padding: '0.5rem 0.75rem', background: 'var(--bg-base)', border: '1px solid var(--border-light)',
-            flexWrap: 'wrap' }}>
+            flexWrap: 'wrap',
+          }}>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
               Lọc theo template <strong>{template}</strong>:
             </span>
             {allowedChannels.map(ch => (
-              <span key={ch} style={{ fontSize: 'var(--text-xs)', fontWeight: 700,
+              <span key={ch} style={{
+                fontSize: 'var(--text-xs)', fontWeight: 700,
                 color: TEMPLATE_COLOR[ch] ?? 'var(--text-secondary)',
-                background: `${TEMPLATE_COLOR[ch] ?? '#888'}18`, padding: '2px 7px', borderRadius: 2 }}>
+                background: `${TEMPLATE_COLOR[ch] ?? '#888'}18`,
+                padding: '2px 7px', borderRadius: 2,
+              }}>
                 {ch}
               </span>
             ))}
@@ -504,13 +636,25 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
           <PreviewTable rows={activeRows} />
 
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
-            <button onClick={() => handleImport(activeRows)}
-              style={{ padding: '0.6rem 1.75rem', background: 'var(--text-primary)', color: 'var(--bg-base)', border: 'none', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.05em' }}>
+            <button
+              onClick={() => handleImport(activeRows, readyStage)}
+              disabled={locked}
+              style={{
+                padding: '0.6rem 1.75rem', background: 'var(--text-primary)', color: 'var(--bg-base)',
+                border: 'none', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)',
+                fontWeight: 600, cursor: locked ? 'not-allowed' : 'pointer',
+                letterSpacing: '0.05em', opacity: locked ? 0.5 : 1,
+              }}>
               <i className="fa-solid fa-file-import" style={{ marginRight: 7 }} />
               Import {activeRows.length} sản phẩm
             </button>
-            <button onClick={() => { setStage({ ...stage, selected: null }); setManualCode('') }}
-              style={{ padding: '0.6rem 1.25rem', border: '1px solid var(--border-base)', background: 'transparent', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+            <button
+              onClick={() => { setStage({ ...readyStage, selected: null }); setManualCode('') }}
+              style={{
+                padding: '0.6rem 1.25rem', border: '1px solid var(--border-base)',
+                background: 'transparent', color: 'var(--text-secondary)',
+                fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', cursor: 'pointer',
+              }}>
               Bỏ chọn
             </button>
           </div>
@@ -532,13 +676,19 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
       )}
 
       {activeCode && allActiveRows.length === 0 && (
-        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-base)', fontSize: 'var(--text-sm)' }}>
-          Mã "{activeCode}" không có dòng "Đã ship" trong file.
+        <div style={{
+          padding: '2rem', textAlign: 'center', color: 'var(--text-muted)',
+          border: '1px dashed var(--border-base)', fontSize: 'var(--text-sm)',
+        }}>
+          Mã "{activeCode}" không có dòng "Đã ship" trong sheet {activeSheet}.
         </div>
       )}
 
-      {!activeCode && (
-        <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-base)', fontSize: 'var(--text-sm)' }}>
+      {!activeCode && parsed.vinvOptions.length > 0 && (
+        <div style={{
+          padding: '2rem', textAlign: 'center', color: 'var(--text-muted)',
+          border: '1px dashed var(--border-base)', fontSize: 'var(--text-sm)',
+        }}>
           Chọn mã V-INV ở trên để xem danh sách sản phẩm
         </div>
       )}
