@@ -1,15 +1,18 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { toast } from '@/components/ui/Toast'
 import { DropZone } from '@/components/import/DropZone'
+import { useUser } from '@/contexts/UserContext'
 import type { ImportRow } from '@/types'
 
 // ── Column indices in SPHT file ────────────────────────────────────────────
 // [3]  SKU         [4]  SO        [5]  MO
 // [6]  Description [7]  Loại vàng [8]  Qty  [9] Weight(gr)
 // [15] Tên khách   [16] Hiện trạng (filter = "Đã ship")  [17] V-INV code
+
+const SPHT_URL_KEY = 'spht_sheet_url'
 
 // ── Template → allowed TÊN KHÁCH channels ─────────────────────────────────
 export const TEMPLATE_CHANNELS: Record<string, string[]> = {
@@ -18,7 +21,7 @@ export const TEMPLATE_CHANNELS: Record<string, string[]> = {
   ADM:      ['ADM', 'ADM1', 'ADM2'],
   CH1_AG3:  ['CH1-AG3', 'CH2-AG3', 'CH3-AG3'],
   VNSI_AG3: ['KENH-SI', 'KÊNH SỈ', 'Kênh sỉ', 'Kênh Sỉ'],
-  MANUAL:   [],   // no filter
+  MANUAL:   [],
 }
 
 function channelsForTemplate(template: string): string[] {
@@ -27,24 +30,24 @@ function channelsForTemplate(template: string): string[] {
 
 function rowMatchesTemplate(tenKhach: string, template: string): boolean {
   const allowed = channelsForTemplate(template)
-  if (allowed.length === 0) return true   // MANUAL — accept all
+  if (allowed.length === 0) return true
   return allowed.some(ch => tenKhach.trim().toLowerCase() === ch.toLowerCase())
 }
 
 interface VinvOption {
   code:     string
   count:    number
-  channels: string[]   // distinct TÊN KHÁCH values
+  channels: string[]
 }
 
 interface ParsedSPHT {
-  filename:     string
+  sourceName:   string
   sheetName:    string
   vinvOptions:  VinvOption[]
   rowsByVinv:   Record<string, ImportRow[]>
 }
 
-// ── Parser ─────────────────────────────────────────────────────────────────
+// ── Parser (from ArrayBuffer) ──────────────────────────────────────────────
 
 function findHeaderRowIndex(rows: any[][]): number {
   for (let i = 0; i < Math.min(20, rows.length); i++) {
@@ -53,73 +56,57 @@ function findHeaderRowIndex(rows: any[][]): number {
   return 0
 }
 
-function parseSPHT(file: File): Promise<ParsedSPHT> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = reject
-    reader.onload = e => {
-      try {
-        const data     = new Uint8Array(e.target!.result as ArrayBuffer)
-        const wb       = XLSX.read(data, { type: 'array' })
+function parseSPHTBuffer(buf: ArrayBuffer, sourceName: string): ParsedSPHT {
+  const wb = XLSX.read(new Uint8Array(buf), { type: 'array' })
 
-        // Prefer sheet whose name starts with "HT", else first sheet
-        const sheetName = wb.SheetNames.find(n => /^HT/i.test(n)) ?? wb.SheetNames[0]
-        const sheet     = wb.Sheets[sheetName]
-        const all: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
+  const sheetName = wb.SheetNames.find(n => /^HT/i.test(n)) ?? wb.SheetNames[0]
+  const sheet     = wb.Sheets[sheetName]
+  const all: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
 
-        const headerIdx  = findHeaderRowIndex(all)
-        const dataRows   = all.slice(headerIdx + 1)
+  const headerIdx  = findHeaderRowIndex(all)
+  const dataRows   = all.slice(headerIdx + 1)
+  const rowsByVinv: Record<string, ImportRow[]> = {}
 
-        const rowsByVinv: Record<string, ImportRow[]> = {}
+  dataRows.forEach((row, i) => {
+    const hientrang = String(row[16] ?? '').trim()
+    const vinv      = String(row[17] ?? '').trim()
+    if (!vinv || hientrang !== 'Đã ship') return
 
-        dataRows.forEach((row, i) => {
-          const hientrang = String(row[16] ?? '').trim()
-          const vinv      = String(row[17] ?? '').trim()
-          if (!vinv || hientrang !== 'Đã ship') return
+    const skuRaw = String(row[3] ?? '').trim()
+    const soRaw  = String(row[4] ?? '').trim()
+    const moRaw  = String(row[5] ?? '').trim()
+    const soMo   = soRaw && moRaw ? `SO${soRaw}-MO${moRaw}` : soRaw ? `SO${soRaw}` : ''
+    const qty    = parseInt(String(row[8])) || 1
+    const wt     = parseFloat(String(row[9])) || 0
 
-          const skuRaw = String(row[3] ?? '').trim()
-          const soRaw  = String(row[4] ?? '').trim()
-          const moRaw  = String(row[5] ?? '').trim()
-          const soMo   = soRaw && moRaw ? `SO${soRaw}-MO${moRaw}` : soRaw ? `SO${soRaw}` : ''
-
-          const qty    = parseInt(String(row[8])) || 1
-          const wt     = parseFloat(String(row[9])) || 0
-
-          const importRow: ImportRow = {
-            rowNum:      headerIdx + 1 + i + 2,   // 1-based Excel row
-            store:       '',
-            location:    '',
-            sku:         skuRaw ? String(Number(skuRaw) || skuRaw).toUpperCase() : `SKU-${i + 1}`,
-            soMo,
-            description: String(row[6] ?? '').trim(),
-            qty,
-            weightTotal: wt,
-            loaiVang:    String(row[7] ?? '').trim().toUpperCase(),
-            class:       String(row[10] ?? '').trim(),
-            subClass:    String(row[11] ?? '').trim(),
-            niniAdm:     String(row[15] ?? '').trim(),  // TÊN KHÁCH → ghi chú
-          }
-
-          if (!rowsByVinv[vinv]) rowsByVinv[vinv] = []
-          rowsByVinv[vinv].push(importRow)
-        })
-
-        // Build vinvOptions summary
-        const vinvOptions: VinvOption[] = Object.entries(rowsByVinv)
-          .map(([code, rows]) => ({
-            code,
-            count:    rows.length,
-            channels: Array.from(new Set(rows.map(r => r.niniAdm).filter(Boolean))),
-          }))
-          .sort((a, b) => a.code.localeCompare(b.code))
-
-        resolve({ filename: file.name, sheetName, vinvOptions, rowsByVinv })
-      } catch (err) {
-        reject(err)
-      }
+    const importRow: ImportRow = {
+      rowNum:      headerIdx + 1 + i + 2,
+      store:       '',
+      location:    '',
+      sku:         skuRaw ? String(Number(skuRaw) || skuRaw).toUpperCase() : `SKU-${i + 1}`,
+      soMo,
+      description: String(row[6] ?? '').trim(),
+      qty,
+      weightTotal: wt,
+      loaiVang:    String(row[7] ?? '').trim().toUpperCase(),
+      class:       String(row[10] ?? '').trim(),
+      subClass:    String(row[11] ?? '').trim(),
+      niniAdm:     String(row[15] ?? '').trim(),
     }
-    reader.readAsArrayBuffer(file)
+
+    if (!rowsByVinv[vinv]) rowsByVinv[vinv] = []
+    rowsByVinv[vinv].push(importRow)
   })
+
+  const vinvOptions: VinvOption[] = Object.entries(rowsByVinv)
+    .map(([code, rows]) => ({
+      code,
+      count:    rows.length,
+      channels: Array.from(new Set(rows.map(r => r.niniAdm).filter(Boolean))),
+    }))
+    .sort((a, b) => a.code.localeCompare(b.code))
+
+  return { sourceName, sheetName, vinvOptions, rowsByVinv }
 }
 
 // ── Preview table ──────────────────────────────────────────────────────────
@@ -192,36 +179,87 @@ interface Props {
 
 type Stage =
   | { s: 'idle' }
-  | { s: 'parsing' }
-  | { s: 'ready';   parsed: ParsedSPHT; selected: string | null }
+  | { s: 'fetching' }
+  | { s: 'ready';    parsed: ParsedSPHT; selected: string | null }
   | { s: 'importing' }
 
 export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
-  const [stage,   setStage]   = useState<Stage>({ s: 'idle' })
+  const { canDo } = useUser()
+  const canManage = canDo('manage_rates')
+
+  const [stage,      setStage]      = useState<Stage>({ s: 'idle' })
   const [manualCode, setManualCode] = useState('')
 
-  async function handleFile(file: File) {
-    setStage({ s: 'parsing' })
+  // Saved URL state
+  const [savedUrl,  setSavedUrl]  = useState<string | null>(null)
+  const [urlInput,  setUrlInput]  = useState('')
+  const [editUrl,   setEditUrl]   = useState(false)
+  const [urlSaving, setUrlSaving] = useState(false)
+  const editInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    fetch(`/api/settings?key=${SPHT_URL_KEY}`)
+      .then(r => r.json())
+      .then(j => { if (j.success && j.value) { setSavedUrl(j.value); setUrlInput(j.value) } })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (editUrl) setTimeout(() => editInputRef.current?.focus(), 50)
+  }, [editUrl])
+
+  async function saveUrl(url: string) {
+    setUrlSaving(true)
+    await fetch('/api/settings', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: SPHT_URL_KEY, value: url }),
+    })
+    setSavedUrl(url)
+    setUrlSaving(false)
+    setEditUrl(false)
+  }
+
+  async function loadFromBuffer(buf: ArrayBuffer, sourceName: string) {
     try {
-      const parsed = await parseSPHT(file)
+      const parsed = parseSPHTBuffer(buf, sourceName)
       if (parsed.vinvOptions.length === 0) {
-        toast('Không tìm thấy dòng nào có HIỆN TRẠNG = "Đã ship" trong file.', 'warn', 5000)
+        toast('Không tìm thấy dòng nào có HIỆN TRẠNG = "Đã ship".', 'warn', 5000)
         setStage({ s: 'idle' }); return
       }
       setStage({ s: 'ready', parsed, selected: null })
     } catch (err) {
-      toast(`Lỗi đọc file: ${String(err)}`, 'error', 5000)
+      toast(`Lỗi đọc dữ liệu: ${String(err)}`, 'error', 5000)
       setStage({ s: 'idle' })
     }
+  }
+
+  async function handleFetchUrl(url: string) {
+    if (!url.trim()) return
+    setStage({ s: 'fetching' })
+    try {
+      const res = await fetch(`/api/proxy/sheets?url=${encodeURIComponent(url.trim())}`)
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j.error ?? `HTTP ${res.status}`)
+      }
+      await loadFromBuffer(await res.arrayBuffer(), 'Google Sheet')
+    } catch (err) {
+      toast(String(err), 'error', 6000)
+      setStage({ s: 'idle' })
+    }
+  }
+
+  async function handleFile(file: File) {
+    setStage({ s: 'fetching' })
+    await loadFromBuffer(await file.arrayBuffer(), file.name)
   }
 
   async function handleImport(rows: ImportRow[]) {
     setStage({ s: 'importing' })
     try {
       const res  = await fetch('/api/import', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ invoiceId, rows }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ invoiceId, rows }),
       })
       const json = await res.json()
       if (!json.success) throw new Error(json.message || 'Import failed')
@@ -229,30 +267,23 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
       onDone(rows.length)
     } catch (err) {
       toast(String(err), 'error', 5000)
-      // restore previous stage so user can try again
-      setStage(prev => prev.s === 'importing' ? { s: 'idle' } : prev)
+      setStage({ s: 'idle' })
     }
   }
 
-  // ── Idle ──
-  if (stage.s === 'idle') {
-    return (
-      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-base)', padding: '2rem' }}>
-        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', marginBottom: '1rem', lineHeight: 1.6 }}>
-          Upload file <strong>SPHT NHẬP KHO TỔNG</strong> — hệ thống sẽ tự lọc các dòng <strong>Đã ship</strong>
-          và cho bạn chọn mã <strong>V-INV</strong> (P60501, P60503...) để import vào invoice này.
-        </div>
-        <DropZone onFile={handleFile} disabled={locked} />
-      </div>
-    )
+  function shortUrl(url: string) {
+    try {
+      const m = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9_-]{6,10})/)
+      return m ? `docs.google.com/…/${m[1]}…` : url.slice(0, 44) + '…'
+    } catch { return url.slice(0, 44) + '…' }
   }
 
-  // ── Parsing ──
-  if (stage.s === 'parsing') {
+  // ── Fetching ──
+  if (stage.s === 'fetching') {
     return (
       <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
         <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 24, display: 'block', marginBottom: '1rem' }} />
-        Đang đọc file...
+        Đang tải dữ liệu...
       </div>
     )
   }
@@ -267,36 +298,133 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
     )
   }
 
-  // ── Ready: show V-INV picker + preview ──
+  // ── Idle ──
+  if (stage.s === 'idle') {
+    return (
+      <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-base)', padding: '1.5rem 2rem' }}>
+
+        {/* Google Sheet section */}
+        <div style={{ marginBottom: '1.25rem' }}>
+          <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.6rem' }}>
+            <i className="fa-brands fa-google-drive" style={{ marginRight: 6, color: '#34A853' }} />
+            Google Sheet SPHT Nhập Kho
+          </div>
+
+          {editUrl || !savedUrl ? (
+            /* URL input */
+            <div style={{ display: 'flex', gap: 6 }}>
+              <input
+                ref={editInputRef}
+                value={urlInput}
+                onChange={e => setUrlInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' && urlInput.trim()) {
+                    saveUrl(urlInput).then(() => handleFetchUrl(urlInput))
+                  }
+                  if (e.key === 'Escape') setEditUrl(false)
+                }}
+                placeholder="https://docs.google.com/spreadsheets/d/…"
+                style={{
+                  flex: 1, border: '1px solid var(--border-base)', background: 'var(--bg-base)',
+                  padding: '6px 10px', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)',
+                  color: 'var(--text-primary)', outline: 'none',
+                }}
+              />
+              <button
+                onClick={async () => {
+                  if (!urlInput.trim()) return
+                  await saveUrl(urlInput)
+                  handleFetchUrl(urlInput)
+                }}
+                disabled={urlSaving || !urlInput.trim() || locked}
+                style={{
+                  padding: '6px 18px', background: 'var(--text-primary)', color: 'var(--text-inverse)',
+                  border: 'none', cursor: urlSaving || !urlInput.trim() || locked ? 'not-allowed' : 'pointer',
+                  opacity: urlSaving || !urlInput.trim() || locked ? 0.6 : 1,
+                  fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600, whiteSpace: 'nowrap',
+                }}>
+                {urlSaving ? <i className="fa-solid fa-circle-notch fa-spin" /> : 'Lưu & Tải'}
+              </button>
+              {savedUrl && editUrl && (
+                <button onClick={() => setEditUrl(false)}
+                  style={{ padding: '6px 10px', border: '1px solid var(--border-base)', background: 'transparent', cursor: 'pointer', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)' }}>
+                  Hủy
+                </button>
+              )}
+            </div>
+          ) : (
+            /* Saved URL display + action buttons */
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '0.6rem 0.75rem', background: 'var(--bg-base)', border: '1px solid var(--border-base)' }}>
+              <i className="fa-solid fa-circle-check" style={{ color: '#34A853', fontSize: 12, flexShrink: 0 }} />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {shortUrl(savedUrl)}
+              </span>
+              {canManage && (
+                <button onClick={() => setEditUrl(true)}
+                  title="Đổi link"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12, padding: 2, flexShrink: 0 }}>
+                  <i className="fa-solid fa-pen" />
+                </button>
+              )}
+              <button
+                onClick={() => handleFetchUrl(savedUrl)}
+                disabled={locked}
+                style={{
+                  padding: '5px 18px', background: 'var(--text-primary)', color: 'var(--text-inverse)',
+                  border: 'none', cursor: locked ? 'not-allowed' : 'pointer', opacity: locked ? 0.6 : 1,
+                  fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600,
+                  flexShrink: 0, whiteSpace: 'nowrap',
+                }}>
+                <i className="fa-solid fa-rotate-right" style={{ marginRight: 6 }} />Tải dữ liệu
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem' }}>
+          <div style={{ flex: 1, borderTop: '1px solid var(--border-light)' }} />
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>hoặc upload file</span>
+          <div style={{ flex: 1, borderTop: '1px solid var(--border-light)' }} />
+        </div>
+
+        {/* File upload fallback */}
+        <DropZone onFile={handleFile} disabled={locked} />
+      </div>
+    )
+  }
+
+  // ── Ready: V-INV picker + preview ──
   const { parsed, selected } = stage
   const allowedChannels = channelsForTemplate(template)
 
   function filterByTemplate(rows: ImportRow[]) {
-    if (allowedChannels.length === 0) return rows   // MANUAL — no filter
+    if (allowedChannels.length === 0) return rows
     return rows.filter(r => rowMatchesTemplate(r.niniAdm, template))
   }
 
-  const allForSelected   = selected ? (parsed.rowsByVinv[selected] ?? []) : []
-  const allForManual     = manualCode.trim() ? (parsed.rowsByVinv[manualCode.trim()] ?? []) : []
-  const activeCode       = selected ?? (manualCode.trim() || null)
-  const allActiveRows    = selected ? allForSelected : allForManual
-  const activeRows       = filterByTemplate(allActiveRows)
-  const skippedRows      = allActiveRows.filter(r => !rowMatchesTemplate(r.niniAdm, template))
+  const allForSelected = selected ? (parsed.rowsByVinv[selected] ?? []) : []
+  const allForManual   = manualCode.trim() ? (parsed.rowsByVinv[manualCode.trim()] ?? []) : []
+  const activeCode     = selected ?? (manualCode.trim() || null)
+  const allActiveRows  = selected ? allForSelected : allForManual
+  const activeRows     = filterByTemplate(allActiveRows)
+  const skippedRows    = allActiveRows.filter(r => !rowMatchesTemplate(r.niniAdm, template))
 
   return (
     <div>
-      {/* File info */}
+      {/* Source info */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.25rem', padding: '0.75rem 1rem', background: 'var(--bg-surface)', border: '1px solid var(--border-base)' }}>
-        <i className="fa-solid fa-file-excel" style={{ color: '#16a34a', fontSize: 18 }} />
+        <i className={parsed.sourceName === 'Google Sheet' ? 'fa-brands fa-google-drive' : 'fa-solid fa-file-excel'}
+          style={{ color: parsed.sourceName === 'Google Sheet' ? '#34A853' : '#16a34a', fontSize: 18 }} />
         <div>
-          <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>{parsed.filename}</div>
+          <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>{parsed.sourceName}</div>
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
             Sheet: <strong>{parsed.sheetName}</strong> — {parsed.vinvOptions.length} mã V-INV có hàng "Đã ship"
           </div>
         </div>
         <button onClick={() => { setStage({ s: 'idle' }); setManualCode('') }}
           style={{ marginLeft: 'auto', background: 'none', border: '1px solid var(--border-base)', padding: '4px 12px', cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)' }}>
-          <i className="fa-solid fa-arrows-rotate" style={{ marginRight: 5 }} />Đổi file
+          <i className="fa-solid fa-arrows-rotate" style={{ marginRight: 5 }} />Đổi nguồn
         </button>
       </div>
 
@@ -307,12 +435,11 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
           {parsed.vinvOptions.map(opt => {
-            const isActive    = selected === opt.code
-            const matchCount  = filterByTemplate(parsed.rowsByVinv[opt.code] ?? []).length
-            const hasMatch    = matchCount > 0
+            const isActive   = selected === opt.code
+            const matchCount = filterByTemplate(parsed.rowsByVinv[opt.code] ?? []).length
+            const hasMatch   = matchCount > 0
             return (
-              <button
-                key={opt.code}
+              <button key={opt.code}
                 onClick={() => { setStage({ ...stage, selected: isActive ? null : opt.code }); setManualCode('') }}
                 style={{
                   padding: '6px 14px',
@@ -323,8 +450,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
                   fontFamily: 'var(--font-mono)', fontWeight: 700,
                   fontSize: 'var(--text-sm)', borderRadius: 2, transition: 'all 0.1s',
                   opacity: hasMatch ? 1 : 0.45,
-                }}
-              >
+                }}>
                 {opt.code}
                 <span style={{ marginLeft: 6, fontSize: 'var(--text-xs)', fontWeight: 400, opacity: 0.8 }}>
                   {hasMatch ? `(${matchCount} SP)` : `(0/${opt.count})`}
@@ -352,7 +478,6 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
       {/* Preview */}
       {activeCode && activeRows.length > 0 && (
         <div>
-          {/* Filter info bar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem',
             padding: '0.5rem 0.75rem', background: 'var(--bg-base)', border: '1px solid var(--border-light)',
             flexWrap: 'wrap' }}>
@@ -362,8 +487,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
             {allowedChannels.map(ch => (
               <span key={ch} style={{ fontSize: 'var(--text-xs)', fontWeight: 700,
                 color: TEMPLATE_COLOR[ch] ?? 'var(--text-secondary)',
-                background: `${TEMPLATE_COLOR[ch] ?? '#888'}18`,
-                padding: '2px 7px', borderRadius: 2 }}>
+                background: `${TEMPLATE_COLOR[ch] ?? '#888'}18`, padding: '2px 7px', borderRadius: 2 }}>
                 {ch}
               </span>
             ))}
@@ -380,21 +504,13 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
           <PreviewTable rows={activeRows} />
 
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
-            <button
-              onClick={() => handleImport(activeRows)}
-              style={{
-                padding: '0.6rem 1.75rem', background: 'var(--text-primary)', color: 'var(--bg-base)',
-                border: 'none', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)',
-                fontWeight: 600, cursor: 'pointer', letterSpacing: '0.05em',
-              }}
-            >
+            <button onClick={() => handleImport(activeRows)}
+              style={{ padding: '0.6rem 1.75rem', background: 'var(--text-primary)', color: 'var(--bg-base)', border: 'none', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', letterSpacing: '0.05em' }}>
               <i className="fa-solid fa-file-import" style={{ marginRight: 7 }} />
               Import {activeRows.length} sản phẩm
             </button>
-            <button
-              onClick={() => { setStage({ ...stage, selected: null }); setManualCode('') }}
-              style={{ padding: '0.6rem 1.25rem', border: '1px solid var(--border-base)', background: 'transparent', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}
-            >
+            <button onClick={() => { setStage({ ...stage, selected: null }); setManualCode('') }}
+              style={{ padding: '0.6rem 1.25rem', border: '1px solid var(--border-base)', background: 'transparent', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
               Bỏ chọn
             </button>
           </div>
@@ -407,7 +523,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
             Không có sản phẩm nào khớp template <strong>{template}</strong>
           </div>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-            Mã <strong>{activeCode}</strong> có {allActiveRows.length} SP nhưng thuộc kênh:{' '}
+            Mã <strong>{activeCode}</strong> có {allActiveRows.length} SP thuộc kênh:{' '}
             {Array.from(new Set(allActiveRows.map(r => r.niniAdm).filter(Boolean))).join(', ')}.
             <br />
             Template <strong>{template}</strong> chỉ nhận kênh: {allowedChannels.join(', ') || '(tất cả)'}.
