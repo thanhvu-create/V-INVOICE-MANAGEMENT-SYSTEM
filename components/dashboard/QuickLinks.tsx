@@ -6,11 +6,11 @@ interface LinkDef {
 }
 
 const LINKS: LinkDef[] = [
-  { href: '/invoices/new',        label: 'New Invoice',   icon: 'fa-file-plus', roles: ['admin', 'manager', 'user'] },
-  { href: '/invoices',            label: 'All Invoices',  icon: 'fa-list',      roles: ['admin', 'manager', 'user', 'viewer'] },
-  { href: '/admin/metal-rates',   label: 'Metal Rates',   icon: 'fa-coins',     roles: ['admin', 'manager'] },
-  { href: '/admin/products',      label: 'Products',      icon: 'fa-gem',       roles: ['admin'] },
-  { href: '/admin/users',         label: 'Users',         icon: 'fa-users',     roles: ['admin'] },
+  { href: '/invoices/new',      label: 'New Invoice',  icon: 'fa-file-plus', roles: ['admin', 'manager', 'user']           },
+  { href: '/invoices',          label: 'All Invoices', icon: 'fa-list',      roles: ['admin', 'manager', 'user', 'viewer'] },
+  { href: '/admin/metal-rates', label: 'NVL Prices',   icon: 'fa-coins',     roles: ['admin', 'manager']                   },
+  { href: '/admin/gem-catalog', label: 'Gem Catalog',  icon: 'fa-gem',       roles: ['admin', 'manager']                   },
+  { href: '/admin/users',       label: 'Users',        icon: 'fa-users',     roles: ['admin']                              },
 ]
 
 export function QuickLinks({ role }: { role: string }) {

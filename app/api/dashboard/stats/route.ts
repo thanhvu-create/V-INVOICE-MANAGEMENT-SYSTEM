@@ -14,20 +14,22 @@ export async function GET() {
     if (error) throw error
 
     const stats = data as {
-      by_status:           Record<string, number>
-      total_items:         number
-      month_cif:           number
-      month_invoice_count: number
+      by_status:            Record<string, number>
+      by_template?:         Record<string, number>
+      total_items:          number
+      month_cif:            number
+      month_invoice_count:  number
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        by_status:   stats.by_status ?? {},
-        total_items: stats.total_items,
+        by_status:            stats.by_status ?? {},
+        by_template:          stats.by_template ?? {},
+        total_items:          stats.total_items ?? 0,
+        month_invoice_count:  stats.month_invoice_count ?? 0,
         ...(canSeePrice ? {
-          month_cif:           stats.month_cif,
-          month_invoice_count: stats.month_invoice_count,
+          month_cif: stats.month_cif ?? 0,
         } : {}),
       },
     })
