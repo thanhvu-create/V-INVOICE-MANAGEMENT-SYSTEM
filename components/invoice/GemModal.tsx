@@ -77,11 +77,22 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
     }
   }, [open, gem])
 
-  // Auto-map size_raw → size_xoan_range + don_gia when both ma_xoan and size_raw are filled
+  // Extract trailing size from gem code: "L-RD409-2.1" → "2.1", "BG-L14-0.05" → "0.05"
+  function extractSizeFromCode(maXoan: string): string {
+    const last = maXoan.split('-').pop() ?? ''
+    return /^\d/.test(last) || last.includes('*') ? last : ''
+  }
+
+  // Auto-map to size_xoan_range + don_gia.
+  // Size source priority: size_raw field (manual) → embedded in ma_xoan code
+  // Only overwrites size_xoan_range when: size_raw is filled, OR size_xoan_range is currently empty
   useEffect(() => {
-    if (!form.ma_xoan || !form.size_raw || !nvlHotList.length) return
-    const tbVien = parseFloat(form.size_raw) || 0
-    const range  = mapSizeToRange(form.ma_xoan, form.size_raw, tbVien)
+    if (!form.ma_xoan || !nvlHotList.length) return
+    if (form.size_xoan_range && !form.size_raw) return  // existing range, user not overriding → skip
+    const sizeToUse = form.size_raw || extractSizeFromCode(form.ma_xoan)
+    if (!sizeToUse) return
+    const tbVien = parseFloat(sizeToUse) || 0
+    const range  = mapSizeToRange(form.ma_xoan, sizeToUse, tbVien)
     if (!range) return
     const found  = nvlHotList.find(r => r.size_range === range)
     if (!found) return

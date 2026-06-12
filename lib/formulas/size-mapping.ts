@@ -105,8 +105,8 @@ export function mapSizeToRange(maXoan: string, rawSize: string, tbVien: number):
   if (!maXoan) return null
   const u = maXoan.toUpperCase()
 
-  // RD-LG must be checked before plain RD (both start with "RD")
-  if (u.startsWith('RD-LG') || u.startsWith('RDL')) {
+  // Lab-Grown RD: "RD-LG...", "RDL...", "L-RD..." — check before plain "RD"
+  if (u.startsWith('RD-LG') || u.startsWith('RDL') || u.startsWith('L-RD')) {
     const mm = parseFloat(rawSize)
     return isNaN(mm) ? null : lookup(mm, RDL_RANGES)
   }
