@@ -88,19 +88,21 @@ function extractDriveFileId(url: string | null | undefined): string | null {
   return null
 }
 
-// Fetch Google CDN thumbnail URL for a Drive file (publicly accessible, no auth needed to view)
-async function fetchThumbnailUrl(accessToken: string, fileId: string): Promise<string | null> {
+// Grant "anyone with link = reader" permission on the Drive file so =IMAGE() in Sheets can load it.
+// =IMAGE() is evaluated by Google's servers (no user OAuth) — file must be publicly readable.
+// Product images in invoices are appropriate to share publicly (clients/suppliers need to see them in the sheet).
+async function makePublicAndGetUrl(accessToken: string, fileId: string): Promise<string | null> {
   try {
     const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=thumbnailLink`,
-      { headers: { Authorization: `Bearer ${accessToken}` } },
+      `https://www.googleapis.com/drive/v3/files/${fileId}/permissions`,
+      {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: 'reader', type: 'anyone' }),
+      },
     )
     if (!res.ok) return null
-    const data = await res.json()
-    const thumb = data.thumbnailLink as string | undefined
-    if (!thumb) return null
-    // Increase thumbnail size from default (s220) to s500
-    return thumb.replace(/=s\d+$/, '=s500')
+    return `https://drive.google.com/uc?export=view&id=${fileId}`
   } catch {
     return null
   }
@@ -490,15 +492,14 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     if (!invoice) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
 
-    // Replace each item's image_url with a Google CDN thumbnail URL (publicly accessible, works in =IMAGE() formula).
-    // Drive files are private by default — =IMAGE() cannot load them without auth.
-    // thumbnailLink from Drive API is a time-limited CDN URL that Google Sheets can fetch without credentials.
+    // Grant public read access to Drive image files so =IMAGE() formula works in Sheets.
+    // =IMAGE() is evaluated by Google's servers without user OAuth — files must be publicly readable.
     const processedItems = await Promise.all(
       (items ?? []).map(async (item) => {
         const fileId = extractDriveFileId(item.image_url)
         if (!fileId) return item
-        const thumbUrl = await fetchThumbnailUrl(accessToken, fileId)
-        return { ...item, image_url: thumbUrl ?? null }
+        const publicUrl = await makePublicAndGetUrl(accessToken, fileId)
+        return { ...item, image_url: publicUrl ?? null }
       }),
     )
 
