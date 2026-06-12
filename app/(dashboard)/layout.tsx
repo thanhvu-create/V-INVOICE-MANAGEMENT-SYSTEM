@@ -6,14 +6,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <UserProvider>
       <TopNav />
-      <main
-        className="page-enter"
-        style={{
-          maxWidth: '1400px',
-          margin:   '0 auto',
-          padding:  '2rem',
-        }}
-      >
+      <main className="main-content page-enter">
         {children}
       </main>
       <ToastProvider />

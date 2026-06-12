@@ -330,9 +330,23 @@ a { transition: color 0.15s ease-out; }
 }
 .no-print {}
 
+/* ── Main content responsive padding ────────────────────────────────────── */
+.main-content {
+  max-width: 1400px;
+  margin:    0 auto;
+  padding:   2rem;
+}
+@media (max-width: 767px) {
+  .main-content { padding: 1rem; }
+}
+@media (max-width: 479px) {
+  .main-content { padding: 0.75rem 0.65rem; }
+}
+
 /* ── TopNav responsive ──────────────────────────────────────────────────── */
-.topnav-hamburger { display: none; }
-.topnav-row2      { display: flex; }
+.topnav-hamburger      { display: none; }
+.topnav-row2           { display: flex; }
+.topnav-desktop-actions { display: flex; align-items: center; gap: 0.5rem; }
 
 @media (max-width: 767px) {
   .topnav-hamburger {
@@ -345,6 +359,9 @@ a { transition: color 0.15s ease-out; }
     font-size:   16px;
     cursor:      pointer;
   }
+  /* Hide desktop-only controls; sign out lives in mobile menu instead */
+  .topnav-desktop-actions { display: none; }
+
   .topnav-row2 {
     display:         none;
     position:        absolute;
@@ -358,9 +375,27 @@ a { transition: color 0.15s ease-out; }
     z-index:         200;
   }
   .topnav-row2.open { display: flex; animation: slideDownFade 0.18s ease-out both; }
-  .topnav-row2 a {
+  .topnav-row2 a, .topnav-row2 button.topnav-mobile-item {
+    display:       block;
+    width:         100%;
     padding:       14px 1.5rem !important;
     border-bottom: 1px solid var(--border-light) !important;
+    text-align:    left;
+    background:    transparent;
+    font-family:   var(--font-body);
+    font-size:     11px;
+    font-weight:   400;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color:         var(--text-muted);
+    cursor:        pointer;
+    border-left:   none;
+    border-right:  none;
+    border-top:    none;
+  }
+  .topnav-row2 button.topnav-mobile-item:hover {
+    background: var(--bg-hover);
+    color:      var(--text-primary);
   }
   .topnav-brand    { font-size: 15px !important; }
   .topnav-username { display: none; }

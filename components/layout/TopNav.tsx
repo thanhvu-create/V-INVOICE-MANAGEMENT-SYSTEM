@@ -80,10 +80,10 @@ export function TopNav() {
           V-Invoice
         </Link>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           {loaded && user.email && (
             <>
-              {/* Role eyebrow chip */}
+              {/* Role eyebrow chip — always visible */}
               <span style={{
                 fontFamily:     'var(--font-body)',
                 fontSize:       '10px',
@@ -95,7 +95,7 @@ export function TopNav() {
                 {ROLE_LABEL[user.role]}
               </span>
 
-              {/* Full name */}
+              {/* Full name — hidden on mobile via .topnav-username */}
               <span
                 className="topnav-username"
                 style={{
@@ -107,71 +107,74 @@ export function TopNav() {
                 {user.fullName}
               </span>
 
-              {/* Google Drive auth */}
-              <DriveAuthButton />
+              {/* Desktop-only controls: Drive + Help + Logout — hidden on mobile */}
+              <div className="topnav-desktop-actions">
+                {/* Google Drive auth */}
+                <DriveAuthButton />
 
-              {/* Help */}
-              <button
-                onClick={() => setShowHelp(true)}
-                title="Hướng dẫn sử dụng"
-                style={{
-                  padding:      '4px 10px',
-                  border:       '1px solid var(--border-base)',
-                  background:   'transparent',
-                  color:        'var(--text-muted)',
-                  fontFamily:   'var(--font-body)',
-                  fontSize:     '11px',
-                  letterSpacing:'0.08em',
-                  cursor:       'pointer',
-                  borderRadius: 0,
-                  transition:   'background 0.15s, color 0.15s',
-                  display:      'inline-flex',
-                  alignItems:   'center',
-                  gap:          5,
-                }}
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'var(--border-strong)'
-                  e.currentTarget.style.color      = 'var(--text-inverse)'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = 'transparent'
-                  e.currentTarget.style.color      = 'var(--text-muted)'
-                }}
-              >
-                <i className="fa-regular fa-circle-question" style={{ fontSize: 13 }} />
-                <span className="topnav-username">Hướng dẫn</span>
-              </button>
+                {/* Help */}
+                <button
+                  onClick={() => setShowHelp(true)}
+                  title="Hướng dẫn sử dụng"
+                  style={{
+                    padding:      '4px 10px',
+                    border:       '1px solid var(--border-base)',
+                    background:   'transparent',
+                    color:        'var(--text-muted)',
+                    fontFamily:   'var(--font-body)',
+                    fontSize:     '11px',
+                    letterSpacing:'0.08em',
+                    cursor:       'pointer',
+                    borderRadius: 0,
+                    transition:   'background 0.15s, color 0.15s',
+                    display:      'inline-flex',
+                    alignItems:   'center',
+                    gap:          5,
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.background = 'var(--border-strong)'
+                    e.currentTarget.style.color      = 'var(--text-inverse)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.background = 'transparent'
+                    e.currentTarget.style.color      = 'var(--text-muted)'
+                  }}
+                >
+                  <i className="fa-regular fa-circle-question" style={{ fontSize: 13 }} />
+                  <span className="topnav-username">Hướng dẫn</span>
+                </button>
 
-              {/* Logout */}
-              <button
-                onClick={handleLogout}
-                className="no-print"
-                style={{
-                  padding:        '4px 14px',
-                  border:         '1px solid var(--border-base)',
-                  background:     'transparent',
-                  color:          'var(--text-muted)',
-                  fontFamily:     'var(--font-body)',
-                  fontSize:       '11px',
-                  letterSpacing:  '0.08em',
-                  textTransform:  'uppercase',
-                  cursor:         'pointer',
-                  borderRadius:   0,
-                  transition:     'background 0.15s, color 0.15s',
-                }}
-                onMouseEnter={e => {
-                  const b = e.currentTarget
-                  b.style.background = 'var(--border-strong)'
-                  b.style.color      = 'var(--text-inverse)'
-                }}
-                onMouseLeave={e => {
-                  const b = e.currentTarget
-                  b.style.background = 'transparent'
-                  b.style.color      = 'var(--text-muted)'
-                }}
-              >
-                Sign Out
-              </button>
+                {/* Logout */}
+                <button
+                  onClick={handleLogout}
+                  className="no-print"
+                  style={{
+                    padding:        '4px 14px',
+                    border:         '1px solid var(--border-base)',
+                    background:     'transparent',
+                    color:          'var(--text-muted)',
+                    fontFamily:     'var(--font-body)',
+                    fontSize:       '11px',
+                    letterSpacing:  '0.08em',
+                    textTransform:  'uppercase',
+                    cursor:         'pointer',
+                    borderRadius:   0,
+                    transition:     'background 0.15s, color 0.15s',
+                  }}
+                  onMouseEnter={e => {
+                    const b = e.currentTarget
+                    b.style.background = 'var(--border-strong)'
+                    b.style.color      = 'var(--text-inverse)'
+                  }}
+                  onMouseLeave={e => {
+                    const b = e.currentTarget
+                    b.style.background = 'transparent'
+                    b.style.color      = 'var(--text-muted)'
+                  }}
+                >
+                  Sign Out
+                </button>
+              </div>
             </>
           )}
 
@@ -210,7 +213,6 @@ export function TopNav() {
                 textTransform:  'uppercase',
                 color:          isActive ? 'var(--text-primary)' : 'var(--text-muted)',
                 textDecoration: 'none',
-                /* Active = HP pink underline; inactive = transparent */
                 borderBottom:   isActive
                   ? '2px solid var(--color-accent)'
                   : '2px solid transparent',
@@ -228,6 +230,18 @@ export function TopNav() {
             </Link>
           )
         })}
+
+        {/* Sign Out — mobile only (desktop version is in .topnav-desktop-actions) */}
+        {loaded && user.email && (
+          <button
+            className="topnav-mobile-item"
+            onClick={handleLogout}
+            style={{ borderTop: '1px solid var(--border-base)' }}
+          >
+            <i className="fa-solid fa-right-from-bracket" style={{ marginRight: 8, fontSize: 11 }} />
+            Sign Out
+          </button>
+        )}
       </nav>
 
       {showHelp && <HelpModal onClose={() => setShowHelp(false)} />}
