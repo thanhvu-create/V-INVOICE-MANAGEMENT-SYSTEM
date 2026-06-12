@@ -344,9 +344,10 @@ a { transition: color 0.15s ease-out; }
 }
 
 /* ── TopNav responsive ──────────────────────────────────────────────────── */
-.topnav-hamburger      { display: none; }
-.topnav-row2           { display: flex; }
-.topnav-desktop-actions { display: flex; align-items: center; gap: 0.5rem; }
+.topnav-hamburger              { display: none; }
+.topnav-row2                   { display: flex; }
+.topnav-desktop-actions        { display: flex; align-items: center; gap: 0.5rem; }
+.topnav-row2 button.topnav-mobile-item { display: none; }
 
 @media (max-width: 767px) {
   .topnav-hamburger {
@@ -361,6 +362,8 @@ a { transition: color 0.15s ease-out; }
   }
   /* Hide desktop-only controls; sign out lives in mobile menu instead */
   .topnav-desktop-actions { display: none; }
+  /* Show mobile-only items in the dropdown */
+  .topnav-row2 button.topnav-mobile-item { display: block; }
 
   .topnav-row2 {
     display:         none;
