@@ -68,23 +68,47 @@ function n(v: unknown): number | string {
 }
 
 function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
+  const template   = (invoice.template_type ?? 'CH1') as string
+  const isCH2      = template === 'CH2'
+  const isADM      = template === 'ADM'
+  const isCH1_AG3  = template === 'CH1_AG3'
+  const isVNSI_AG3 = template === 'VNSI_AG3'
+  const isAG3      = isCH1_AG3 || isVNSI_AG3
+
+  // Which optional price columns appear per template:
+  // CH1:       Purchase, CIF, ERP BOM, Chênh lệch, Tag, FB
+  // CH2:       Purchase, Tag, FB  (no CIF, no ERP/Chênh)
+  // ADM:       Purchase, CIF  (no ERP/Chênh, no Tag/FB)
+  // CH1_AG3:   Purchase, CIF, Tag, FB  (no ERP/Chênh)
+  // VNSI_AG3:  Purchase, CIF, Tag, FB  (no ERP/Chênh)
+  const hasCIF  = !isCH2
+  const hasERP  = template === 'CH1'
+  const hasTagFB = !isADM
+
   const rows: (string | number)[][] = []
 
-  // Row 1 — title
-  rows.push([invoice.invoice_code ?? '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''])
+  // Row 1 — invoice title (span across all cols)
+  rows.push([invoice.invoice_code ?? ''])
 
-  // Row 2 — column headers
-  rows.push([
-    'No.', 'Store', 'Location in Store', 'Vendor model#', 'SO# & MO#',
-    'SKU# new', 'Class', 'Sub class', 'Description', 'Qt.(pcs)', 'Wt.(gr)',
-    ...(canSeePrice
-      ? ['HP for Purchase price', 'HP for CIF price', 'ERP for Bom cost ($)', 'Chênh lệch', 'HP for Tag price', 'HP for FB price']
-      : []),
-    'Ghi chú',
-  ])
+  // Row 2 — column headers (dynamic per template)
+  const header: string[] = [
+    'No.', 'Store', 'Location in Store', 'Vendor model#',
+    isAG3 ? 'PO#' : 'SO# & MO#',
+  ]
+  if (isCH1_AG3) { header.push('SKU# AG', 'SKU# new (USA)') }
+  else            { header.push('SKU# new') }
+  header.push('Class', 'Sub class', 'Description', 'Qt.(pcs)', 'Wt.(gr)')
+  if (canSeePrice) {
+    header.push('HP for Purchase price')
+    if (hasCIF)   header.push('HP for CIF price')
+    if (hasERP)   header.push('ERP for Bom cost ($)', 'Chênh lệch')
+    if (hasTagFB) header.push('HP for Tag price', 'HP for FB price')
+  }
+  header.push('Ghi chú')
+  rows.push(header)
 
-  // Row 3 — sub-header (template has a 2nd header row; keep blank here)
-  rows.push(Array(canSeePrice ? 18 : 12).fill(''))
+  // Row 3 — blank sub-header row
+  rows.push(Array(header.length).fill(''))
 
   // Data rows
   for (const item of items ?? []) {
@@ -94,30 +118,31 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
       ? ((purchase - erp) / purchase)
       : ''
 
-    rows.push([
+    const row: (string | number)[] = [
       n(item.seq),
-      item.store       ?? '',
-      item.location    ?? '',
+      item.store        ?? '',
+      item.location     ?? '',
       item.vendor_model ?? item.sku ?? '',
-      item.so_mo       ?? '',
-      item.sku         ?? '',
+      isAG3 ? (item.po_number ?? '') : (item.so_mo ?? ''),
+    ]
+    if (isCH1_AG3) { row.push(item.sku_ag ?? '', item.sku ?? '') }
+    else            { row.push(item.sku ?? '') }
+    row.push(
       item.class       ?? '',
       item.sub_class   ?? '',
       item.description ?? '',
       n(item.qt_pcs),
       n(item.wt_gr ?? item.t_pham_co_nvl_da),
-      ...(canSeePrice
-        ? [
-            typeof purchase === 'number' ? purchase : '',
-            n(item.cif_price),
-            typeof erp === 'number' ? erp : '',
-            typeof chenh === 'number' ? chenh : '',
-            n(item.tag_price),
-            n(item.fb_price),
-          ]
-        : []),
-      item.nini_adm ?? '',
-    ])
+    )
+    if (canSeePrice) {
+      row.push(typeof purchase === 'number' ? purchase : '')
+      if (hasCIF)   row.push(n(item.cif_price))
+      if (hasERP)   row.push(typeof erp === 'number' ? erp : '', typeof chenh === 'number' ? chenh : '')
+      if (hasTagFB) row.push(n(item.tag_price), n(item.fb_price))
+    }
+    row.push(item.nini_adm ?? '')
+
+    rows.push(row)
   }
 
   return rows
