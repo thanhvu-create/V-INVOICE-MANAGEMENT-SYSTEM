@@ -572,7 +572,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         summaryGrandTotalRowIdx = 3 + dataRowCount
         const gt = Array(_gtNCols).fill('')
         gt[0] = 'TỔNG'; gt[4] = sumF('qt_pcs'); gt[7] = sumF('tien_vang')
-        if (_isADMgt) { gt[22] = sumF('von_san_xuat'); gt[23] = sumF('cif_price') }
+        if (_isADMgt) { gt[22] = sumF('von_san_xuat'); gt[23] = sumF('von_san_xuat') * 1.10 }
         else          { gt[8] = sumF('t_pham_co_nvl_da'); gt[27] = sumF('von_san_xuat') }
         summaryRows.push(gt)
       }

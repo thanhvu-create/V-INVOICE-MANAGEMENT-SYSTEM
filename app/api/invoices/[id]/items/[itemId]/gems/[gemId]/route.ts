@@ -14,15 +14,15 @@ async function triggerRecalc(db: ReturnType<typeof createServiceClient>, itemId:
   ])
   if (item && invoice) {
     const gemList = diamonds ?? []
+    const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
     if (gemList.length) {
       await Promise.all(gemList.map(d =>
-        db.from('invoice_diamonds').update(recalcDiamond(d)).eq('id', d.id)
+        db.from('invoice_diamonds').update(recalcDiamond(d, template)).eq('id', d.id)
       ))
     }
-    const updatedGems = gemList.map(d => ({ ...d, ...recalcDiamond(d) }))
-    const nvl      = nvlFromInvoice(invoice)
-    const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
-    const updates  = recalcItem(item, updatedGems as any, nvl, template)
+    const updatedGems = gemList.map(d => ({ ...d, ...recalcDiamond(d, template) }))
+    const nvl     = nvlFromInvoice(invoice)
+    const updates = recalcItem(item, updatedGems as any, nvl, template)
     await db.from('invoice_products').update(updates).eq('id', itemId)
   }
 }
@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const body = await req.json()
     const db   = createServiceClient()
 
-    const { data: inv } = await db.from('invoices').select('status, created_by').eq('id', params.id).single()
+    const { data: inv } = await db.from('invoices').select('status, created_by, template_type').eq('id', params.id).single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
     const editError = checkEditPermission({
       isLocked:  inv.status === 'finalized',
@@ -44,6 +44,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       userId:    ctx.userId,
     })
     if (editError) return NextResponse.json({ success: false, message: editError }, { status: 403 })
+
+    const template = ((inv as any).template_type ?? 'CH1') as InvoiceTemplate
 
     const EDITABLE = [
       'ma_xoan', 'p_chat', 'size_xoan_range',
@@ -57,7 +59,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const { data: existing } = await db.from('invoice_diamonds').select('*').eq('id', params.gemId).single()
     if (existing) {
       const merged = { ...existing, ...updates }
-      const derived = recalcDiamond(merged as any)
+      const derived = recalcDiamond(merged as any, template)
       Object.assign(updates, derived)
     }
 

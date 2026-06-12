@@ -1,15 +1,29 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import { apiCall } from '@/lib/api'
+import { mapSizeToRange } from '@/lib/formulas/size-mapping'
 
 interface GemRow {
   ma_xoan:      string
   p_chat:       string
-  size_xoan:    string
+  size_xoan:    string   // raw size from tracking (col H): "2.1" or "2.3*2.3"
   sl_hot:       number
-  tl_sau_xu_ly: number
+  tl_sau_xu_ly: number   // TB viên ct/stone (col L)
+}
+
+interface NVLHotRow {
+  id:         string
+  stone_type: string
+  grade:      string
+  size_range: string
+  mk_price:   number
+}
+
+interface EnrichedRow extends GemRow {
+  mapped_range: string | null  // computed via mapSizeToRange
+  don_gia:      number         // looked up from NVL Hot catalog
 }
 
 interface Props {
@@ -55,13 +69,15 @@ function parseAndFilter(buf: ArrayBuffer, mo: string | null): GemRow[] {
     if (!rowMO) continue
     if (mo && rowMO !== mo) continue
     if (status !== 'xuất') continue
-    const ma_xoan = String(r[5] ?? '').trim()
+    // Col G (index 6) = Mã xoàn thuần; Col F (index 5) = combined "Mã xoàn + Size" (formula)
+    // Col L (index 11) = TB viên (average ct/stone); Col J (index 9) = Tổng TL (total ct)
+    const ma_xoan = String(r[6] ?? '').trim()
     out.push({
       ma_xoan,
       p_chat:       inferPChat(ma_xoan),
       size_xoan:    String(r[7]  ?? '').trim(),
       sl_hot:       Number(r[8]  ?? 0),
-      tl_sau_xu_ly: Number(r[9]  ?? 0),
+      tl_sau_xu_ly: Number(r[11] ?? 0),
     })
   }
   return out
@@ -75,7 +91,25 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
   const [fetchError, setFetchError] = useState('')
   const [addedIds,   setAddedIds]   = useState<Set<number>>(new Set())
   const [adding,     setAdding]     = useState(false)
+  const [nvlHotList, setNvlHotList] = useState<NVLHotRow[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
+
+  // Fetch NVL Hot catalog for price lookup
+  useEffect(() => {
+    fetch('/api/nvl-hot')
+      .then(r => r.json())
+      .then(j => { if (j.success) setNvlHotList(j.data ?? []) })
+      .catch(() => {})
+  }, [])
+
+  const enrichedRows: EnrichedRow[] | null = useMemo(() => {
+    if (!rows) return null
+    return rows.map(r => {
+      const mapped_range = mapSizeToRange(r.ma_xoan, r.size_xoan, r.tl_sau_xu_ly)
+      const found        = mapped_range ? nvlHotList.find(c => c.size_range === mapped_range) : null
+      return { ...r, mapped_range, don_gia: found?.mk_price ?? 0 }
+    })
+  }, [rows, nvlHotList])
 
   // Auto-fetch from saved URL on mount
   useEffect(() => {
@@ -130,17 +164,24 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
     }
   }
 
+  function buildGemBody(r: EnrichedRow) {
+    return {
+      ma_xoan:           r.ma_xoan || null,
+      p_chat:            r.p_chat,
+      size_xoan_range:   r.mapped_range || null,
+      sl_hot:            r.sl_hot,
+      tl_truoc_xu_ly_ct: null,
+      tl_sau_xu_ly_ct:   r.tl_sau_xu_ly || null,
+      don_gia:           r.don_gia,
+    }
+  }
+
   async function handleAddOne(idx: number) {
-    if (addedIds.has(idx) || !rows) return
-    const r = rows[idx]
+    if (addedIds.has(idx) || !enrichedRows) return
     const data = await apiCall(
       () => fetch(`/api/invoices/${invoiceId}/items/${itemId}/gems`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ma_xoan: r.ma_xoan || null, p_chat: r.p_chat,
-          size_xoan_range: r.size_xoan || null, sl_hot: r.sl_hot,
-          tl_truoc_xu_ly_ct: null, tl_sau_xu_ly_ct: r.tl_sau_xu_ly || null, don_gia: 0,
-        }),
+        body: JSON.stringify(buildGemBody(enrichedRows[idx])),
       }),
       { successMsg: 'Gem added.' }
     )
@@ -151,21 +192,16 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
   }
 
   async function handleAddAll() {
-    if (!rows) return
+    if (!enrichedRows) return
     setAdding(true)
     let count = 0
     const newIds = new Set(addedIds)
-    for (let idx = 0; idx < rows.length; idx++) {
+    for (let idx = 0; idx < enrichedRows.length; idx++) {
       if (newIds.has(idx)) continue
-      const r = rows[idx]
       const data = await apiCall(
         () => fetch(`/api/invoices/${invoiceId}/items/${itemId}/gems`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            ma_xoan: r.ma_xoan || null, p_chat: r.p_chat,
-            size_xoan_range: r.size_xoan || null, sl_hot: r.sl_hot,
-            tl_truoc_xu_ly_ct: null, tl_sau_xu_ly_ct: r.tl_sau_xu_ly || null, don_gia: 0,
-          }),
+          body: JSON.stringify(buildGemBody(enrichedRows[idx])),
         }),
         { successMsg: '' }
       )
@@ -176,7 +212,7 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
     if (count > 0) onSaved()
   }
 
-  const pending = rows ? rows.filter((_, i) => !addedIds.has(i)) : []
+  const pending = enrichedRows ? enrichedRows.filter((_, i) => !addedIds.has(i)) : []
 
   return (
     <div style={{ borderTop: '1px solid var(--border-light)', padding: '0.75rem 1rem', background: 'var(--bg-base)' }}>
@@ -233,9 +269,9 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
       )}
 
       {/* Results */}
-      {rows !== null && !fetching && (
+      {enrichedRows !== null && !fetching && (
         <div>
-          {rows.length === 0 ? (
+          {enrichedRows.length === 0 ? (
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', padding: '0.2rem 0' }}>
               Không tìm thấy dòng nào (MO={mo ?? '—'}, trạng thái=Xuất).
             </div>
@@ -245,21 +281,26 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
                 <table style={{ borderCollapse: 'collapse', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', width: '100%' }}>
                   <thead>
                     <tr>
-                      {['Mã Xoàn', 'P.Chất', 'Size', 'SL', 'TB viên (ct)', ''].map(h => (
+                      {['Mã Xoàn', 'Size gốc', 'Range NVL', 'Đơn giá', 'SL', 'TB viên', ''].map(h => (
                         <th key={h} style={{ padding: '3px 8px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-base)', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {rows.map((r, idx) => {
+                    {enrichedRows.map((r, idx) => {
                       const done = addedIds.has(idx)
                       return (
                         <tr key={idx} style={{ opacity: done ? 0.4 : 1 }}
                           onMouseEnter={e => !done && (e.currentTarget.style.background = 'var(--bg-hover)')}
                           onMouseLeave={e => (e.currentTarget.style.background = '')}>
                           <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{r.ma_xoan || '—'}</td>
-                          <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>{r.p_chat}</td>
-                          <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{r.size_xoan || '—'}</td>
+                          <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>{r.size_xoan || '—'}</td>
+                          <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', color: r.mapped_range ? 'var(--color-success)' : 'var(--text-muted)' }}>
+                            {r.mapped_range ?? '—'}
+                          </td>
+                          <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', color: r.don_gia > 0 ? 'inherit' : 'var(--text-muted)' }}>
+                            {r.don_gia > 0 ? `$${r.don_gia}` : '—'}
+                          </td>
                           <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{r.sl_hot}</td>
                           <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{r.tl_sau_xu_ly.toFixed(4)}</td>
                           <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', whiteSpace: 'nowrap' }}>

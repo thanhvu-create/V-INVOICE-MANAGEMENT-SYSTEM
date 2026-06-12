@@ -432,7 +432,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                 </tbody>
                 <tfoot>
                   <tr style={{ background: 'var(--bg-base)', borderTop: '1px solid var(--border-base)' }}>
-                    <td colSpan={6} style={{ padding: '3px 8px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Tổng</td>
+                    <td colSpan={template === 'CH2' ? 5 : 6} style={{ padding: '3px 8px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Tổng</td>
                     <td style={{ padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>
                       {gems.reduce((s: number, g: any) => s + (g.tl_xoan_gr ?? 0), 0).toFixed(4)}
                     </td>

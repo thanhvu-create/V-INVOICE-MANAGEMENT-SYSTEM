@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react'
 import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
+import { mapSizeToRange } from '@/lib/formulas/size-mapping'
 
 interface GemForm {
   ma_xoan:           string
   p_chat:            string
+  size_raw:          string  // helper — not sent to API; triggers auto-map to size_xoan_range
   size_xoan_range:   string
   sl_hot:            string
   tl_truoc_xu_ly_ct: string
@@ -16,7 +18,7 @@ interface GemForm {
 }
 
 const EMPTY_FORM: GemForm = {
-  ma_xoan: '', p_chat: 'VVS1', size_xoan_range: '',
+  ma_xoan: '', p_chat: 'VVS1', size_raw: '', size_xoan_range: '',
   sl_hot: '1', tl_truoc_xu_ly_ct: '', tl_sau_xu_ly_ct: '',
   don_gia: '', don_gia_phi: '1',
 }
@@ -62,6 +64,7 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
       setForm({
         ma_xoan:           gem.ma_xoan           ?? '',
         p_chat:            gem.p_chat            ?? 'VVS1',
+        size_raw:          '',
         size_xoan_range:   gem.size_xoan_range   ?? '',
         sl_hot:            String(gem.sl_hot     ?? 1),
         tl_truoc_xu_ly_ct: String(gem.tl_truoc_xu_ly_ct ?? ''),
@@ -74,18 +77,31 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
     }
   }, [open, gem])
 
+  // Auto-map size_raw → size_xoan_range + don_gia when both ma_xoan and size_raw are filled
+  useEffect(() => {
+    if (!form.ma_xoan || !form.size_raw || !nvlHotList.length) return
+    const tbVien = parseFloat(form.size_raw) || 0
+    const range  = mapSizeToRange(form.ma_xoan, form.size_raw, tbVien)
+    if (!range) return
+    const found  = nvlHotList.find(r => r.size_range === range)
+    if (!found) return
+    setForm(v => ({ ...v, size_xoan_range: range, don_gia: String(found.mk_price) }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.ma_xoan, form.size_raw, nvlHotList])
+
   if (!open) return null
 
   const f = (key: keyof GemForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(v => ({ ...v, [key]: e.target.value }))
 
-  // Live computed preview — CH2 uses tl_sau (no tl_truoc column)
+  // Live computed preview — CH2 uses tl_sau (no tl_truoc column); ADM has no setting fee
+  const isADM      = template === 'ADM'
   const tlTruoc    = parseFloat(isCH2 ? form.tl_sau_xu_ly_ct : form.tl_truoc_xu_ly_ct) || 0
   const slHot      = parseInt(form.sl_hot) || 0
   const donGia     = parseFloat(form.don_gia) || 0
   const tl_xoan_gr = tlTruoc > 0 ? tlTruoc / 5 : null
   const t_gia_xoan = tlTruoc > 0 && donGia > 0 ? tlTruoc * donGia : null
-  const t_phi      = slHot > 0 ? slHot * 1 : null
+  const t_phi      = isADM ? 0 : (slHot > 0 ? slHot * 1 : null)
 
   function handleRangeChange(range: string) {
     const found = nvlHotList.find(r => r.size_range === range)
@@ -159,11 +175,16 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
         {/* Body */}
         <div style={{ padding: '1.25rem' }}>
 
-          {/* ma_xoan + p_chat */}
-          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+          {/* ma_xoan + size_raw (auto-map trigger) + p_chat */}
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
             <div>
               <label style={labelStyle}>Mã Xoàn</label>
-              <input style={inputStyle} placeholder="RD 1.0mm, BG3…" value={form.ma_xoan} onChange={f('ma_xoan')} />
+              <input style={inputStyle} placeholder="RD-11119, BG-L14…" value={form.ma_xoan} onChange={f('ma_xoan')} />
+            </div>
+            <div>
+              <label style={labelStyle} title="mm cho RD/PR; ct TB viên cho BG/MQ/PS/OV">Size (mm / ct)</label>
+              <input style={{ ...inputStyle, background: form.size_raw ? 'var(--color-accent-light, #fffbeb)' : 'var(--bg-surface)' }}
+                placeholder="2.1 hoặc 0.05" value={form.size_raw} onChange={f('size_raw')} />
             </div>
             <div>
               <label style={labelStyle}>P.Chất</label>

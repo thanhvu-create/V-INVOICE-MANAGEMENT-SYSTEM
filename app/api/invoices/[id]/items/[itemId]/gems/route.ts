@@ -9,7 +9,7 @@ type Params = { params: { id: string; itemId: string } }
 async function guardAndCheck(db: ReturnType<typeof createServiceClient>, invoiceId: string, ctx: AuthContext) {
   const { data } = await db
     .from('invoices')
-    .select('status, created_by')
+    .select('status, created_by, template_type')
     .eq('id', invoiceId)
     .single()
   if (!data) throw { status: 404, message: 'Not found' }
@@ -66,7 +66,8 @@ export async function POST(req: NextRequest, { params }: Params) {
     const body = await req.json()
     const db   = createServiceClient()
 
-    await guardAndCheck(db, params.id, ctx)
+    const inv      = await guardAndCheck(db, params.id, ctx)
+    const template = ((inv as any).template_type ?? 'CH1') as InvoiceTemplate
 
     // Get next seq
     const { data: maxRow } = await db
@@ -79,28 +80,21 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const seq = (maxRow?.seq ?? 0) + 1
 
-    const tl_truoc = body.tl_truoc_xu_ly_ct ?? null
-    const don_gia  = body.don_gia           ?? 0
-    const sl_hot   = body.sl_hot            ?? 1
+    const gemBase = {
+      product_id:        params.itemId,
+      seq,
+      ma_xoan:           body.ma_xoan          ?? null,
+      p_chat:            body.p_chat           ?? 'VVS1',
+      size_xoan_range:   body.size_xoan_range  ?? null,
+      sl_hot:            body.sl_hot           ?? 1,
+      tl_truoc_xu_ly_ct: body.tl_truoc_xu_ly_ct ?? null,
+      tl_sau_xu_ly_ct:   body.tl_sau_xu_ly_ct  ?? null,
+      don_gia:           body.don_gia           ?? 0,
+    }
 
     const { error } = await db
       .from('invoice_diamonds')
-      .insert({
-        product_id:          params.itemId,
-        seq,
-        ma_xoan:             body.ma_xoan             ?? null,
-        p_chat:              body.p_chat              ?? 'VVS1',
-        size_xoan_range:     body.size_xoan_range     ?? null,
-        sl_hot,
-        tl_truoc_xu_ly_ct:   tl_truoc,
-        tl_sau_xu_ly_ct:     body.tl_sau_xu_ly_ct    ?? null,
-        don_gia,
-        don_gia_phi:         1,
-        // Computed immediately on insert
-        tl_xoan_gr:          tl_truoc != null ? tl_truoc / 5 : null,
-        t_gia_xoan:          tl_truoc != null ? tl_truoc * don_gia : null,
-        t_phi:               sl_hot * 1,
-      })
+      .insert({ ...gemBase, ...recalcDiamond(gemBase, template) })
 
     if (error) throw error
     await triggerRecalc(db, params.itemId, params.id)

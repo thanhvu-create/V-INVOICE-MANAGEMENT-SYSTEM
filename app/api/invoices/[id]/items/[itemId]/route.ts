@@ -61,6 +61,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     if (error) throw error
 
     // Recalculate: first update diamond derived fields, then recalc item
+    const nvl      = nvlFromInvoice(invoice)
+    const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
+
     const { data: diamonds } = await db.from('invoice_diamonds').select('*').eq('product_id', params.itemId)
     const gemList = diamonds ?? []
     if (gemList.length) {
@@ -69,9 +72,6 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       ))
     }
     const updatedGems = gemList.map(d => ({ ...d, ...recalcDiamond(d, template) }))
-
-    const nvl      = nvlFromInvoice(invoice)
-    const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
     const recalc   = recalcItem(item, updatedGems as any, nvl, template)
     await db.from('invoice_products').update(recalc).eq('id', params.itemId)
 
