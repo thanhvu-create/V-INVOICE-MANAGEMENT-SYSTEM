@@ -32,14 +32,14 @@ async function triggerRecalc(db: ReturnType<typeof createServiceClient>, itemId:
   ])
   if (item && invoice) {
     const gemList = diamonds ?? []
+    const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
     if (gemList.length) {
       await Promise.all(gemList.map(d =>
-        db.from('invoice_diamonds').update(recalcDiamond(d)).eq('id', d.id)
+        db.from('invoice_diamonds').update(recalcDiamond(d, template)).eq('id', d.id)
       ))
     }
-    const updatedGems = gemList.map(d => ({ ...d, ...recalcDiamond(d) }))
+    const updatedGems = gemList.map(d => ({ ...d, ...recalcDiamond(d, template) }))
     const nvl      = nvlFromInvoice(invoice)
-    const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
     const updates  = recalcItem(item, updatedGems as any, nvl, template)
     await db.from('invoice_products').update(updates).eq('id', itemId)
   }

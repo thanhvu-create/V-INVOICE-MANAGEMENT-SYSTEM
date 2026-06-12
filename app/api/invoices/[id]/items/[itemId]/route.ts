@@ -65,10 +65,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const gemList = diamonds ?? []
     if (gemList.length) {
       await Promise.all(gemList.map(d =>
-        db.from('invoice_diamonds').update(recalcDiamond(d)).eq('id', d.id)
+        db.from('invoice_diamonds').update(recalcDiamond(d, template)).eq('id', d.id)
       ))
     }
-    const updatedGems = gemList.map(d => ({ ...d, ...recalcDiamond(d) }))
+    const updatedGems = gemList.map(d => ({ ...d, ...recalcDiamond(d, template) }))
 
     const nvl      = nvlFromInvoice(invoice)
     const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate

@@ -104,8 +104,9 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
     if (hasERP)   header.push('ERP for Bom cost ($)', 'Chênh lệch')
     if (hasTagFB) header.push('HP for Tag price', 'HP for FB price')
     if (isAG3)    header.push('Qt/1sp', 'Wt/1sp (gr)', 'HP Purchase/1sp', 'HP Tag/1sp')
+    if (isADM)    header.push('Ngày gửi', 'Hóa đơn (V-INV)')
   }
-  header.push(isAG3 ? 'Chi tiết/1sp' : 'Ghi chú')
+  header.push(isAG3 ? 'Chi tiết/1sp' : 'Ghi chú (NINI)')
   rows.push(header)
 
   // Row 3 — blank sub-header row
@@ -140,6 +141,7 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
       if (hasCIF)   row.push(n(item.cif_price))
       if (hasERP)   row.push(typeof erp === 'number' ? erp : '', typeof chenh === 'number' ? chenh : '')
       if (hasTagFB) row.push(n(item.tag_price), n(item.fb_price))
+      if (isADM) row.push(item.ngay_gui ?? '', item.hoa_don ?? '')
       // AG3 per-unit pricing section (Giá/1sp group: Qt/1sp, Wt/1sp, Purchase/1sp, Tag/1sp)
       if (isAG3) {
         const qty = (typeof n(item.qt_pcs) === 'number' && (n(item.qt_pcs) as number) > 0)
@@ -227,10 +229,93 @@ function buildSummaryRowsAG3(items: any[]) {
   return rows
 }
 
+// ADM SUMMARY: 24 cols (A–X). W=HPUSA, X=CIF 10% (SUMMARY internal).
+// No fabrication fee columns. nini_adm appears in sub-row g=1 col C.
+// U col (don_gia_phi) = 0 for ADM — fee per pcs is waived.
+function buildSummaryRowsADM(items: any[]) {
+  const C = 24
+  const rows: (string | number)[][] = []
+
+  // Row 1 — group headers
+  const r1 = Array(C).fill('')
+  r1[0]='STT'; r1[1]='HÌNH ẢNH'; r1[2]='THÔNG TIN SẢN PHẨM'
+  r1[7]='Tiền vàng ($)'; r1[8]='TL SẢN PHẨM (gr)'
+  r1[11]='THÔNG TIN XOÀN'; r1[18]='GIÁ XOÀN'; r1[20]='Phí nhận hột'
+  r1[22]='HPUSA'; r1[23]='CIF 10% ($)'
+  rows.push(r1)
+
+  // Row 2 — sub-headers
+  const r2 = Array(C).fill('')
+  r2[2]='SO/MO'; r2[3]='Kích Thước'; r2[4]='Số lượng'; r2[5]='Mã số mẫu'; r2[6]='Loại vàng'
+  r2[8]='T.Phẩm (có NVL đá)'; r2[9]='T.Phẩm (trừ NVL đá)'; r2[10]='T.Phẩm (vàng TT)'
+  r2[11]='Mã Xoàn'; r2[12]='P.Chất'; r2[13]='Size (mm)'; r2[14]='SL'
+  r2[15]='TL (ct.) trước xử lý'; r2[16]='TL (ct.) sau xử lý'; r2[17]='TL Xoàn (gr)'
+  r2[18]='Đơn giá'; r2[19]='Tổng giá'; r2[20]='Đơn giá phí'; r2[21]='T.Phí'
+  r2[22]='Vốn sản xuất'
+  rows.push(r2)
+
+  // Row 3 — Chinese
+  const r3 = Array(C).fill('')
+  r3[0]='编号'; r3[1]='图片'; r3[2]='产品编号'; r3[3]='尺寸'; r3[4]='数量'; r3[5]='型号'; r3[6]='金属类型'
+  r3[7]='金价'; r3[10]='净金重'
+  r3[11]='石编号'; r3[12]='石头质量'; r3[13]='大小'; r3[14]='石数'; r3[15]='车前石重'
+  r3[17]='石重/克'; r3[18]='石单价'; r3[19]='石总价'; r3[20]='镶单价'; r3[21]='镶工总价'
+  r3[22]='总计'; r3[23]='到岸价'
+  rows.push(r3)
+
+  for (const item of items ?? []) {
+    const gems    = (item.invoice_diamonds ?? []) as any[]
+    // Always at least 2 rows: main + nini_adm sub-row
+    const numRows = Math.max(gems.length, item.nini_adm ? 2 : 1)
+    const vonSX   = typeof n(item.von_san_xuat) === 'number' ? (n(item.von_san_xuat) as number) : 0
+
+    for (let g = 0; g < numRows; g++) {
+      const gem = gems[g] as any | undefined
+      const row = Array(C).fill('')
+
+      if (g === 0) {
+        row[0]  = n(item.seq)
+        row[2]  = item.so_mo        ?? ''
+        row[3]  = item.kich_thuoc   ?? ''
+        row[4]  = n(item.qt_pcs)
+        row[5]  = item.vendor_model ?? ''
+        row[6]  = item.loai_vang    ?? ''
+        row[7]  = n(item.tien_vang)
+        row[8]  = n(item.t_pham_co_nvl_da)
+        row[9]  = n(item.t_pham_tru_nvl_da)
+        row[10] = n(item.t_pham_vang_thuc_te ?? item.t_pham_tru_nvl_da)
+        row[22] = vonSX > 0 ? vonSX : ''
+        row[23] = vonSX > 0 ? vonSX * 1.10 : ''
+      }
+      // nini_adm goes in sub-row g=1, col C (matches Excel C5 pattern)
+      if (g === 1 && item.nini_adm) row[2] = item.nini_adm
+
+      if (gem) {
+        row[11] = gem.ma_xoan         ?? ''
+        row[12] = gem.p_chat          ?? ''
+        row[13] = gem.size_xoan_range ?? ''
+        row[14] = n(gem.sl_hot)
+        row[15] = n(gem.tl_truoc_xu_ly_ct)
+        row[16] = n(gem.tl_sau_xu_ly_ct)
+        row[17] = n(gem.tl_xoan_gr)
+        row[18] = n(gem.don_gia)
+        row[19] = n(gem.t_gia_xoan)
+        row[20] = 0   // don_gia_phi = 0 for ADM
+        row[21] = 0   // t_phi = 0 for ADM
+      }
+
+      rows.push(row)
+    }
+  }
+
+  return rows
+}
+
 function buildSummaryRows(invoice: any, items: any[]) {
   const template = invoice.template_type ?? 'CH1'
   const isAG3 = template === 'CH1_AG3' || template === 'VNSI_AG3'
   if (isAG3) return buildSummaryRowsAG3(items)
+  if (template === 'ADM') return buildSummaryRowsADM(items)
 
   const isCH2 = template === 'CH2'
   const rows: (string | number)[][] = []

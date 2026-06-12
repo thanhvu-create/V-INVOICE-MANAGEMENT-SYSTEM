@@ -110,7 +110,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
       resin:            hasFees ? (parseFloat(form.resin)        || 0) : 0,
       phi_phu_kien:     hasFees ? (parseFloat(form.phi_phu_kien) || 0) : 0,
       bao_hiem:         (isAG3 || isAdm) ? null : (parseFloat(form.bao_hiem) || null),
-      nini_adm:         (isAG3 || isAdm) ? null : (form.nini_adm.trim() || null),
+      nini_adm:         isAG3 ? null : (form.nini_adm.trim() || null),
       chi_tiet_tap:     isAG3 ? (form.chi_tiet_tap.trim() || null) : null,
       image_url:        form.image_url.trim()   || null,
     }
@@ -269,7 +269,12 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
               <label style={labelStyle}>Chi tiết / Tập</label>
               <input style={inputStyle} placeholder="Chi tiết hoặc tập..." value={form.chi_tiet_tap} onChange={f('chi_tiet_tap')} />
             </div>
-          ) : !isAdm ? (
+          ) : isAdm ? (
+            <div style={{ marginBottom: '0.75rem' }}>
+              <label style={labelStyle}>Ghi chú / NINI (ADM)</label>
+              <input style={inputStyle} placeholder='e.g. "ADM1, Son of a Jeweler Kathy"' value={form.nini_adm} onChange={f('nini_adm')} />
+            </div>
+          ) : (
             <div style={{ ...grid2, gridTemplateColumns: '1fr 2fr', marginBottom: '0.75rem' }}>
               <div>
                 <label style={labelStyle}>Bảo hiểm (AC)</label>
@@ -280,7 +285,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
                 <input style={inputStyle} placeholder='e.g. "ba sao"' value={form.nini_adm} onChange={f('nini_adm')} />
               </div>
             </div>
-          ) : null}
+          )}
 
           <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
             <button onClick={onClose} style={{ padding: '0.5rem 1.25rem', border: '1px solid var(--border-base)', background: 'transparent', color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)', cursor: 'pointer', borderRadius: 0 }}>Hủy</button>
