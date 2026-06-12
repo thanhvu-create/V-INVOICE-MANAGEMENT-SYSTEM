@@ -88,21 +88,38 @@ function extractDriveFileId(url: string | null | undefined): string | null {
   return null
 }
 
-// Grant "anyone with link = reader" permission on the Drive file so =IMAGE() in Sheets can load it.
-// =IMAGE() is evaluated by Google's servers (no user OAuth) — file must be publicly readable.
-// Product images in invoices are appropriate to share publicly (clients/suppliers need to see them in the sheet).
-async function makePublicAndGetUrl(accessToken: string, fileId: string): Promise<string | null> {
+// Fetch image bytes from Drive and upload to Supabase public Storage.
+// =IMAGE() in Sheets needs a public URL — Drive files are private.
+// drive.readonly scope is sufficient to read bytes; no permission change on Drive files needed.
+async function fetchImageToSupabase(
+  accessToken: string,
+  fileId: string,
+  db: any,
+): Promise<string | null> {
   try {
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}/permissions`,
-      {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: 'reader', type: 'anyone' }),
-      },
+    // Fetch raw bytes from Drive
+    const imgRes = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
     )
-    if (!res.ok) return null
-    return `https://drive.google.com/uc?export=view&id=${fileId}`
+    if (!imgRes.ok) return null
+
+    const contentType = imgRes.headers.get('content-type') || 'image/jpeg'
+    const ext = contentType.split('/')[1]?.split(';')[0]?.toLowerCase().replace('jpeg', 'jpg') || 'jpg'
+    const bytes = new Uint8Array(await imgRes.arrayBuffer())
+
+    // Create public bucket (no-op if already exists)
+    await (db.storage as any).createBucket('export-images', { public: true }).catch(() => {})
+
+    const path = `drive/${fileId}.${ext}`
+    const { error } = await db.storage
+      .from('export-images')
+      .upload(path, bytes, { contentType, upsert: true })
+
+    if (error) return null
+
+    const { data } = db.storage.from('export-images').getPublicUrl(path)
+    return data?.publicUrl ?? null
   } catch {
     return null
   }
@@ -492,13 +509,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     if (!invoice) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
 
-    // Grant public read access to Drive image files so =IMAGE() formula works in Sheets.
-    // =IMAGE() is evaluated by Google's servers without user OAuth — files must be publicly readable.
+    // Upload Drive images to Supabase public Storage to get permanent public URLs for =IMAGE() formula.
     const processedItems = await Promise.all(
       (items ?? []).map(async (item) => {
         const fileId = extractDriveFileId(item.image_url)
         if (!fileId) return item
-        const publicUrl = await makePublicAndGetUrl(accessToken, fileId)
+        const publicUrl = await fetchImageToSupabase(accessToken, fileId, db)
         return { ...item, image_url: publicUrl ?? null }
       }),
     )
