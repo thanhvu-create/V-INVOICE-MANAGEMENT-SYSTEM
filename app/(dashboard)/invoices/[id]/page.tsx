@@ -129,9 +129,6 @@ export default function InvoiceDetailPage() {
               <i className="fa-solid fa-file-import" style={{ fontSize: 11 }} /> Import
             </a>
           )}
-          <a href={`/api/invoices/${id}/export`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', color: 'var(--text-primary)', textDecoration: 'none', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)' }}>
-            <i className="fa-solid fa-file-export" style={{ fontSize: 11 }} /> Export
-          </a>
           <div style={{ display: 'inline-flex', alignItems: 'stretch' }}>
             <button
               onClick={handleExportSheets}
