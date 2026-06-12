@@ -103,8 +103,9 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
     if (hasCIF)   header.push('HP for CIF price')
     if (hasERP)   header.push('ERP for Bom cost ($)', 'Chênh lệch')
     if (hasTagFB) header.push('HP for Tag price', 'HP for FB price')
+    if (isAG3)    header.push('Qt/1sp', 'Wt/1sp (gr)', 'HP Purchase/1sp', 'HP Tag/1sp')
   }
-  header.push('Ghi chú')
+  header.push(isAG3 ? 'Chi tiết/1sp' : 'Ghi chú')
   rows.push(header)
 
   // Row 3 — blank sub-header row
@@ -139,8 +140,19 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
       if (hasCIF)   row.push(n(item.cif_price))
       if (hasERP)   row.push(typeof erp === 'number' ? erp : '', typeof chenh === 'number' ? chenh : '')
       if (hasTagFB) row.push(n(item.tag_price), n(item.fb_price))
+      // AG3 per-unit pricing section (Giá/1sp group: Qt/1sp, Wt/1sp, Purchase/1sp, Tag/1sp)
+      if (isAG3) {
+        const qty = (typeof n(item.qt_pcs) === 'number' && (n(item.qt_pcs) as number) > 0)
+          ? (n(item.qt_pcs) as number) : 1
+        const wtPerUnit  = typeof n(item.wt_gr ?? item.t_pham_co_nvl_da) === 'number'
+          ? (n(item.wt_gr ?? item.t_pham_co_nvl_da) as number) / qty : ''
+        const purPerUnit = typeof purchase === 'number' ? purchase / qty : ''
+        const tagPerUnit = typeof n(item.tag_price) === 'number'
+          ? (n(item.tag_price) as number) / qty : ''
+        row.push(1, wtPerUnit, purPerUnit, tagPerUnit)
+      }
     }
-    row.push(item.nini_adm ?? '')
+    row.push(isAG3 ? (item.chi_tiet_tap ?? '') : (item.nini_adm ?? ''))
 
     rows.push(row)
   }
@@ -167,9 +179,60 @@ function buildNVLRows(invoice: any) {
 }
 
 const SUMMARY_COLS = 32
+const SUMMARY_COLS_AG3 = 10
+
+// AG3 templates (CH1_AG3, VNSI_AG3) have a simplified SUMMARY: only 10 cols, no gem/fabrication section.
+// Structure mirrors actual Excel: STT, IMG, vendor_model, Kích Thước, Qty, Mã mẫu, Loại vàng, Tiền vàng, TL T.Phẩm, Trị giá
+// Block = 3 rows/product (data row + empty row + spacer row)
+function buildSummaryRowsAG3(items: any[]) {
+  const C = SUMMARY_COLS_AG3
+  const rows: (string | number)[][] = []
+
+  // Row 1 — group headers
+  const r1 = Array(C).fill('')
+  r1[0] = 'STT';   r1[1] = 'HÌNH ẢNH'; r1[2] = 'THÔNG TIN SẢN PHẨM'
+  r1[7] = 'Tiền vàng ($)'; r1[8] = 'TL T.Phẩm (gr)'; r1[9] = 'Trị giá ($)'
+  rows.push(r1)
+
+  // Row 2 — sub-headers
+  const r2 = Array(C).fill('')
+  r2[2] = 'SO/MO'; r2[3] = 'Kích Thước'; r2[4] = 'Số lượng'
+  r2[5] = 'Mã số mẫu'; r2[6] = 'Loại vàng'
+  rows.push(r2)
+
+  // Row 3 — Chinese
+  const r3 = Array(C).fill('')
+  r3[0]='编号'; r3[1]='图片'; r3[2]='产品编号'; r3[3]='尺寸'; r3[4]='数量'
+  r3[5]='型号'; r3[6]='金属类型'; r3[7]='金价'; r3[9]='总计'
+  rows.push(r3)
+
+  // Data rows — 3 rows per product (data + empty + spacer)
+  for (const item of items ?? []) {
+    const row = Array(C).fill('')
+    row[0] = n(item.seq)
+    // Col C (SO/MO) = vendor_model for AG3 (SUMMARY formula = 'JM FORM'!D = vendor model#)
+    row[2] = item.vendor_model ?? item.so_mo ?? ''
+    row[3] = item.kich_thuoc   ?? ''
+    row[4] = n(item.qt_pcs)
+    row[5] = item.vendor_model ?? ''
+    row[6] = item.loai_vang    ?? ''
+    row[7] = n(item.tien_vang)
+    row[8] = n(item.t_pham_co_nvl_da)
+    row[9] = n(item.von_san_xuat)  // Trị giá = von_san_xuat = tien_vang for AG3
+    rows.push(row)
+    rows.push(Array(C).fill(''))                                    // empty row
+    rows.push(Array(C).fill('').map((v, i) => i === 7 ? ' ' : v))  // spacer (space in Tiền vàng col to match Excel)
+  }
+
+  return rows
+}
 
 function buildSummaryRows(invoice: any, items: any[]) {
-  const isCH2 = invoice.template_type === 'CH2'
+  const template = invoice.template_type ?? 'CH1'
+  const isAG3 = template === 'CH1_AG3' || template === 'VNSI_AG3'
+  if (isAG3) return buildSummaryRowsAG3(items)
+
+  const isCH2 = template === 'CH2'
   const rows: (string | number)[][] = []
 
   // Row 1 — group headers
