@@ -200,7 +200,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               ] : []),
               ...(template === 'CH1' && item.erp_bom_cost != null ? [
                 ['ERP BOM ($)', fmt2(item.erp_bom_cost)],
-                ['Chênh lệch', fmt2((item.von_san_xuat ?? 0) - item.erp_bom_cost)],
+                ['Chênh lệch', item.von_san_xuat ? (((item.von_san_xuat - item.erp_bom_cost) / item.von_san_xuat) * 100).toFixed(1) + '%' : '—'],
               ] : []),
             ] : []),
             ...(canSeePrice && hasFees && (item.gia_cong || item.duc || item.thiet_ke || item.resin || item.phi_phu_kien) ? [
@@ -336,7 +336,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                 ] : []),
                 ...(template === 'CH1' && item.erp_bom_cost != null ? [
                   ['ERP BOM ($)', fmt2(item.erp_bom_cost)],
-                  ['Chênh lệch', fmt2((item.von_san_xuat ?? 0) - item.erp_bom_cost)],
+                  ['Chênh lệch', item.von_san_xuat ? (((item.von_san_xuat - item.erp_bom_cost) / item.von_san_xuat) * 100).toFixed(1) + '%' : '—'],
                 ] : []),
               ].map(([l, v]) => (
                 <div key={l as string}>

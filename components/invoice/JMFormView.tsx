@@ -45,11 +45,11 @@ const JM_COLS: Col[] = [
   // Output prices — all templates
   { key: 'von_san_xuat',     label: 'HP Purchase',       mono: true, computed: true, price: true, width: 105 },
   { key: 'cif_price',        label: 'HP CIF',            mono: true, computed: true, price: true, width: 100 },
+  // CH1-only: ERP BOM reference + variance (Excel col N, O — between CIF and Tag)
+  { key: 'erp_bom_cost',     label: 'ERP BOM ($)',       mono: true, price: true, ch1only: true, width: 105 },
+  { key: 'chenh_lech',       label: 'Chênh lệch',        mono: true, computed: true, ch1only: true, width: 100 },
   { key: 'tag_price',        label: 'HP Tag',            mono: true, price: true, width: 100 },
   { key: 'fb_price',         label: 'HP FB',             mono: true, price: true, width: 100 },
-  // CH1-only: ERP BOM reference + variance
-  { key: 'erp_bom_cost',     label: 'ERP BOM ($)',       mono: true, price: true, ch1only: true, width: 105 },
-  { key: 'chenh_lech',       label: 'Chênh lệch',        mono: true, computed: true, price: true, ch1only: true, width: 100 },
   // AG3-only: per-piece pricing display
   { key: '_pu_wt',           label: 'Wt./1sp (gr)',      mono: true, computed: true, ag3only: true, width: 100 },
   { key: '_purchase_unit',   label: 'Purchase/1sp',      mono: true, computed: true, price: true, ag3only: true, width: 110 },
@@ -86,7 +86,12 @@ function parseFieldValue(field: string, raw: string): unknown {
 
 function getDisplayValue(col: Col, item: any): string {
   // Computed-display keys (not in DB — derived from other fields)
-  if (col.key === 'chenh_lech')     return fmt2((item.von_san_xuat ?? 0) - (item.erp_bom_cost ?? 0))
+  if (col.key === 'chenh_lech') {
+    const p = item.von_san_xuat ?? 0
+    const e = item.erp_bom_cost ?? 0
+    if (p === 0) return '—'
+    return ((p - e) / p * 100).toFixed(1) + '%'
+  }
   if (col.key === '_pu_wt')         return fmt4((item.t_pham_co_nvl_da ?? 0) / Math.max(1, item.qt_pcs ?? 1))
   if (col.key === '_purchase_unit') return fmt2((item.von_san_xuat ?? 0) / Math.max(1, item.qt_pcs ?? 1))
   if (col.key === '_tag_unit')      return fmt2((item.tag_price ?? 0) / Math.max(1, item.qt_pcs ?? 1))

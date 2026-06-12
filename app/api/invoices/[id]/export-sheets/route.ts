@@ -123,102 +123,116 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
   return rows
 }
 
-function buildSummaryRows(invoice: any, items: any[]) {
+function buildNVLRows(invoice: any) {
+  const rows: (string | number)[][] = []
+  rows.push(['NVL - Giá Vàng (Snapshot tại thời điểm tạo invoice)'])
+  rows.push([''])
+  rows.push(['Loại', 'Giá trị'])
+  rows.push(['Giá 24K ($/oz)',    n(invoice.nvl_gold_24k ?? '')])
+  rows.push(['Giá PT ($/oz)',     n(invoice.nvl_pt_price ?? '')])
+  rows.push(['Giá AG ($/oz)',     n(invoice.nvl_ag_price ?? '')])
+  rows.push(['Giá PD ($/oz)',     n(invoice.nvl_pd_price ?? '')])
+  rows.push([''])
+  rows.push(['Loss vàng',         n(invoice.nvl_loss_gold ?? 0.06)])
+  rows.push(['Loss PT',           n(invoice.nvl_loss_pt ?? 0.17)])
+  rows.push(['CIF rate',          n(invoice.nvl_cif_rate ?? 0.05)])
+  rows.push(['Tag multiplier',    n(invoice.nvl_tag_multiplier ?? '')])
+  rows.push(['FB multiplier',     n(invoice.nvl_fr_multiplier ?? '')])
+  return rows
+}
+
+const SUMMARY_COLS = 32
+const GEM_ROWS_PER_PRODUCT = 5
+
+function buildSummaryRows(_invoice: any, items: any[]) {
   const rows: (string | number)[][] = []
 
-  // NVL Giá vàng block (rows 1-13 in Excel)
-  rows.push(['NVL - Giá vàng', '', '', '', ''])
-  rows.push(['Giá 24K ($/oz)', '', '', '', n(invoice.nvl_gold_24k ?? '')])
-  rows.push(['Giá PT ($/oz)', '', '', '', n(invoice.nvl_pt_price ?? '')])
-  rows.push(['Giá AG ($/oz)', '', '', '', n(invoice.nvl_ag_price ?? '')])
-  rows.push(['Giá PD ($/oz)', '', '', '', n(invoice.nvl_pd_price ?? '')])
-  rows.push(['Loss vàng', '', '', '', n(invoice.nvl_loss_gold ?? 0.06)])
-  rows.push(['Loss PT', '', '', '', n(invoice.nvl_loss_pt ?? 0.17)])
-  rows.push(['CIF rate', '', '', '', n(invoice.nvl_cif_rate ?? 0.05)])
-  rows.push(['Tag multiplier', '', '', '', n(invoice.nvl_tag_multiplier ?? '')])
-  rows.push(['FB multiplier', '', '', '', n(invoice.nvl_fr_multiplier ?? '')])
-  rows.push(['', '', '', '', ''])
-  rows.push(['', '', '', '', ''])
-  rows.push(['', '', '', '', ''])
-  rows.push(['', '', '', '', ''])
+  // Row 1 — group headers (matches Excel SUMMARY row 1)
+  const r1: (string | number)[] = Array(SUMMARY_COLS).fill('')
+  r1[0]  = 'STT';            r1[1]  = 'HÌNH ẢNH'
+  r1[2]  = 'THÔNG TIN SẢN PHẨM'
+  r1[7]  = 'Tiền vàng ($)'
+  r1[8]  = 'TRỌNG Lượng (gr)'
+  r1[11] = 'THÔNG TIN XOÀN'
+  r1[20] = 'Phí nhận hột'
+  r1[22] = 'Gia công / 1 SP'; r1[23] = 'Đúc / 1sp'
+  r1[24] = 'Thiết Kế / 1sp'; r1[25] = 'Resin / 1sp'
+  r1[26] = 'Phí phụ kiện (mua bên ngoài)'
+  r1[27] = 'HPUSA';           r1[28] = 'NINI/ADM'
+  r1[29] = 'Ngày gửi';        r1[30] = 'Tracking# gửi hàng USA'
+  r1[31] = 'Hóa Đôn (V-INVOICE)'
+  rows.push(r1)
 
-  // Blank separator row
-  rows.push(Array(14).fill(''))
+  // Row 2 — sub-headers (matches Excel SUMMARY row 2)
+  const r2: (string | number)[] = Array(SUMMARY_COLS).fill('')
+  r2[2]  = 'SO/MO';           r2[3]  = 'Kích Thước'
+  r2[4]  = 'Số lượng';        r2[5]  = 'Mã số mẫu';  r2[6]  = 'Loại vàng'
+  r2[8]  = 'T.Phẩm (có NVL đá)'; r2[9] = 'T.Phẩm (trừ NVL đá)'; r2[10] = 'T.Phẩm (vàng TT)'
+  r2[11] = 'Mã Xoàn';         r2[12] = 'P. chất';    r2[13] = 'Size Xoàn'
+  r2[14] = 'SL hột';           r2[15] = 'TL (ct.) trước xử lý'; r2[16] = 'TL (ct.) sau xử lý'
+  r2[17] = 'TL Xoàn (gr)';    r2[18] = 'Đơn giá ($)'; r2[19] = 'T.GIÁ XOÀN'
+  r2[20] = 'Đơn giá phí';     r2[21] = 'T.Phí'
+  r2[27] = 'Vốn sản xuất';    r2[28] = 'Bảo hiểm'
+  rows.push(r2)
 
-  // SUMMARY headers (rows 15-16 in Excel)
-  rows.push([
-    'STT', 'SO/MO', 'Kích Thước', 'Số lượng', 'Mã số mẫu', 'Loại vàng',
-    'Tiền vàng ($)', 'T.Phẩm (có NVL đá)', 'T.Phẩm (trừ NVL đá)', 'T.Phẩm (vàng TT)',
-    'Mã Xoàn', 'P. chất', 'Size Xoàn', 'SL hột',
-    'TL trước xử lý (ct.)', 'TL sau xử lý (ct.)', 'TL Xoàn (gr)', 'Đơn giá ($)', 'T.GIÁ XOÀN',
-    'Đơn giá phí', 'T.Phí',
-    'Gia công / 1 SP', 'Đúc / 1sp', 'Thiết Kế / 1sp', 'Resin / 1sp', 'Phí phụ kiện',
-    'Vốn sản xuất',
-    'Bảo hiểm', 'Ngày gửi', 'Tracking#', 'Hóa Đơn (V-INVOICE)',
-  ])
-  rows.push(Array(31).fill(''))
+  // Row 3 — Chinese translations (matches Excel SUMMARY row 3)
+  const r3: (string | number)[] = Array(SUMMARY_COLS).fill('')
+  r3[0]='编号'; r3[1]='图片'; r3[2]='产品编号'; r3[3]='尺寸'; r3[4]='数量'; r3[5]='型号'; r3[6]='金属类型'
+  r3[7]='金价'; r3[9]='产品重量'; r3[10]='净金重'
+  r3[11]='石编号'; r3[12]='石头质量'; r3[13]='大小'; r3[14]='石数'; r3[15]='车前石重'
+  r3[17]='石重/克'; r3[18]='石单价(连耗)'; r3[19]='石总价'; r3[20]='镶单价'; r3[21]='镶工总价'
+  r3[22]='产品费'; r3[23]='倒膜费'; r3[24]='起版费'; r3[25]='蜡版费'; r3[26]='附件价'
+  r3[27]='总计'; r3[28]='到岸价'
+  rows.push(r3)
 
-  // Data: 1 main row + gem sub-rows per product
+  // Data — fixed 5-row blocks per product (matches Excel block structure)
   for (const item of items ?? []) {
-    const gems    = (item.invoice_diamonds ?? []) as any[]
-    const numRows = Math.max(gems.length, 1)
+    const gems = (item.invoice_diamonds ?? []) as any[]
 
-    for (let g = 0; g < numRows; g++) {
-      const gem     = gems[g] as any
-      const isFirst = g === 0
-      if (isFirst) {
-        rows.push([
-          n(item.seq),
-          item.so_mo       ?? '',
-          item.kich_thuoc  ?? '',
-          n(item.qt_pcs),
-          item.vendor_model ?? '',
-          item.loai_vang   ?? '',
-          n(item.tien_vang),
-          n(item.t_pham_co_nvl_da),
-          n(item.t_pham_tru_nvl_da),
-          n(item.t_pham_vang_thuc_te ?? item.t_pham_tru_nvl_da),
-          gem?.ma_xoan          ?? '',
-          gem?.p_chat           ?? '',
-          gem?.size_xoan_range  ?? '',
-          n(gem?.sl_hot),
-          n(gem?.tl_truoc_xu_ly_ct),
-          n(gem?.tl_sau_xu_ly_ct),
-          n(gem?.tl_xoan_gr),
-          n(gem?.don_gia),
-          n(gem?.t_gia_xoan),
-          n(gem?.don_gia_phi),
-          n(gem?.t_phi),
-          n(item.gia_cong),
-          n(item.duc),
-          n(item.thiet_ke),
-          n(item.resin),
-          n(item.phi_phu_kien),
-          n(item.von_san_xuat),
-          n(item.bao_hiem),
-          item.ngay_gui    ?? '',
-          item.tracking_no ?? '',
-          item.hoa_don     ?? '',
-        ])
-      } else {
-        // gem-only sub-row
-        const emptyMain = Array(10).fill('')
-        rows.push([
-          ...emptyMain,
-          gem?.ma_xoan         ?? '',
-          gem?.p_chat          ?? '',
-          gem?.size_xoan_range ?? '',
-          n(gem?.sl_hot),
-          n(gem?.tl_truoc_xu_ly_ct),
-          n(gem?.tl_sau_xu_ly_ct),
-          n(gem?.tl_xoan_gr),
-          n(gem?.don_gia),
-          n(gem?.t_gia_xoan),
-          n(gem?.don_gia_phi),
-          n(gem?.t_phi),
-          ...Array(10).fill(''),
-        ])
+    for (let g = 0; g < GEM_ROWS_PER_PRODUCT; g++) {
+      const gem = gems[g] as any | undefined
+      const row: (string | number)[] = Array(SUMMARY_COLS).fill('')
+
+      if (g === 0) {
+        // Main row — product identity + first gem + fees + output
+        row[0]  = n(item.seq)
+        // row[1] = '' (HÌNH ẢNH — always empty in export)
+        row[2]  = item.so_mo      ?? ''
+        row[3]  = item.kich_thuoc ?? ''
+        row[4]  = n(item.qt_pcs)
+        row[5]  = item.vendor_model ?? ''
+        row[6]  = item.loai_vang  ?? ''
+        row[7]  = n(item.tien_vang)
+        row[8]  = n(item.t_pham_co_nvl_da)
+        row[9]  = n(item.t_pham_tru_nvl_da)
+        row[10] = n(item.t_pham_vang_thuc_te ?? item.t_pham_tru_nvl_da)
+        row[22] = n(item.gia_cong);     row[23] = n(item.duc)
+        row[24] = n(item.thiet_ke);     row[25] = n(item.resin)
+        row[26] = n(item.phi_phu_kien)
+        row[27] = n(item.von_san_xuat); row[28] = n(item.bao_hiem)
+        row[29] = item.ngay_gui    ?? ''
+        row[30] = item.tracking_no ?? ''
+        row[31] = item.hoa_don     ?? ''
       }
+
+      // Gem columns (11-21) — filled for every sub-row that has a gem
+      if (gem) {
+        row[11] = gem.ma_xoan         ?? ''
+        row[12] = gem.p_chat          ?? ''
+        row[13] = gem.size_xoan_range ?? ''
+        row[14] = n(gem.sl_hot)
+        row[15] = n(gem.tl_truoc_xu_ly_ct)
+        row[16] = n(gem.tl_sau_xu_ly_ct)
+        row[17] = n(gem.tl_xoan_gr)
+        row[18] = n(gem.don_gia)
+        row[19] = n(gem.t_gia_xoan)
+        row[20] = 1                   // don_gia_phi always $1
+        row[21] = n(gem.t_phi)
+      } else {
+        row[20] = 1                   // don_gia_phi = $1 even in empty sub-rows
+      }
+
+      rows.push(row)
     }
   }
 
@@ -257,12 +271,13 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     const title = `V-Invoice ${invoice.invoice_code ?? params.id} (${invoice.template_type ?? ''})`
 
-    // 1. Create spreadsheet with two sheets
+    // 1. Create spreadsheet with three sheets
     const created = await sheetsPost(accessToken, '', {
       properties: { title },
       sheets: [
         { properties: { title: 'JM FORM',  sheetId: 0, index: 0 } },
         { properties: { title: 'SUMMARY',  sheetId: 1, index: 1 } },
+        { properties: { title: 'NVL',      sheetId: 2, index: 2 } },
       ],
     })
 
@@ -283,6 +298,14 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       accessToken,
       `${spreadsheetId}/values/${encodeURIComponent('SUMMARY!A1')}?valueInputOption=USER_ENTERED`,
       { values: summaryRows },
+    )
+
+    // 3b. Write NVL data (3rd sheet)
+    const nvlRows = buildNVLRows(invoice)
+    await sheetsPut(
+      accessToken,
+      `${spreadsheetId}/values/${encodeURIComponent('NVL!A1')}?valueInputOption=USER_ENTERED`,
+      { values: nvlRows },
     )
 
     // 4. Move to configured Drive folder (if set)
@@ -318,19 +341,43 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
             fields: 'gridProperties.frozenRowCount,gridProperties.frozenColumnCount',
           },
         },
-        // Bold SUMMARY headers row (row 16, index 15)
+        // SUMMARY row 1 — group headers (amber/yellow)
         {
           repeatCell: {
-            range:  { sheetId: 1, startRowIndex: 15, endRowIndex: 16 },
+            range:  { sheetId: 1, startRowIndex: 0, endRowIndex: 1 },
+            cell:   { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.98, green: 0.92, blue: 0.60 } } },
+            fields: 'userEnteredFormat(textFormat,backgroundColor)',
+          },
+        },
+        // SUMMARY row 2 — sub-headers (blue)
+        {
+          repeatCell: {
+            range:  { sheetId: 1, startRowIndex: 1, endRowIndex: 2 },
             cell:   { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.88, green: 0.93, blue: 0.99 } } },
             fields: 'userEnteredFormat(textFormat,backgroundColor)',
           },
         },
-        // Freeze first 16 rows of SUMMARY (NVL + headers)
+        // SUMMARY row 3 — Chinese row (light gray, italic)
+        {
+          repeatCell: {
+            range:  { sheetId: 1, startRowIndex: 2, endRowIndex: 3 },
+            cell:   { userEnteredFormat: { textFormat: { italic: true }, backgroundColor: { red: 0.95, green: 0.95, blue: 0.95 } } },
+            fields: 'userEnteredFormat(textFormat,backgroundColor)',
+          },
+        },
+        // Freeze first 3 rows of SUMMARY (3 header rows)
         {
           updateSheetProperties: {
-            properties: { sheetId: 1, gridProperties: { frozenRowCount: 16 } },
+            properties: { sheetId: 1, gridProperties: { frozenRowCount: 3 } },
             fields: 'gridProperties.frozenRowCount',
+          },
+        },
+        // NVL sheet — bold title row
+        {
+          repeatCell: {
+            range:  { sheetId: 2, startRowIndex: 0, endRowIndex: 1 },
+            cell:   { userEnteredFormat: { textFormat: { bold: true, fontSize: 11 } } },
+            fields: 'userEnteredFormat(textFormat)',
           },
         },
       ],
