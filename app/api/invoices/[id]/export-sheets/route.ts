@@ -505,63 +505,315 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       }
     }
 
-    // 5. Basic formatting: bold headers, freeze rows
+    // 5. Comprehensive formatting
+    const template2    = (invoice.template_type ?? 'CH1') as string
+    const isAG3f       = template2 === 'CH1_AG3' || template2 === 'VNSI_AG3'
+    const isADMf       = template2 === 'ADM'
+    const isCH1f       = template2 === 'CH1'
+    const jmColCount   = (jmRows[1] ?? jmRows[0])?.length ?? 20
+    const summaryNCols = summaryRows[0]?.length ?? 32
+
+    // Helper — thin border object
+    const thin = { style: 'SOLID', width: 1, color: { red: 0.75, green: 0.75, blue: 0.75 } }
+    const thinLight = { style: 'SOLID', width: 1, color: { red: 0.88, green: 0.88, blue: 0.88 } }
+
+    // ── SUMMARY group-header merges ──────────────────────────────────────────
+    // Cells that have sub-headers in row 1 are NOT vertically merged (they keep their group label in row 0 only).
+    // Cells with NO sub-header in row 1 are vertically merged rows 0-1 so they look like a single tall header.
+    // Multi-column group labels get a horizontal merge within row 0.
+    const summaryMerges: any[] = []
+    if (isAG3f) {
+      // AG3: 10 cols — THÔNG TIN SẢN PHẨM spans cols 2-6
+      summaryMerges.push(
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 2, endColumnIndex: 7 }, mergeType: 'MERGE_ALL' } },
+      )
+      // Single-col group headers with no row-1 sub-header → vertical merge rows 0-1
+      for (const c of [0, 1, 7, 8, 9]) {
+        summaryMerges.push({ mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 2, startColumnIndex: c, endColumnIndex: c + 1 }, mergeType: 'MERGE_ALL' } })
+      }
+    } else if (isADMf) {
+      // ADM: 24 cols
+      summaryMerges.push(
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 2,  endColumnIndex: 7  }, mergeType: 'MERGE_ALL' } }, // THÔNG TIN SP
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 8,  endColumnIndex: 11 }, mergeType: 'MERGE_ALL' } }, // TL SẢN PHẨM
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 11, endColumnIndex: 18 }, mergeType: 'MERGE_ALL' } }, // THÔNG TIN XOÀN
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 18, endColumnIndex: 20 }, mergeType: 'MERGE_ALL' } }, // GIÁ XOÀN
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 20, endColumnIndex: 22 }, mergeType: 'MERGE_ALL' } }, // Phí nhận hột
+      )
+      for (const c of [0, 1, 7, 23]) {
+        summaryMerges.push({ mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 2, startColumnIndex: c, endColumnIndex: c + 1 }, mergeType: 'MERGE_ALL' } })
+      }
+    } else {
+      // CH1 / CH2: 32 cols
+      summaryMerges.push(
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 2,  endColumnIndex: 7  }, mergeType: 'MERGE_ALL' } }, // THÔNG TIN SP
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 8,  endColumnIndex: 11 }, mergeType: 'MERGE_ALL' } }, // TRỌNG Lượng
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 11, endColumnIndex: 20 }, mergeType: 'MERGE_ALL' } }, // THÔNG TIN XOÀN
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 20, endColumnIndex: 22 }, mergeType: 'MERGE_ALL' } }, // Phí nhận hột
+      )
+      // Fabrication single cols 22-26 + shipping cols 29-31 have no sub-header in row 1
+      for (const c of [0, 1, 7, 22, 23, 24, 25, 26, 29, 30, 31]) {
+        summaryMerges.push({ mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 2, startColumnIndex: c, endColumnIndex: c + 1 }, mergeType: 'MERGE_ALL' } })
+      }
+    }
+
+    // ── SUMMARY column widths (pixel) ────────────────────────────────────────
+    const summaryColWidths: any[] = []
+    const scw = (s: number, e: number, px: number) => summaryColWidths.push({
+      updateDimensionProperties: { range: { sheetId: 1, dimension: 'COLUMNS', startIndex: s, endIndex: e }, properties: { pixelSize: px }, fields: 'pixelSize' },
+    })
+    if (isAG3f) {
+      scw(0,1,45); scw(1,2,95); scw(2,3,140); scw(3,4,70); scw(4,5,55)
+      scw(5,6,90); scw(6,7,70); scw(7,8,85); scw(8,9,90); scw(9,10,85)
+    } else if (isADMf) {
+      scw(0,1,45); scw(1,2,95); scw(2,3,140); scw(3,4,70); scw(4,5,55)
+      scw(5,6,90); scw(6,7,70); scw(7,8,85); scw(8,9,95); scw(9,10,95); scw(10,11,95)
+      scw(11,12,110); scw(12,13,65); scw(13,14,80); scw(14,15,50); scw(15,16,85)
+      scw(16,17,85); scw(17,18,80); scw(18,19,80); scw(19,20,80); scw(20,21,80); scw(21,22,70)
+      scw(22,23,85); scw(23,24,85)
+    } else {
+      scw(0,1,45); scw(1,2,100); scw(2,3,140); scw(3,4,70); scw(4,5,55)
+      scw(5,6,90); scw(6,7,70); scw(7,8,85); scw(8,9,95); scw(9,10,95); scw(10,11,95)
+      scw(11,12,110); scw(12,13,65); scw(13,14,80); scw(14,15,50); scw(15,16,85)
+      scw(16,17,85); scw(17,18,80); scw(18,19,80); scw(19,20,80); scw(20,21,80); scw(21,22,70)
+      scw(22,23,72); scw(23,24,68); scw(24,25,72); scw(25,26,68); scw(26,27,72)
+      scw(27,28,85); scw(28,29,80); scw(29,30,100); scw(30,31,120); scw(31,32,100)
+    }
+
+    // ── SUMMARY number formats (data rows start at row 3) ────────────────────
+    const summaryNumFmt: any[] = []
+    const sfmt = (s: number, e: number, pattern: string, type = 'CURRENCY') => summaryNumFmt.push({
+      repeatCell: {
+        range: { sheetId: 1, startRowIndex: 3, startColumnIndex: s, endColumnIndex: e },
+        cell: { userEnteredFormat: { numberFormat: { type, pattern }, horizontalAlignment: 'RIGHT' } },
+        fields: 'userEnteredFormat(numberFormat,horizontalAlignment)',
+      },
+    })
+    if (isAG3f) {
+      sfmt(7, 8,  '#,##0.00')           // Tiền vàng
+      sfmt(8, 9,  '0.####', 'NUMBER')   // TL T.Phẩm
+      sfmt(9, 10, '#,##0.00')           // Trị giá
+    } else if (isADMf) {
+      sfmt(7, 8,  '#,##0.00')           // Tiền vàng
+      sfmt(8, 11, '0.####', 'NUMBER')   // T.Phẩm weights
+      sfmt(15,18, '0.####', 'NUMBER')   // TL trước/sau/xoàn
+      sfmt(18,20, '#,##0.00')           // GIÁ XOÀN
+      sfmt(20,22, '#,##0.00')           // Phí nhận hột
+      sfmt(22,24, '#,##0.00')           // HPUSA, CIF
+    } else {
+      sfmt(7, 8,  '#,##0.00')           // Tiền vàng
+      sfmt(8, 11, '0.####', 'NUMBER')   // T.Phẩm weights
+      sfmt(15,18, '0.####', 'NUMBER')   // TL trước/sau/xoàn gr
+      sfmt(18,22, '#,##0.00')           // Đơn giá, T.GIÁ, Phí nhận hột cols
+      sfmt(22,28, '#,##0.00')           // Gia công–HPUSA
+    }
+
+    // ── JM FORM column widths ────────────────────────────────────────────────
+    const jmColWidths: any[] = []
+    const jcw = (s: number, e: number, px: number) => jmColWidths.push({
+      updateDimensionProperties: { range: { sheetId: 0, dimension: 'COLUMNS', startIndex: s, endIndex: e }, properties: { pixelSize: px }, fields: 'pixelSize' },
+    })
+    // Base cols common to all templates
+    jcw(0,1,40); jcw(1,2,62); jcw(2,3,85); jcw(3,4,90); jcw(4,5,175)
+    if (template2 === 'CH1_AG3') {
+      jcw(5,7,85)                // SKU AG + SKU USA
+      jcw(7,8,68); jcw(8,9,68); jcw(9,10,200); jcw(10,12,58) // Class, SubClass, Desc, Qt+Wt
+      jcw(12,jmColCount,95)      // price cols
+    } else {
+      jcw(5,6,85)                // SKU
+      jcw(6,7,68); jcw(7,8,68); jcw(8,9,200); jcw(9,11,58)   // Class, SubClass, Desc, Qt+Wt
+      jcw(11,jmColCount,95)      // price cols
+    }
+
+    // ── JM FORM number formats (data rows start at row 3) ────────────────────
+    const jmNumFmt: any[] = []
+    if (canSeePrice) {
+      // Price cols start after the base cols
+      const priceStart = template2 === 'CH1_AG3' ? 12 : 11
+      jmNumFmt.push({
+        repeatCell: {
+          range: { sheetId: 0, startRowIndex: 3, startColumnIndex: priceStart, endColumnIndex: jmColCount - 1 },
+          cell: { userEnteredFormat: { numberFormat: { type: 'CURRENCY', pattern: '#,##0.00' }, horizontalAlignment: 'RIGHT' } },
+          fields: 'userEnteredFormat(numberFormat,horizontalAlignment)',
+        },
+      })
+      // Chênh lệch col is percentage (CH1 only: priceStart+3)
+      if (isCH1f) {
+        jmNumFmt.push({
+          repeatCell: {
+            range: { sheetId: 0, startRowIndex: 3, startColumnIndex: priceStart + 3, endColumnIndex: priceStart + 4 },
+            cell: { userEnteredFormat: { numberFormat: { type: 'PERCENT', pattern: '0.00%' } } },
+            fields: 'userEnteredFormat.numberFormat',
+          },
+        })
+      }
+    }
+
     await sheetsPost(accessToken, `${spreadsheetId}:batchUpdate`, {
       requests: [
-        // Bold row 2 of JM FORM (col headers)
+        // ═══════════════════════ JM FORM (sheetId 0) ═══════════════════════
+        // Title row (row 0): merge all cols + blue/white bold
+        { mergeCells: { range: { sheetId: 0, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: jmColCount }, mergeType: 'MERGE_ALL' } },
         {
           repeatCell: {
-            range:  { sheetId: 0, startRowIndex: 1, endRowIndex: 2 },
-            cell:   { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.98, green: 0.95, blue: 0.80 } } },
+            range: { sheetId: 0, startRowIndex: 0, endRowIndex: 1 },
+            cell: { userEnteredFormat: {
+              textFormat: { bold: true, fontSize: 12, foregroundColor: { red: 1, green: 1, blue: 1 } },
+              backgroundColor: { red: 0.17, green: 0.36, blue: 0.60 },
+              horizontalAlignment: 'CENTER',
+              verticalAlignment: 'MIDDLE',
+            }},
+            fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment)',
+          },
+        },
+        // Column header row (row 1): amber bg, bold, center, wrap
+        {
+          repeatCell: {
+            range: { sheetId: 0, startRowIndex: 1, endRowIndex: 2 },
+            cell: { userEnteredFormat: {
+              textFormat: { bold: true, fontSize: 9 },
+              backgroundColor: { red: 0.98, green: 0.95, blue: 0.80 },
+              horizontalAlignment: 'CENTER',
+              verticalAlignment: 'MIDDLE',
+              wrapStrategy: 'WRAP',
+            }},
+            fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy)',
+          },
+        },
+        // Sub-header row (row 2): same amber, bold, center, wrap
+        {
+          repeatCell: {
+            range: { sheetId: 0, startRowIndex: 2, endRowIndex: 3 },
+            cell: { userEnteredFormat: {
+              textFormat: { bold: true, fontSize: 9 },
+              backgroundColor: { red: 0.98, green: 0.95, blue: 0.80 },
+              horizontalAlignment: 'CENTER',
+              verticalAlignment: 'MIDDLE',
+              wrapStrategy: 'WRAP',
+            }},
+            fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy)',
+          },
+        },
+        // Freeze first 3 rows + first col
+        { updateSheetProperties: { properties: { sheetId: 0, gridProperties: { frozenRowCount: 3, frozenColumnCount: 1 } }, fields: 'gridProperties.frozenRowCount,gridProperties.frozenColumnCount' } },
+        // Row heights: title 30px, header rows 42px
+        { updateDimensionProperties: { range: { sheetId: 0, dimension: 'ROWS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 30 }, fields: 'pixelSize' } },
+        { updateDimensionProperties: { range: { sheetId: 0, dimension: 'ROWS', startIndex: 1, endIndex: 3 }, properties: { pixelSize: 42 }, fields: 'pixelSize' } },
+        // Right-align numeric data cols (Qt, Wt, prices)
+        {
+          repeatCell: {
+            range: { sheetId: 0, startRowIndex: 3, startColumnIndex: template2 === 'CH1_AG3' ? 10 : 9, endColumnIndex: jmColCount },
+            cell: { userEnteredFormat: { horizontalAlignment: 'RIGHT', verticalAlignment: 'MIDDLE' } },
+            fields: 'userEnteredFormat(horizontalAlignment,verticalAlignment)',
+          },
+        },
+        // Left-align + middle-valign text data cols
+        {
+          repeatCell: {
+            range: { sheetId: 0, startRowIndex: 3, startColumnIndex: 0, endColumnIndex: template2 === 'CH1_AG3' ? 10 : 9 },
+            cell: { userEnteredFormat: { horizontalAlignment: 'LEFT', verticalAlignment: 'MIDDLE' } },
+            fields: 'userEnteredFormat(horizontalAlignment,verticalAlignment)',
+          },
+        },
+        // Borders: header area (rows 1-2)
+        { updateBorders: { range: { sheetId: 0, startRowIndex: 1, endRowIndex: 3, startColumnIndex: 0, endColumnIndex: jmColCount }, top: thin, bottom: thin, left: thin, right: thin, innerHorizontal: thinLight, innerVertical: thinLight } },
+        // Borders: data area (rows 3-150)
+        { updateBorders: { range: { sheetId: 0, startRowIndex: 3, endRowIndex: 150, startColumnIndex: 0, endColumnIndex: jmColCount }, top: thinLight, bottom: thinLight, left: thinLight, right: thinLight, innerHorizontal: thinLight, innerVertical: thinLight } },
+        // Column widths
+        ...jmColWidths,
+        // Number formats
+        ...jmNumFmt,
+
+        // ═══════════════════════ SUMMARY (sheetId 1) ══════════════════════
+        // Row 0 — group headers: amber/gold bg, bold, center, wrap
+        {
+          repeatCell: {
+            range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1 },
+            cell: { userEnteredFormat: {
+              textFormat: { bold: true, fontSize: 9 },
+              backgroundColor: { red: 0.98, green: 0.92, blue: 0.60 },
+              horizontalAlignment: 'CENTER',
+              verticalAlignment: 'MIDDLE',
+              wrapStrategy: 'WRAP',
+            }},
+            fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy)',
+          },
+        },
+        // Row 1 — sub-headers: light blue, bold, center, wrap
+        {
+          repeatCell: {
+            range: { sheetId: 1, startRowIndex: 1, endRowIndex: 2 },
+            cell: { userEnteredFormat: {
+              textFormat: { bold: true, fontSize: 9 },
+              backgroundColor: { red: 0.88, green: 0.93, blue: 0.99 },
+              horizontalAlignment: 'CENTER',
+              verticalAlignment: 'MIDDLE',
+              wrapStrategy: 'WRAP',
+            }},
+            fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy)',
+          },
+        },
+        // Row 2 — Chinese: gray italic, small font, center
+        {
+          repeatCell: {
+            range: { sheetId: 1, startRowIndex: 2, endRowIndex: 3 },
+            cell: { userEnteredFormat: {
+              textFormat: { italic: true, fontSize: 8, foregroundColor: { red: 0.4, green: 0.4, blue: 0.4 } },
+              backgroundColor: { red: 0.95, green: 0.95, blue: 0.95 },
+              horizontalAlignment: 'CENTER',
+              verticalAlignment: 'MIDDLE',
+            }},
+            fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment)',
+          },
+        },
+        // Freeze 3 header rows
+        { updateSheetProperties: { properties: { sheetId: 1, gridProperties: { frozenRowCount: 3 } }, fields: 'gridProperties.frozenRowCount' } },
+        // Row heights: header rows 42px, Chinese row 20px
+        { updateDimensionProperties: { range: { sheetId: 1, dimension: 'ROWS', startIndex: 0, endIndex: 2 }, properties: { pixelSize: 42 }, fields: 'pixelSize' } },
+        { updateDimensionProperties: { range: { sheetId: 1, dimension: 'ROWS', startIndex: 2, endIndex: 3 }, properties: { pixelSize: 20 }, fields: 'pixelSize' } },
+        // Borders: header rows
+        { updateBorders: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 3, startColumnIndex: 0, endColumnIndex: summaryNCols }, top: thin, bottom: thin, left: thin, right: thin, innerHorizontal: thinLight, innerVertical: thinLight } },
+        // Borders: data area
+        { updateBorders: { range: { sheetId: 1, startRowIndex: 3, endRowIndex: 200, startColumnIndex: 0, endColumnIndex: summaryNCols }, top: thinLight, bottom: thinLight, left: thinLight, right: thinLight, innerHorizontal: thinLight, innerVertical: thinLight } },
+        // Center-align all data cells in SUMMARY
+        { repeatCell: { range: { sheetId: 1, startRowIndex: 3, startColumnIndex: 0, endColumnIndex: summaryNCols }, cell: { userEnteredFormat: { verticalAlignment: 'MIDDLE' } }, fields: 'userEnteredFormat.verticalAlignment' } },
+        // Group-header merges
+        ...summaryMerges,
+        // Column widths
+        ...summaryColWidths,
+        // Number formats
+        ...summaryNumFmt,
+
+        // ═══════════════════════ NVL (sheetId 2) ══════════════════════════
+        {
+          repeatCell: {
+            range: { sheetId: 2, startRowIndex: 0, endRowIndex: 1 },
+            cell: { userEnteredFormat: {
+              textFormat: { bold: true, fontSize: 11 },
+              backgroundColor: { red: 0.87, green: 0.95, blue: 0.85 },
+            }},
             fields: 'userEnteredFormat(textFormat,backgroundColor)',
           },
         },
-        // Freeze first 3 rows + first col of JM FORM
-        {
-          updateSheetProperties: {
-            properties: { sheetId: 0, gridProperties: { frozenRowCount: 3, frozenColumnCount: 1 } },
-            fields: 'gridProperties.frozenRowCount,gridProperties.frozenColumnCount',
-          },
-        },
-        // SUMMARY row 1 — group headers (amber/yellow)
+        // Header row of NVL table
         {
           repeatCell: {
-            range:  { sheetId: 1, startRowIndex: 0, endRowIndex: 1 },
-            cell:   { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.98, green: 0.92, blue: 0.60 } } },
+            range: { sheetId: 2, startRowIndex: 2, endRowIndex: 3 },
+            cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.88, green: 0.93, blue: 0.99 } } },
             fields: 'userEnteredFormat(textFormat,backgroundColor)',
           },
         },
-        // SUMMARY row 2 — sub-headers (blue)
+        // NVL value col: currency/number format
         {
           repeatCell: {
-            range:  { sheetId: 1, startRowIndex: 1, endRowIndex: 2 },
-            cell:   { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.88, green: 0.93, blue: 0.99 } } },
-            fields: 'userEnteredFormat(textFormat,backgroundColor)',
+            range: { sheetId: 2, startRowIndex: 3, endRowIndex: 20, startColumnIndex: 1, endColumnIndex: 2 },
+            cell: { userEnteredFormat: { numberFormat: { type: 'NUMBER', pattern: '#,##0.00####' }, horizontalAlignment: 'RIGHT' } },
+            fields: 'userEnteredFormat(numberFormat,horizontalAlignment)',
           },
         },
-        // SUMMARY row 3 — Chinese row (light gray, italic)
-        {
-          repeatCell: {
-            range:  { sheetId: 1, startRowIndex: 2, endRowIndex: 3 },
-            cell:   { userEnteredFormat: { textFormat: { italic: true }, backgroundColor: { red: 0.95, green: 0.95, blue: 0.95 } } },
-            fields: 'userEnteredFormat(textFormat,backgroundColor)',
-          },
-        },
-        // Freeze first 3 rows of SUMMARY (3 header rows)
-        {
-          updateSheetProperties: {
-            properties: { sheetId: 1, gridProperties: { frozenRowCount: 3 } },
-            fields: 'gridProperties.frozenRowCount',
-          },
-        },
-        // NVL sheet — bold title row
-        {
-          repeatCell: {
-            range:  { sheetId: 2, startRowIndex: 0, endRowIndex: 1 },
-            cell:   { userEnteredFormat: { textFormat: { bold: true, fontSize: 11 } } },
-            fields: 'userEnteredFormat(textFormat)',
-          },
-        },
+        // NVL col widths
+        { updateDimensionProperties: { range: { sheetId: 2, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 165 }, fields: 'pixelSize' } },
+        { updateDimensionProperties: { range: { sheetId: 2, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 }, properties: { pixelSize: 110 }, fields: 'pixelSize' } },
       ],
     })
 
