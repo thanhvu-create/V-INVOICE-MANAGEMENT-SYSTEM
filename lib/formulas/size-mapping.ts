@@ -105,8 +105,19 @@ export function mapSizeToRange(maXoan: string, rawSize: string, tbVien: number):
   if (!maXoan) return null
   const u = maXoan.toUpperCase()
 
-  // Lab-Grown RD: "RD-LG...", "RDL...", "L-RD..." — check before plain "RD"
-  if (u.startsWith('RD-LG') || u.startsWith('RDL') || u.startsWith('L-RD')) {
+  // L-XX prefix (lab-grown variant of any type)
+  // L-RD → RDL table (distinct lab-grown pricing)
+  // L-PR / L-BG / L-OV / etc → same table as natural type (strip prefix and recurse)
+  if (u.startsWith('L-') && maXoan.length > 2) {
+    if (u.startsWith('L-RD')) {
+      const mm = parseFloat(rawSize)
+      return isNaN(mm) ? null : lookup(mm, RDL_RANGES)
+    }
+    return mapSizeToRange(maXoan.slice(2), rawSize, tbVien)
+  }
+
+  // RD-LG / RDL — explicit lab-grown RD prefix variants
+  if (u.startsWith('RD-LG') || u.startsWith('RDL')) {
     const mm = parseFloat(rawSize)
     return isNaN(mm) ? null : lookup(mm, RDL_RANGES)
   }
