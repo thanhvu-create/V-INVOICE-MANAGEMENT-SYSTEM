@@ -142,12 +142,12 @@ function buildNVLRows(invoice: any) {
 }
 
 const SUMMARY_COLS = 32
-const GEM_ROWS_PER_PRODUCT = 5
 
-function buildSummaryRows(_invoice: any, items: any[]) {
+function buildSummaryRows(invoice: any, items: any[]) {
+  const isCH2 = invoice.template_type === 'CH2'
   const rows: (string | number)[][] = []
 
-  // Row 1 — group headers (matches Excel SUMMARY row 1)
+  // Row 1 — group headers
   const r1: (string | number)[] = Array(SUMMARY_COLS).fill('')
   r1[0]  = 'STT';            r1[1]  = 'HÌNH ẢNH'
   r1[2]  = 'THÔNG TIN SẢN PHẨM'
@@ -163,19 +163,21 @@ function buildSummaryRows(_invoice: any, items: any[]) {
   r1[31] = 'Hóa Đôn (V-INVOICE)'
   rows.push(r1)
 
-  // Row 2 — sub-headers (matches Excel SUMMARY row 2)
+  // Row 2 — sub-headers (col 15/16 differ for CH2: no TL trước, only TL sau)
   const r2: (string | number)[] = Array(SUMMARY_COLS).fill('')
   r2[2]  = 'SO/MO';           r2[3]  = 'Kích Thước'
   r2[4]  = 'Số lượng';        r2[5]  = 'Mã số mẫu';  r2[6]  = 'Loại vàng'
   r2[8]  = 'T.Phẩm (có NVL đá)'; r2[9] = 'T.Phẩm (trừ NVL đá)'; r2[10] = 'T.Phẩm (vàng TT)'
   r2[11] = 'Mã Xoàn';         r2[12] = 'P. chất';    r2[13] = 'Size Xoàn'
-  r2[14] = 'SL hột';           r2[15] = 'TL (ct.) trước xử lý'; r2[16] = 'TL (ct.) sau xử lý'
+  r2[14] = 'SL hột'
+  r2[15] = isCH2 ? 'TL (ct.) sau xử lý' : 'TL (ct.) trước xử lý'
+  r2[16] = isCH2 ? '' : 'TL (ct.) sau xử lý'
   r2[17] = 'TL Xoàn (gr)';    r2[18] = 'Đơn giá ($)'; r2[19] = 'T.GIÁ XOÀN'
   r2[20] = 'Đơn giá phí';     r2[21] = 'T.Phí'
   r2[27] = 'Vốn sản xuất';    r2[28] = 'Bảo hiểm'
   rows.push(r2)
 
-  // Row 3 — Chinese translations (matches Excel SUMMARY row 3)
+  // Row 3 — Chinese translations
   const r3: (string | number)[] = Array(SUMMARY_COLS).fill('')
   r3[0]='编号'; r3[1]='图片'; r3[2]='产品编号'; r3[3]='尺寸'; r3[4]='数量'; r3[5]='型号'; r3[6]='金属类型'
   r3[7]='金价'; r3[9]='产品重量'; r3[10]='净金重'
@@ -185,23 +187,23 @@ function buildSummaryRows(_invoice: any, items: any[]) {
   r3[27]='总计'; r3[28]='到岸价'
   rows.push(r3)
 
-  // Data — fixed 5-row blocks per product (matches Excel block structure)
+  // Data — dynamic rows: 1 main row + 1 row per gem (no fixed block limit)
   for (const item of items ?? []) {
     const gems = (item.invoice_diamonds ?? []) as any[]
+    const numRows = Math.max(gems.length, 1)
 
-    for (let g = 0; g < GEM_ROWS_PER_PRODUCT; g++) {
+    for (let g = 0; g < numRows; g++) {
       const gem = gems[g] as any | undefined
       const row: (string | number)[] = Array(SUMMARY_COLS).fill('')
 
       if (g === 0) {
-        // Main row — product identity + first gem + fees + output
+        // Main row — product identity + fees + output
         row[0]  = n(item.seq)
-        // row[1] = '' (HÌNH ẢNH — always empty in export)
-        row[2]  = item.so_mo      ?? ''
-        row[3]  = item.kich_thuoc ?? ''
+        row[2]  = item.so_mo        ?? ''
+        row[3]  = item.kich_thuoc   ?? ''
         row[4]  = n(item.qt_pcs)
         row[5]  = item.vendor_model ?? ''
-        row[6]  = item.loai_vang  ?? ''
+        row[6]  = item.loai_vang    ?? ''
         row[7]  = n(item.tien_vang)
         row[8]  = n(item.t_pham_co_nvl_da)
         row[9]  = n(item.t_pham_tru_nvl_da)
@@ -215,21 +217,19 @@ function buildSummaryRows(_invoice: any, items: any[]) {
         row[31] = item.hoa_don     ?? ''
       }
 
-      // Gem columns (11-21) — filled for every sub-row that has a gem
+      // Gem columns (11-21) — CH2 uses tl_sau as primary (no tl_truoc column)
       if (gem) {
         row[11] = gem.ma_xoan         ?? ''
         row[12] = gem.p_chat          ?? ''
         row[13] = gem.size_xoan_range ?? ''
         row[14] = n(gem.sl_hot)
-        row[15] = n(gem.tl_truoc_xu_ly_ct)
-        row[16] = n(gem.tl_sau_xu_ly_ct)
+        row[15] = isCH2 ? n(gem.tl_sau_xu_ly_ct) : n(gem.tl_truoc_xu_ly_ct)
+        row[16] = isCH2 ? '' : n(gem.tl_sau_xu_ly_ct)
         row[17] = n(gem.tl_xoan_gr)
         row[18] = n(gem.don_gia)
         row[19] = n(gem.t_gia_xoan)
-        row[20] = 1                   // don_gia_phi always $1
+        row[20] = 1
         row[21] = n(gem.t_phi)
-      } else {
-        row[20] = 1                   // don_gia_phi = $1 even in empty sub-rows
       }
 
       rows.push(row)
