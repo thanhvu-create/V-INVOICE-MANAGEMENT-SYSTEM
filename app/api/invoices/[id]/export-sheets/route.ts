@@ -544,6 +544,40 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     // 3. Write SUMMARY data
     const summaryRows = buildSummaryRows(invoice, processedItems)
+
+    // ── Grand total row (TỔNG CỘNG) ─────────────────────────────────────────
+    const template3 = (invoice.template_type ?? 'CH1') as string
+    const _isAG3gt  = template3 === 'CH1_AG3' || template3 === 'VNSI_AG3'
+    const _isADMgt  = template3 === 'ADM'
+    const _gtNCols  = summaryRows[0]?.length ?? 32
+    const sumF = (field: string) => processedItems.reduce((s: number, item: any) => {
+      const v = n(item[field]); return s + (typeof v === 'number' ? v : 0)
+    }, 0)
+
+    let summaryGrandTotalRowIdx = -1
+    if (processedItems.length > 0) {
+      if (_isAG3gt) {
+        summaryGrandTotalRowIdx = 3 + processedItems.length * 4
+        const gt = Array(_gtNCols).fill('')
+        gt[0] = 'TỔNG'; gt[4] = sumF('qt_pcs'); gt[7] = sumF('tien_vang')
+        gt[8] = sumF('t_pham_co_nvl_da'); gt[9] = sumF('von_san_xuat')
+        summaryRows.push(gt)
+      } else {
+        let dataRowCount = 0
+        for (const item of processedItems) {
+          const gems = (item.invoice_diamonds ?? []) as any[]
+          if (_isADMgt) dataRowCount += Math.max(gems.length, item.nini_adm ? 2 : 1)
+          else          dataRowCount += Math.max(gems.length, 1)
+        }
+        summaryGrandTotalRowIdx = 3 + dataRowCount
+        const gt = Array(_gtNCols).fill('')
+        gt[0] = 'TỔNG'; gt[4] = sumF('qt_pcs'); gt[7] = sumF('tien_vang')
+        if (_isADMgt) { gt[22] = sumF('von_san_xuat'); gt[23] = sumF('cif_price') }
+        else          { gt[8] = sumF('t_pham_co_nvl_da'); gt[27] = sumF('von_san_xuat') }
+        summaryRows.push(gt)
+      }
+    }
+
     await sheetsPut(
       accessToken,
       `${spreadsheetId}/values/${encodeURIComponent('SUMMARY!A1')}?valueInputOption=USER_ENTERED`,
@@ -584,6 +618,45 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     // Helper — thin border object
     const thin = { style: 'SOLID', width: 1, color: { red: 0.75, green: 0.75, blue: 0.75 } }
     const thinLight = { style: 'SOLID', width: 1, color: { red: 0.88, green: 0.88, blue: 0.88 } }
+    const thickGold = { style: 'SOLID_MEDIUM', width: 2, color: { red: 0.70, green: 0.55, blue: 0.10 } }
+    const thickDark = { style: 'SOLID_MEDIUM', width: 2, color: { red: 0.30, green: 0.30, blue: 0.30 } }
+
+    // ── Dynamic SUMMARY totals formatting ────────────────────────────────────
+    const summaryExtraFmt: any[] = []
+    if (isAG3f && processedItems.length > 0) {
+      for (let i = 0; i < processedItems.length; i++) {
+        const subRowIdx    = 3 + i * 4 + 1
+        const spacerRowIdx = 3 + i * 4 + 2
+        const totalsRowIdx = 3 + i * 4 + 3
+        summaryExtraFmt.push(
+          { updateDimensionProperties: { range: { sheetId: 1, dimension: 'ROWS', startIndex: subRowIdx, endIndex: subRowIdx + 1 }, properties: { pixelSize: 22 }, fields: 'pixelSize' } },
+          { updateDimensionProperties: { range: { sheetId: 1, dimension: 'ROWS', startIndex: spacerRowIdx, endIndex: spacerRowIdx + 1 }, properties: { pixelSize: 8 }, fields: 'pixelSize' } },
+          { updateDimensionProperties: { range: { sheetId: 1, dimension: 'ROWS', startIndex: totalsRowIdx, endIndex: totalsRowIdx + 1 }, properties: { pixelSize: 28 }, fields: 'pixelSize' } },
+          { repeatCell: {
+            range: { sheetId: 1, startRowIndex: totalsRowIdx, endRowIndex: totalsRowIdx + 1 },
+            cell: { userEnteredFormat: { textFormat: { bold: true }, backgroundColor: { red: 0.98, green: 0.94, blue: 0.75 } } },
+            fields: 'userEnteredFormat(textFormat,backgroundColor)',
+          }},
+          { updateBorders: { range: { sheetId: 1, startRowIndex: totalsRowIdx, endRowIndex: totalsRowIdx + 1, startColumnIndex: 0, endColumnIndex: summaryNCols }, top: thickGold, bottom: thickGold, left: thin, right: thin, innerVertical: thinLight } },
+        )
+      }
+    }
+    if (summaryGrandTotalRowIdx >= 0) {
+      summaryExtraFmt.push(
+        { updateDimensionProperties: { range: { sheetId: 1, dimension: 'ROWS', startIndex: summaryGrandTotalRowIdx, endIndex: summaryGrandTotalRowIdx + 1 }, properties: { pixelSize: 32 }, fields: 'pixelSize' } },
+        { repeatCell: {
+          range: { sheetId: 1, startRowIndex: summaryGrandTotalRowIdx, endRowIndex: summaryGrandTotalRowIdx + 1 },
+          cell: { userEnteredFormat: {
+            textFormat: { bold: true, fontSize: 10 },
+            backgroundColor: { red: 0.98, green: 0.88, blue: 0.50 },
+            horizontalAlignment: 'CENTER',
+            verticalAlignment: 'MIDDLE',
+          }},
+          fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment)',
+        }},
+        { updateBorders: { range: { sheetId: 1, startRowIndex: summaryGrandTotalRowIdx, endRowIndex: summaryGrandTotalRowIdx + 1, startColumnIndex: 0, endColumnIndex: summaryNCols }, top: thickDark, bottom: thickDark, left: thickDark, right: thickDark, innerVertical: thinLight } },
+      )
+    }
 
     // ── SUMMARY group-header merges ──────────────────────────────────────────
     // Cells that have sub-headers in row 1 are NOT vertically merged (they keep their group label in row 0 only).
@@ -838,6 +911,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         ...summaryColWidths,
         // Number formats
         ...summaryNumFmt,
+        // Totals row formatting (AG3 per-item totals + grand total)
+        ...summaryExtraFmt,
 
         // ═══════════════════════ NVL (sheetId 2) ══════════════════════════
         {
