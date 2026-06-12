@@ -107,6 +107,7 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
     if (isADM)    header.push('Ngày gửi', 'Hóa đơn (V-INV)')
   }
   header.push(isAG3 ? 'Chi tiết/1sp' : 'Ghi chú (NINI)')
+  if (isAG3) header.push('', '', '')  // V=empty spacer, W=hoa_don (unlabeled in Excel), X=ngay_gui (unlabeled)
   rows.push(header)
 
   // Row 3 — blank sub-header row
@@ -155,6 +156,7 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
       }
     }
     row.push(isAG3 ? (item.chi_tiet_tap ?? '') : (item.nini_adm ?? ''))
+    if (isAG3) row.push('', item.hoa_don ?? '', item.ngay_gui ?? '')  // V=empty, W=hoa_don, X=ngay_gui
 
     rows.push(row)
   }
@@ -208,7 +210,7 @@ function buildSummaryRowsAG3(items: any[]) {
   r3[5]='型号'; r3[6]='金属类型'; r3[7]='金价'; r3[9]='总计'
   rows.push(r3)
 
-  // Data rows — 3 rows per product (data + empty + spacer)
+  // Data rows — 4 rows per product (data + channel-sub-row + spacer + totals)
   for (const item of items ?? []) {
     const row = Array(C).fill('')
     row[0] = n(item.seq)
@@ -222,8 +224,15 @@ function buildSummaryRowsAG3(items: any[]) {
     row[8] = n(item.t_pham_co_nvl_da)
     row[9] = n(item.von_san_xuat)  // Trị giá = von_san_xuat = tien_vang for AG3
     rows.push(row)
-    rows.push(Array(C).fill(''))                                    // empty row
+    rows.push(Array(C).fill(''))                                    // channel sub-row (CH1-SR etc — blank, users fill manually)
     rows.push(Array(C).fill('').map((v, i) => i === 7 ? ' ' : v))  // spacer (space in Tiền vàng col to match Excel)
+    // Totals row — aggregates qty + financial values (mirrors Excel R7 pattern)
+    const totals = Array(C).fill('')
+    totals[4] = n(item.qt_pcs)
+    totals[7] = n(item.tien_vang)
+    totals[8] = n(item.t_pham_co_nvl_da)
+    totals[9] = n(item.von_san_xuat)
+    rows.push(totals)
   }
 
   return rows
@@ -331,7 +340,7 @@ function buildSummaryRows(invoice: any, items: any[]) {
   r1[22] = 'Gia công / 1 SP'; r1[23] = 'Đúc / 1sp'
   r1[24] = 'Thiết Kế / 1sp'; r1[25] = 'Resin / 1sp'
   r1[26] = 'Phí phụ kiện (mua bên ngoài)'
-  r1[27] = 'HPUSA';           r1[28] = 'NINI/ADM'
+  r1[27] = 'HPUSA'
   r1[29] = 'Ngày gửi';        r1[30] = 'Tracking# gửi hàng USA'
   r1[31] = 'Hóa Đôn (V-INVOICE)'
   rows.push(r1)
