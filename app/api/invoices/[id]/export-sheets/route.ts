@@ -67,8 +67,14 @@ function n(v: unknown): number | string {
   return isNaN(f) ? '' : f
 }
 
-function driveImageFormula(url: string | null | undefined): string {
-  if (!url?.trim()) return ''
+// Wrap a public URL in =IMAGE() formula
+function driveImageFormula(publicUrl: string | null | undefined): string {
+  if (!publicUrl?.trim()) return ''
+  return `=IMAGE("${publicUrl}")`
+}
+
+function extractDriveFileId(url: string | null | undefined): string | null {
+  if (!url?.trim()) return null
   const patterns = [
     /\/file\/d\/([a-zA-Z0-9_-]{10,})/,
     /[?&]id=([a-zA-Z0-9_-]{10,})/,
@@ -77,9 +83,27 @@ function driveImageFormula(url: string | null | undefined): string {
   ]
   for (const re of patterns) {
     const m = url.match(re)
-    if (m) return `=IMAGE("https://drive.google.com/uc?export=view&id=${m[1]}")`
+    if (m) return m[1]
   }
-  return ''
+  return null
+}
+
+// Fetch Google CDN thumbnail URL for a Drive file (publicly accessible, no auth needed to view)
+async function fetchThumbnailUrl(accessToken: string, fileId: string): Promise<string | null> {
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${fileId}?fields=thumbnailLink`,
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    )
+    if (!res.ok) return null
+    const data = await res.json()
+    const thumb = data.thumbnailLink as string | undefined
+    if (!thumb) return null
+    // Increase thumbnail size from default (s220) to s500
+    return thumb.replace(/=s\d+$/, '=s500')
+  } catch {
+    return null
+  }
 }
 
 function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
@@ -466,6 +490,18 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     if (!invoice) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
 
+    // Replace each item's image_url with a Google CDN thumbnail URL (publicly accessible, works in =IMAGE() formula).
+    // Drive files are private by default — =IMAGE() cannot load them without auth.
+    // thumbnailLink from Drive API is a time-limited CDN URL that Google Sheets can fetch without credentials.
+    const processedItems = await Promise.all(
+      (items ?? []).map(async (item) => {
+        const fileId = extractDriveFileId(item.image_url)
+        if (!fileId) return item
+        const thumbUrl = await fetchThumbnailUrl(accessToken, fileId)
+        return { ...item, image_url: thumbUrl ?? null }
+      }),
+    )
+
     const title = `V-Invoice ${invoice.invoice_code ?? params.id} (${invoice.template_type ?? ''})`
 
     // 1. Create spreadsheet with three sheets
@@ -482,7 +518,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
 
     // 2. Write JM FORM data
-    const jmRows = buildJMFormRows(invoice, items ?? [], canSeePrice)
+    const jmRows = buildJMFormRows(invoice, processedItems, canSeePrice)
     await sheetsPut(
       accessToken,
       `${spreadsheetId}/values/${encodeURIComponent('JM FORM!A1')}?valueInputOption=USER_ENTERED`,
@@ -490,7 +526,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     )
 
     // 3. Write SUMMARY data
-    const summaryRows = buildSummaryRows(invoice, items ?? [])
+    const summaryRows = buildSummaryRows(invoice, processedItems)
     await sheetsPut(
       accessToken,
       `${spreadsheetId}/values/${encodeURIComponent('SUMMARY!A1')}?valueInputOption=USER_ENTERED`,
