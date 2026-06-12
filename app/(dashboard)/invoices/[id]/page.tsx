@@ -30,12 +30,32 @@ export default function InvoiceDetailPage() {
   const [view,            setView]         = useState<InvoiceView>('jm-form')
   const [addItemOpen,     setAddItemOpen]  = useState(false)
   const [exportingSheets, setExportingSheets] = useState(false)
+  const [syncingNVL,      setSyncingNVL]      = useState(false)
 
   const canSeePrice = canDo('see_prices')
   const isLocked    = data?.header?.status === 'finalized'
   const status      = data?.header?.status ?? ''
   const canEdit     = canDo('edit') && !isLocked
   const availTrans  = ALLOWED_TRANSITIONS[user.role]?.[status] ?? []
+
+  async function handleSyncNVL() {
+    if (!confirm('Cập nhật giá NVL mới nhất cho invoice này và tính lại toàn bộ sản phẩm?')) return
+    setSyncingNVL(true)
+    try {
+      const res  = await fetch(`/api/invoices/${id}/sync-nvl`, { method: 'POST' })
+      const json = await res.json()
+      if (json.success) {
+        await fetchData()
+        alert(json.message)
+      } else {
+        alert(json.message ?? 'Không thể sync NVL.')
+      }
+    } catch {
+      alert('Lỗi kết nối.')
+    } finally {
+      setSyncingNVL(false)
+    }
+  }
 
   async function handleExportSheets() {
     setExportingSheets(true)
@@ -128,6 +148,19 @@ export default function InvoiceDetailPage() {
             <a href={`/import?invoiceId=${id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', color: 'var(--text-primary)', textDecoration: 'none', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)' }}>
               <i className="fa-solid fa-file-import" style={{ fontSize: 11 }} /> Import
             </a>
+          )}
+          {canEdit && (
+            <button
+              onClick={handleSyncNVL}
+              disabled={syncingNVL}
+              title="Cập nhật giá NVL mới nhất và tính lại toàn bộ sản phẩm"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', background: 'transparent', color: syncingNVL ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)', cursor: syncingNVL ? 'not-allowed' : 'pointer', opacity: syncingNVL ? 0.6 : 1 }}
+            >
+              {syncingNVL
+                ? <><i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 11 }} /> Đang sync…</>
+                : <><i className="fa-solid fa-rotate" style={{ fontSize: 11 }} /> Sync NVL</>
+              }
+            </button>
           )}
           <div style={{ display: 'inline-flex', alignItems: 'stretch' }}>
             <button
