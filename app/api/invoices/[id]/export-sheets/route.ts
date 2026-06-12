@@ -694,8 +694,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
             fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy)',
           },
         },
-        // Freeze first 3 rows + first col
-        { updateSheetProperties: { properties: { sheetId: 0, gridProperties: { frozenRowCount: 3, frozenColumnCount: 1 } }, fields: 'gridProperties.frozenRowCount,gridProperties.frozenColumnCount' } },
+        // Freeze first 3 rows (no col freeze — conflicts with full-width title row merge)
+        { updateSheetProperties: { properties: { sheetId: 0, gridProperties: { frozenRowCount: 3, frozenColumnCount: 0 } }, fields: 'gridProperties.frozenRowCount,gridProperties.frozenColumnCount' } },
         // Row heights: title 30px, header rows 42px
         { updateDimensionProperties: { range: { sheetId: 0, dimension: 'ROWS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 30 }, fields: 'pixelSize' } },
         { updateDimensionProperties: { range: { sheetId: 0, dimension: 'ROWS', startIndex: 1, endIndex: 3 }, properties: { pixelSize: 42 }, fields: 'pixelSize' } },
