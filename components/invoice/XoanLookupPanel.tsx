@@ -27,6 +27,16 @@ function extractMO(soMo: string): string | null {
   return m ? m[1] : null
 }
 
+function inferPChat(maXoan: string): string {
+  if (!maXoan) return ''
+  const u = maXoan.toUpperCase()
+  if (u.includes('CZ')) return 'CZ'
+  if (u.includes('L'))  return 'LG'
+  const DIAMOND = ['RD', 'PR', 'BG', 'MQ', 'PS', 'OV', 'TD']
+  if (DIAMOND.some(p => u.startsWith(p))) return 'VVS1'
+  return ''
+}
+
 function parseAndFilter(buf: ArrayBuffer, mo: string | null): GemRow[] {
   const wb  = XLSX.read(new Uint8Array(buf), { type: 'array' })
   const ws  = wb.Sheets[wb.SheetNames[0]]
@@ -45,12 +55,13 @@ function parseAndFilter(buf: ArrayBuffer, mo: string | null): GemRow[] {
     if (!rowMO) continue
     if (mo && rowMO !== mo) continue
     if (status !== 'xuất') continue
+    const ma_xoan = String(r[5] ?? '').trim()
     out.push({
-      ma_xoan:      String(r[6]  ?? '').trim(),
-      p_chat:       'VVS1',
+      ma_xoan,
+      p_chat:       inferPChat(ma_xoan),
       size_xoan:    String(r[7]  ?? '').trim(),
       sl_hot:       Number(r[8]  ?? 0),
-      tl_sau_xu_ly: Number(r[11] ?? 0),
+      tl_sau_xu_ly: Number(r[9]  ?? 0),
     })
   }
   return out
