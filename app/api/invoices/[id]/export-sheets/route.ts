@@ -67,6 +67,21 @@ function n(v: unknown): number | string {
   return isNaN(f) ? '' : f
 }
 
+function driveImageFormula(url: string | null | undefined): string {
+  if (!url?.trim()) return ''
+  const patterns = [
+    /\/file\/d\/([a-zA-Z0-9_-]{10,})/,
+    /[?&]id=([a-zA-Z0-9_-]{10,})/,
+    /\/d\/([a-zA-Z0-9_-]{10,})/,
+    /\/open\?id=([a-zA-Z0-9_-]{10,})/,
+  ]
+  for (const re of patterns) {
+    const m = url.match(re)
+    if (m) return `=IMAGE("https://drive.google.com/uc?export=view&id=${m[1]}")`
+  }
+  return ''
+}
+
 function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
   const template   = (invoice.template_type ?? 'CH1') as string
   const isCH2      = template === 'CH2'
@@ -211,6 +226,7 @@ function buildSummaryRowsAG3(items: any[]) {
   for (const item of items ?? []) {
     const row = Array(C).fill('')
     row[0] = n(item.seq)
+    row[1] = driveImageFormula(item.image_url)
     // Col C (SO/MO) = vendor_model for AG3 (SUMMARY formula = 'JM FORM'!D = vendor model#)
     row[2] = item.vendor_model ?? item.so_mo ?? ''
     row[3] = item.kich_thuoc   ?? ''
@@ -281,6 +297,7 @@ function buildSummaryRowsADM(items: any[]) {
 
       if (g === 0) {
         row[0]  = n(item.seq)
+        row[1]  = driveImageFormula(item.image_url)
         row[2]  = item.so_mo        ?? ''
         row[3]  = item.kich_thuoc   ?? ''
         row[4]  = n(item.qt_pcs)
@@ -378,6 +395,7 @@ function buildSummaryRows(invoice: any, items: any[]) {
       if (g === 0) {
         // Main row — product identity + fees + output
         row[0]  = n(item.seq)
+        row[1]  = driveImageFormula(item.image_url)
         row[2]  = item.so_mo        ?? ''
         row[3]  = item.kich_thuoc   ?? ''
         row[4]  = n(item.qt_pcs)
@@ -751,9 +769,10 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         },
         // Freeze 3 header rows
         { updateSheetProperties: { properties: { sheetId: 1, gridProperties: { frozenRowCount: 3 } }, fields: 'gridProperties.frozenRowCount' } },
-        // Row heights: header rows 42px, Chinese row 20px
+        // Row heights: header rows 42px, Chinese row 20px, data rows 80px (for images)
         { updateDimensionProperties: { range: { sheetId: 1, dimension: 'ROWS', startIndex: 0, endIndex: 2 }, properties: { pixelSize: 42 }, fields: 'pixelSize' } },
         { updateDimensionProperties: { range: { sheetId: 1, dimension: 'ROWS', startIndex: 2, endIndex: 3 }, properties: { pixelSize: 20 }, fields: 'pixelSize' } },
+        { updateDimensionProperties: { range: { sheetId: 1, dimension: 'ROWS', startIndex: 3, endIndex: 203 }, properties: { pixelSize: 80 }, fields: 'pixelSize' } },
         // Borders: header rows
         { updateBorders: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 3, startColumnIndex: 0, endColumnIndex: summaryNCols }, top: thin, bottom: thin, left: thin, right: thin, innerHorizontal: thinLight, innerVertical: thinLight } },
         // Borders: data area

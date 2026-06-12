@@ -3,6 +3,7 @@
 import { useState, Fragment } from 'react'
 import { JMEditableCell } from './JMEditableCell'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { DriveImage } from './DriveImage'
 import { apiCall } from '@/lib/api'
 
 
@@ -11,6 +12,7 @@ interface Col {
   label:        string
   mono?:        boolean
   sku?:         boolean
+  image?:       boolean
   computed?:    boolean
   price?:       boolean
   notes?:       boolean
@@ -27,6 +29,7 @@ interface Col {
 const JM_COLS: Col[] = [
   // Identity — all templates
   { key: 'seq',              label: 'No.',                                    width: 44  },
+  { key: 'image_url',        label: 'Hình',             image: true,         width: 58  },
   { key: 'store',            label: 'Store',                                  width: 70  },
   { key: 'location',         label: 'Location',                               width: 80  },
   { key: 'vendor_model',     label: 'Vendor Model#',                          width: 120 },
@@ -215,9 +218,9 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                   width: c.width, minWidth: c.width,
                   color: c.computed ? 'var(--color-info)' : 'var(--text-secondary)',
                   textAlign: c.price || c.mono ? 'right' : 'left',
-                  position: (i === 0 || c.sku) ? 'sticky' : 'sticky',
-                  left:     i === 0 ? 0 : c.sku ? 44 : undefined,
-                  zIndex:   i === 0 || c.sku ? 20 : 10,
+                  position: (i === 0 || c.image || c.sku) ? 'sticky' : 'sticky',
+                  left:     i === 0 ? 0 : c.image ? 44 : c.sku ? 102 : undefined,
+                  zIndex:   i === 0 || c.image || c.sku ? 20 : 10,
                   background: c.sku ? 'var(--sku-highlight-bg)' : 'var(--bg-base)',
                 }}>
                   {c.label}
@@ -254,9 +257,9 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                       const isEditableF  = EDITABLE_FIELDS.has(col.key)
                       const displayVal   = getDisplayValue(col, item)
 
-                      const stickyStyle: React.CSSProperties = (i === 0 || col.sku) ? {
+                      const stickyStyle: React.CSSProperties = (i === 0 || col.image || col.sku) ? {
                         position: 'sticky',
-                        left:     i === 0 ? 0 : 44,
+                        left:     i === 0 ? 0 : col.image ? 44 : 102,
                         zIndex:   1,
                       } : {}
 
@@ -264,6 +267,14 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                         return (
                           <td key={col.key} style={{ ...td, ...stickyStyle, background: 'var(--bg-surface)', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', textAlign: 'center' }}>
                             {item.seq}
+                          </td>
+                        )
+                      }
+
+                      if (col.image) {
+                        return (
+                          <td key={col.key} style={{ ...td, padding: '3px 6px', verticalAlign: 'middle' }}>
+                            <DriveImage url={item.image_url} alt={item.sku ?? ''} size={48} />
                           </td>
                         )
                       }
