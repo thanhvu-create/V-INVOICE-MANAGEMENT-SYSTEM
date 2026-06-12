@@ -110,9 +110,6 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
   if (isAG3) header.push('', '', '')  // V=empty spacer, W=hoa_don (unlabeled in Excel), X=ngay_gui (unlabeled)
   rows.push(header)
 
-  // Row 3 — blank sub-header row
-  rows.push(Array(header.length).fill(''))
-
   // Data rows
   for (const item of items ?? []) {
     const purchase = n(item.von_san_xuat ?? item.purchase_price)
@@ -632,7 +629,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       const priceStart = template2 === 'CH1_AG3' ? 12 : 11
       jmNumFmt.push({
         repeatCell: {
-          range: { sheetId: 0, startRowIndex: 3, startColumnIndex: priceStart, endColumnIndex: jmColCount - 1 },
+          range: { sheetId: 0, startRowIndex: 2, startColumnIndex: priceStart, endColumnIndex: jmColCount - 1 },
           cell: { userEnteredFormat: { numberFormat: { type: 'CURRENCY', pattern: '#,##0.00' }, horizontalAlignment: 'RIGHT' } },
           fields: 'userEnteredFormat(numberFormat,horizontalAlignment)',
         },
@@ -641,7 +638,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       if (isCH1f) {
         jmNumFmt.push({
           repeatCell: {
-            range: { sheetId: 0, startRowIndex: 3, startColumnIndex: priceStart + 3, endColumnIndex: priceStart + 4 },
+            range: { sheetId: 0, startRowIndex: 2, startColumnIndex: priceStart + 3, endColumnIndex: priceStart + 4 },
             cell: { userEnteredFormat: { numberFormat: { type: 'PERCENT', pattern: '0.00%' } } },
             fields: 'userEnteredFormat.numberFormat',
           },
@@ -680,29 +677,15 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
             fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy)',
           },
         },
-        // Sub-header row (row 2): same amber, bold, center, wrap
-        {
-          repeatCell: {
-            range: { sheetId: 0, startRowIndex: 2, endRowIndex: 3 },
-            cell: { userEnteredFormat: {
-              textFormat: { bold: true, fontSize: 9 },
-              backgroundColor: { red: 0.98, green: 0.95, blue: 0.80 },
-              horizontalAlignment: 'CENTER',
-              verticalAlignment: 'MIDDLE',
-              wrapStrategy: 'WRAP',
-            }},
-            fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy)',
-          },
-        },
-        // Freeze first 3 rows (no col freeze — conflicts with full-width title row merge)
-        { updateSheetProperties: { properties: { sheetId: 0, gridProperties: { frozenRowCount: 3, frozenColumnCount: 0 } }, fields: 'gridProperties.frozenRowCount,gridProperties.frozenColumnCount' } },
-        // Row heights: title 30px, header rows 42px
+        // Freeze first 2 rows (no col freeze — conflicts with full-width title row merge)
+        { updateSheetProperties: { properties: { sheetId: 0, gridProperties: { frozenRowCount: 2, frozenColumnCount: 0 } }, fields: 'gridProperties.frozenRowCount,gridProperties.frozenColumnCount' } },
+        // Row heights: title 30px, header row 42px
         { updateDimensionProperties: { range: { sheetId: 0, dimension: 'ROWS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 30 }, fields: 'pixelSize' } },
-        { updateDimensionProperties: { range: { sheetId: 0, dimension: 'ROWS', startIndex: 1, endIndex: 3 }, properties: { pixelSize: 42 }, fields: 'pixelSize' } },
+        { updateDimensionProperties: { range: { sheetId: 0, dimension: 'ROWS', startIndex: 1, endIndex: 2 }, properties: { pixelSize: 42 }, fields: 'pixelSize' } },
         // Right-align numeric data cols (Qt, Wt, prices)
         {
           repeatCell: {
-            range: { sheetId: 0, startRowIndex: 3, startColumnIndex: template2 === 'CH1_AG3' ? 10 : 9, endColumnIndex: jmColCount },
+            range: { sheetId: 0, startRowIndex: 2, startColumnIndex: template2 === 'CH1_AG3' ? 10 : 9, endColumnIndex: jmColCount },
             cell: { userEnteredFormat: { horizontalAlignment: 'RIGHT', verticalAlignment: 'MIDDLE' } },
             fields: 'userEnteredFormat(horizontalAlignment,verticalAlignment)',
           },
@@ -710,15 +693,15 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         // Left-align + middle-valign text data cols
         {
           repeatCell: {
-            range: { sheetId: 0, startRowIndex: 3, startColumnIndex: 0, endColumnIndex: template2 === 'CH1_AG3' ? 10 : 9 },
+            range: { sheetId: 0, startRowIndex: 2, startColumnIndex: 0, endColumnIndex: template2 === 'CH1_AG3' ? 10 : 9 },
             cell: { userEnteredFormat: { horizontalAlignment: 'LEFT', verticalAlignment: 'MIDDLE' } },
             fields: 'userEnteredFormat(horizontalAlignment,verticalAlignment)',
           },
         },
         // Borders: header area (rows 1-2)
-        { updateBorders: { range: { sheetId: 0, startRowIndex: 1, endRowIndex: 3, startColumnIndex: 0, endColumnIndex: jmColCount }, top: thin, bottom: thin, left: thin, right: thin, innerHorizontal: thinLight, innerVertical: thinLight } },
-        // Borders: data area (rows 3-150)
-        { updateBorders: { range: { sheetId: 0, startRowIndex: 3, endRowIndex: 150, startColumnIndex: 0, endColumnIndex: jmColCount }, top: thinLight, bottom: thinLight, left: thinLight, right: thinLight, innerHorizontal: thinLight, innerVertical: thinLight } },
+        { updateBorders: { range: { sheetId: 0, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: jmColCount }, top: thin, bottom: thin, left: thin, right: thin, innerHorizontal: thinLight, innerVertical: thinLight } },
+        // Borders: data area (rows 2-150)
+        { updateBorders: { range: { sheetId: 0, startRowIndex: 2, endRowIndex: 150, startColumnIndex: 0, endColumnIndex: jmColCount }, top: thinLight, bottom: thinLight, left: thinLight, right: thinLight, innerHorizontal: thinLight, innerVertical: thinLight } },
         // Column widths
         ...jmColWidths,
         // Number formats
