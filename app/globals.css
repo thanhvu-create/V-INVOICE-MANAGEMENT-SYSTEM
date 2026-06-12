@@ -401,6 +401,27 @@ a { transition: color 0.15s ease-out; }
   .topnav-username { display: none; }
 }
 
+/* ── Recent Invoices row — responsive ───────────────────────────────────── */
+.recent-inv-row {
+  display:     flex;
+  align-items: center;
+  gap:         0.75rem;
+}
+
+@media (max-width: 600px) {
+  .recent-inv-row {
+    flex-wrap:   wrap;
+    gap:         0.3rem 0.5rem;
+    align-items: center;
+  }
+  /* code: shrink if needed, no hard min-width */
+  .recent-inv-code { min-width: 0 !important; flex-shrink: 1; }
+  /* channel: drop to its own full-width line */
+  .recent-inv-chan  { order: 10; flex-basis: 100%; margin-top: 0.1rem; }
+  /* meta (date+status+count): push to the right on line 1 */
+  .recent-inv-meta  { margin-left: auto; }
+}
+
 /* ── Invoice list: table vs card ────────────────────────────────────────── */
 .invoice-table-wrap { display: block; }
 .invoice-card-list  { display: none; }

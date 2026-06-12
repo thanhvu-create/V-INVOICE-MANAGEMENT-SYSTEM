@@ -69,8 +69,8 @@ export function RecentInvoices({ rows, loading }: { rows: RecentRow[]; loading: 
             <a
               key={row.id}
               href={`/invoices/${row.id}`}
+              className="recent-inv-row"
               style={{
-                display: 'flex', alignItems: 'center', gap: '0.75rem',
                 padding: '0.75rem 1rem',
                 borderBottom: idx < rows.length - 1 ? '1px solid var(--border-light)' : 'none',
                 textDecoration: 'none', color: 'inherit',
@@ -81,7 +81,7 @@ export function RecentInvoices({ rows, loading }: { rows: RecentRow[]; loading: 
               onMouseLeave={e => ((e.currentTarget as HTMLAnchorElement).style.background = 'transparent')}
             >
               {/* Invoice code */}
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-primary)', minWidth: 110 }}>
+              <span className="recent-inv-code" style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--text-primary)', minWidth: 110 }}>
                 {row.invoice_code}
               </span>
 
@@ -97,23 +97,21 @@ export function RecentInvoices({ rows, loading }: { rows: RecentRow[]; loading: 
                 </span>
               )}
 
-              {/* Channel */}
-              <span style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {/* Channel — drops to its own line on mobile */}
+              <span className="recent-inv-chan" style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {row.channel ?? '—'}
               </span>
 
-              {/* Date */}
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap', minWidth: 60, textAlign: 'right' }}>
-                {dateLabel}
-              </span>
-
-              {/* Status */}
-              <StatusBadge status={row.status} />
-
-              {/* Item count */}
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', minWidth: 52, textAlign: 'right' }}>
-                {itemCnt} {itemCnt === 1 ? 'item' : 'items'}
-              </span>
+              {/* Date + Status + Count grouped so they stay together */}
+              <div className="recent-inv-meta" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                  {dateLabel}
+                </span>
+                <StatusBadge status={row.status} />
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
+                  {itemCnt} {itemCnt === 1 ? 'item' : 'items'}
+                </span>
+              </div>
             </a>
           )
         })}
