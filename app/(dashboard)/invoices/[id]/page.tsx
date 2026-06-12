@@ -176,9 +176,6 @@ export default function InvoiceDetailPage() {
             </button>
             <ExportFolderConfig />
           </div>
-          <a href={`/invoices/${id}/print`} target="_blank" rel="noreferrer" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', color: 'var(--text-primary)', textDecoration: 'none', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)' }}>
-            <i className="fa-solid fa-print" style={{ fontSize: 11 }} /> Print
-          </a>
           <XoanUrlConfig template={header.template_type ?? 'CH1'} />
         </div>
       </div>

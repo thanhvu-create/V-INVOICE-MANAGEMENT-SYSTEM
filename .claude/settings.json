@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Users/pit008/.claude/projects/c--Users-pit008-Downloads-vinvoice/**)",
+      "Bash(git push origin main)"
+    ]
+  }
+}
+
