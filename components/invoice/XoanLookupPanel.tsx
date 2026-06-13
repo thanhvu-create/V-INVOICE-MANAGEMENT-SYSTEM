@@ -69,15 +69,15 @@ function parseAndFilter(buf: ArrayBuffer, mo: string | null): GemRow[] {
     if (!rowMO) continue
     if (mo && rowMO !== mo) continue
     if (status !== 'xuất') continue
-    // Col G (index 6) = Mã xoàn thuần; Col F (index 5) = combined "Mã xoàn + Size" (formula)
-    // Col L (index 11) = TB viên (average ct/stone); Col J (index 9) = Tổng TL (total ct)
-    const ma_xoan = String(r[6] ?? '').trim()
+    // Col F (index 5) = Mã xoàn; Col H (index 7) = Size gốc; Col I (index 8) = SL
+    // Col J (index 9) = Trọng lượng (dùng làm TB viên); Col M (index 12) = Trạng thái
+    const ma_xoan = String(r[5] ?? '').trim()
     out.push({
       ma_xoan,
       p_chat:       inferPChat(ma_xoan),
       size_xoan:    String(r[7]  ?? '').trim(),
       sl_hot:       Number(r[8]  ?? 0),
-      tl_sau_xu_ly: Number(r[11] ?? 0),
+      tl_sau_xu_ly: Number(r[9]  ?? 0),
     })
   }
   return out
