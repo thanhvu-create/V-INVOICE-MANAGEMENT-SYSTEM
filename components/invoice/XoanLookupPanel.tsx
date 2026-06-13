@@ -10,7 +10,7 @@ interface GemRow {
   p_chat:       string
   size_xoan:    string   // raw size from tracking (col H): "2.1" or "2.3*2.3"
   sl_hot:       number
-  tl_sau_xu_ly: number   // TB viên ct/stone (col L)
+  tl_sau_xu_ly: number   // Trọng lượng (col J, index 9)
 }
 
 interface NVLHotRow {
@@ -77,7 +77,7 @@ function parseAndFilter(buf: ArrayBuffer, mo: string | null): GemRow[] {
       p_chat:       inferPChat(ma_xoan),
       size_xoan:    String(r[7]  ?? '').trim(),
       sl_hot:       Number(r[8]  ?? 0),
-      tl_sau_xu_ly: Number(r[11] ?? 0),
+      tl_sau_xu_ly: Number(r[9]  ?? 0),
     })
   }
   return out
@@ -281,7 +281,7 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
                 <table style={{ borderCollapse: 'collapse', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', width: '100%' }}>
                   <thead>
                     <tr>
-                      {['Mã Xoàn', 'Size gốc', 'Range NVL', 'Đơn giá', 'SL', 'TB viên', ''].map(h => (
+                      {['Mã Xoàn', 'Size gốc', 'Range NVL', 'Đơn giá', 'SL', 'Trọng Lượng', ''].map(h => (
                         <th key={h} style={{ padding: '3px 8px', background: 'var(--bg-surface)', borderBottom: '1px solid var(--border-base)', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>{h}</th>
                       ))}
                     </tr>
