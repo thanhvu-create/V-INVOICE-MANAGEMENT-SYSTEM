@@ -170,8 +170,8 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
       p_chat:            r.p_chat,
       size_xoan_range:   r.mapped_range || null,
       sl_hot:            r.sl_hot,
-      tl_truoc_xu_ly_ct: r.tl_sau_xu_ly || null,
-      tl_sau_xu_ly_ct:   null,
+      tl_truoc_xu_ly_ct: r.tl_sau_xu_ly    || null,
+      tl_sau_xu_ly_ct:   parseFloat(r.size_xoan) || null,
       don_gia:           r.don_gia,
     }
   }

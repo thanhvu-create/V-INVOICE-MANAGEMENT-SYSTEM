@@ -64,7 +64,7 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
       setForm({
         ma_xoan:           gem.ma_xoan           ?? '',
         p_chat:            gem.p_chat            ?? 'VVS1',
-        size_raw:          extractSizeFromCode(gem.ma_xoan ?? ''),
+        size_raw:          String(gem.tl_sau_xu_ly_ct ?? ''),
         size_xoan_range:   gem.size_xoan_range   ?? '',
         sl_hot:            String(gem.sl_hot     ?? 1),
         tl_truoc_xu_ly_ct: String(gem.tl_truoc_xu_ly_ct ?? ''),
@@ -78,9 +78,8 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
   }, [open, gem])
 
   // Extract trailing size from gem code: "L-RD409-2.1" → "2.1", "BG-L14-0.05" → "0.05"
-  // Also handles col-F combined format "RD-11177-1.2 1.2" → take first token after last "-"
   function extractSizeFromCode(maXoan: string): string {
-    const last = (maXoan.split('-').pop() ?? '').split(' ')[0].trim()
+    const last = maXoan.split('-').pop() ?? ''
     return /^\d/.test(last) || last.includes('*') ? last : ''
   }
 
