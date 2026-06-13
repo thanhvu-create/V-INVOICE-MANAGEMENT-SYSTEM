@@ -64,7 +64,7 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
       setForm({
         ma_xoan:           gem.ma_xoan           ?? '',
         p_chat:            gem.p_chat            ?? 'VVS1',
-        size_raw:          String(gem.tl_sau_xu_ly_ct ?? ''),
+        size_raw:          '',
         size_xoan_range:   gem.size_xoan_range   ?? '',
         sl_hot:            String(gem.sl_hot     ?? 1),
         tl_truoc_xu_ly_ct: String(gem.tl_truoc_xu_ly_ct ?? ''),
