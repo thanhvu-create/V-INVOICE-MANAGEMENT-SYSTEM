@@ -77,7 +77,7 @@ function parseAndFilter(buf: ArrayBuffer, mo: string | null): GemRow[] {
       p_chat:       inferPChat(ma_xoan),
       size_xoan:    String(r[7]  ?? '').trim(),
       sl_hot:       Number(r[8]  ?? 0),
-      tl_sau_xu_ly: Number(r[9]  ?? 0),
+      tl_sau_xu_ly: Number(r[11] ?? 0),
     })
   }
   return out
