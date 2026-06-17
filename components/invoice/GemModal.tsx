@@ -38,6 +38,9 @@ interface NVLHotRow {
   stone_type: string
   grade: string
   size_range: string
+  size_min: number | null
+  size_max: number | null
+  size_unit: string
   mk_price: number
 }
 
@@ -105,9 +108,9 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
   const f = (key: keyof GemForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(v => ({ ...v, [key]: e.target.value }))
 
-  // Live computed preview — CH2 uses tl_sau (no tl_truoc column); ADM has no setting fee
+  // Live computed preview — CH2 prefers tl_sau but falls back to tl_truoc (XoanLookupPanel fills tl_truoc); ADM has no setting fee
   const isADM      = template === 'ADM'
-  const tlTruoc    = parseFloat(isCH2 ? form.tl_sau_xu_ly_ct : form.tl_truoc_xu_ly_ct) || 0
+  const tlTruoc    = parseFloat(isCH2 ? (form.tl_sau_xu_ly_ct || form.tl_truoc_xu_ly_ct) : form.tl_truoc_xu_ly_ct) || 0
   const slHot      = parseInt(form.sl_hot) || 0
   const donGia     = parseFloat(form.don_gia) || 0
   const tl_xoan_gr = tlTruoc > 0 ? tlTruoc / 5 : null

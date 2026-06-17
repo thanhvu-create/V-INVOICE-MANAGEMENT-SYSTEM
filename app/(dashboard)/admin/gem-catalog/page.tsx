@@ -30,7 +30,8 @@ const tdStyle: React.CSSProperties = {
   fontSize: 'var(--text-sm)', verticalAlign: 'middle',
 }
 
-const EMPTY = { stone_type: '', grade: '', size_range: '', mk_price: '' }
+const EMPTY = { stone_type: '', grade: '', size_range: '', size_min: '', size_max: '', size_unit: 'mm', mk_price: '' }
+const UNIT_OPTIONS = ['mm', 'ct', 'pcs']
 
 export default function GemCatalogPage() {
   const { canDo } = useUser()
@@ -66,6 +67,9 @@ export default function GemCatalogPage() {
       stone_type: gem.stone_type ?? '',
       grade:      gem.grade      ?? '',
       size_range: gem.size_range ?? '',
+      size_min:   gem.size_min != null ? String(gem.size_min) : '',
+      size_max:   gem.size_max != null ? String(gem.size_max) : '',
+      size_unit:  gem.size_unit ?? 'mm',
       mk_price:   gem.mk_price   != null ? String(gem.mk_price) : '',
     })
     setModal({ open: true, gem })
@@ -78,6 +82,9 @@ export default function GemCatalogPage() {
       stone_type: form.stone_type,
       grade:      form.grade.trim() || null,
       size_range: form.size_range.trim() || null,
+      size_min:   form.size_min !== '' ? parseFloat(form.size_min) : null,
+      size_max:   form.size_max !== '' ? parseFloat(form.size_max) : null,
+      size_unit:  form.size_unit || 'mm',
       mk_price:   form.mk_price !== '' ? parseFloat(form.mk_price) : null,
     }
     const data = await apiCall<any>(
@@ -140,14 +147,14 @@ export default function GemCatalogPage() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 'var(--text-sm)' }}>
             <thead>
               <tr>
-                {['Stone Type', 'Grade', 'Size Range', 'MK Price ($/ct)', ''].map(h => (
+                {['Stone Type', 'Grade', 'Size Range', 'Min', 'Max', 'Unit', 'MK Price ($/ct)', ''].map(h => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {gems.length === 0 ? (
-                <tr><td colSpan={5} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                <tr><td colSpan={8} style={{ ...tdStyle, textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
                   No data. Run <code>fix_v2_logic.sql</code> on Supabase to seed nvl_hot.
                 </td></tr>
               ) : gems.map(g => (
@@ -157,6 +164,9 @@ export default function GemCatalogPage() {
                   <td style={{ ...tdStyle, fontWeight: 700, color: 'var(--color-info)' }}>{g.stone_type}</td>
                   <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontWeight: 600, background: 'var(--sku-highlight-bg)', color: '#92400E' }}>{g.grade ?? '—'}</td>
                   <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)' }}>{g.size_range ?? '—'}</td>
+                  <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{g.size_min != null ? Number(g.size_min) : '—'}</td>
+                  <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', textAlign: 'right' }}>{g.size_max != null ? Number(g.size_max) : '—'}</td>
+                  <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{g.size_unit ?? '—'}</td>
                   <td style={{ ...tdStyle, fontFamily: 'var(--font-mono)', fontWeight: 700, textAlign: 'right' }}>
                     {g.mk_price != null ? `$${Number(g.mk_price).toFixed(2)}` : '—'}
                   </td>
@@ -194,9 +204,25 @@ export default function GemCatalogPage() {
                 <label style={labelStyle}>Grade</label>
                 <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} value={form.grade} onChange={f('grade')} placeholder="e.g. RD B1" />
               </div>
+              <div style={{ gridColumn: '1/-1', display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: '0.5rem' }}>
+                <div>
+                  <label style={labelStyle}>Size Min</label>
+                  <input type="number" min="0" step="0.001" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} value={form.size_min} onChange={f('size_min')} placeholder="0.7" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Size Max</label>
+                  <input type="number" min="0" step="0.001" style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} value={form.size_max} onChange={f('size_max')} placeholder="2.0" />
+                </div>
+                <div>
+                  <label style={labelStyle}>Unit</label>
+                  <select style={inputStyle} value={form.size_unit} onChange={f('size_unit')}>
+                    {UNIT_OPTIONS.map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                </div>
+              </div>
               <div style={{ gridColumn: '1/-1' }}>
-                <label style={labelStyle}>Size Range</label>
-                <input style={inputStyle} value={form.size_range} onChange={f('size_range')} placeholder="e.g. RD1 0.7 - 2.0" />
+                <label style={labelStyle}>Display Label <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>(auto-generated if blank)</span></label>
+                <input style={{ ...inputStyle, color: 'var(--text-muted)' }} value={form.size_range} onChange={f('size_range')} placeholder="e.g. RD1 0.7 - 2.0" />
               </div>
               <div>
                 <label style={labelStyle}>MK Price ($/ct) *</label>
