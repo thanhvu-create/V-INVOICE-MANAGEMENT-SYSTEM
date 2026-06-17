@@ -99,7 +99,14 @@ const OV_RANGES: RangeEntry[] = [
 export function detectStoneType(maXoan: string): string | null {
   if (!maXoan) return null
   const u = maXoan.toUpperCase()
+  // Lab-grown: L-XX prefix → LG-XX (except L-RD → RD-LG for historical reasons)
   if (u.startsWith('L-RD'))                          return 'RD-LG'
+  if (u.startsWith('L-PR'))                          return 'LG-PR'
+  if (u.startsWith('L-BG'))                          return 'LG-BG'
+  if (u.startsWith('L-MQ'))                          return 'LG-MQ'
+  if (u.startsWith('L-PS'))                          return 'LG-PS'
+  if (u.startsWith('L-HS'))                          return 'LG-HS'
+  if (u.startsWith('L-TD'))                          return 'LG-TD'
   if (u.startsWith('L-') && maXoan.length > 2)       return detectStoneType(maXoan.slice(2))
   if (u.startsWith('RD-LG') || u.startsWith('RDL'))  return 'RD-LG'
   if (u.startsWith('RDCZ'))                           return 'RD'
@@ -109,9 +116,12 @@ export function detectStoneType(maXoan: string): string | null {
   if (u.startsWith('MQ'))                             return 'MQ'
   if (u.startsWith('PS'))                             return 'PS'
   if (u.startsWith('OV'))                             return 'OV'
+  if (u.startsWith('HS'))                             return 'LG-HS'
   if (u.startsWith('BQT'))                            return 'BQT'
   if (u.startsWith('XC'))                             return 'XC'
   if (u.startsWith('PL') || u.startsWith('PEARL'))    return 'PEARL'
+  if (u.startsWith('RRB'))                            return 'RRB-N'
+  if (u.startsWith('TD'))                             return 'LG-TD'
   return null
 }
 
