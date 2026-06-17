@@ -112,7 +112,7 @@ export default function InvoiceDetailPage() {
     <div>
       {/* Finalized banner */}
       {isLocked && (
-        <div style={{ background: '#1A1814', color: '#FAFAF7', padding: '8px 16px', textAlign: 'center', fontSize: 'var(--text-xs)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '1rem' }}>
+        <div style={{ background: '#e91d79', color: '#FAFAF7', padding: '8px 16px', textAlign: 'center', fontSize: 'var(--text-xs)', letterSpacing: '0.15em', textTransform: 'uppercase', marginBottom: '1rem' }}>
           <i className="fa-solid fa-lock" style={{ marginRight: 6 }} />
           Finalized — This invoice is locked and cannot be modified
         </div>

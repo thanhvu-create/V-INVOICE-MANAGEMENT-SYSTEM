@@ -62,7 +62,7 @@ export function DetailView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
       ))}
 
       {/* Invoice Total Summary */}
-      <div style={{ marginTop: '1.5rem', background: '#1A1814', color: '#FAFAF7', padding: '1rem 1.25rem' }}>
+      <div style={{ marginTop: '1.5rem', background: '#e91d79', color: '#FAFAF7', padding: '1rem 1.25rem' }}>
         <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(250,250,247,0.5)', marginBottom: '0.75rem' }}>
           Invoice Total — {items.length} items
         </div>

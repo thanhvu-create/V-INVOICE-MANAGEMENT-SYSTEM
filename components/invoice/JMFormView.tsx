@@ -174,7 +174,7 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
 
   const PRICE_BG     = 'rgba(30, 64, 175, 0.04)'
   const PRICE_HEAD   = 'rgba(30, 64, 175, 0.08)'
-  const TOTAL_BG     = '#1A1814'
+  const TOTAL_BG     = '#e91d79'
   const TOTAL_COLOR  = '#FAFAF7'
 
   const th: React.CSSProperties = {
