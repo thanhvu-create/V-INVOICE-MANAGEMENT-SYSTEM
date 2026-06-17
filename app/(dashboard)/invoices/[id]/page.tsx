@@ -144,41 +144,49 @@ export default function InvoiceDetailPage() {
               <i className="fa-solid fa-plus" style={{ fontSize: 11 }} /> Add Item
             </button>
           )}
+          {/* Secondary actions — icon-only on narrow screens */}
           {canEdit && canDo('import') && (
-            <a href={`/import?invoiceId=${id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', color: 'var(--text-primary)', textDecoration: 'none', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)' }}>
-              <i className="fa-solid fa-file-import" style={{ fontSize: 11 }} /> Import
+            <a href={`/import?invoiceId=${id}`} title="Import items from Excel" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.75rem', border: '1px solid var(--border-base)', color: 'var(--text-secondary)', textDecoration: 'none', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)' }}>
+              <i className="fa-solid fa-file-import" style={{ fontSize: 12 }} />
             </a>
           )}
           {canEdit && (
             <button
               onClick={handleSyncNVL}
               disabled={syncingNVL}
-              title="Cập nhật giá NVL mới nhất và tính lại toàn bộ sản phẩm"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', background: 'transparent', color: syncingNVL ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)', cursor: syncingNVL ? 'not-allowed' : 'pointer', opacity: syncingNVL ? 0.6 : 1 }}
+              title="Sync NVL — cập nhật giá mới nhất và tính lại"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0.45rem 0.75rem', border: '1px solid var(--border-base)', background: 'transparent', color: syncingNVL ? 'var(--text-muted)' : 'var(--text-secondary)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)', cursor: syncingNVL ? 'not-allowed' : 'pointer', opacity: syncingNVL ? 0.6 : 1 }}
             >
-              {syncingNVL
-                ? <><i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 11 }} /> Đang sync…</>
-                : <><i className="fa-solid fa-rotate" style={{ fontSize: 11 }} /> Sync NVL</>
-              }
+              <i className={`fa-solid ${syncingNVL ? 'fa-circle-notch fa-spin' : 'fa-rotate'}`} style={{ fontSize: 12 }} />
             </button>
           )}
           <div style={{ display: 'inline-flex', alignItems: 'stretch' }}>
             <button
               onClick={handleExportSheets}
               disabled={exportingSheets}
-              title="Tạo Google Sheet mới với cấu trúc JM FORM + SUMMARY"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 1rem', border: '1px solid var(--border-base)', borderRight: 'none', background: 'transparent', color: exportingSheets ? 'var(--text-muted)' : 'var(--text-primary)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-body)', cursor: exportingSheets ? 'not-allowed' : 'pointer', opacity: exportingSheets ? 0.6 : 1 }}
+              title="Export lên Google Sheets"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.75rem', border: '1px solid var(--border-base)', borderRight: 'none', background: 'transparent', color: exportingSheets ? 'var(--text-muted)' : 'var(--text-secondary)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)', cursor: exportingSheets ? 'not-allowed' : 'pointer', opacity: exportingSheets ? 0.6 : 1 }}
             >
-              {exportingSheets
-                ? <><i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 11 }} /> Đang tạo…</>
-                : <><i className="fa-brands fa-google-drive" style={{ fontSize: 11, color: '#34A853' }} /> Google Sheets</>
-              }
+              <i className={`${exportingSheets ? 'fa-solid fa-circle-notch fa-spin' : 'fa-brands fa-google-drive'}`} style={{ fontSize: 12, color: exportingSheets ? undefined : '#34A853' }} />
             </button>
             <ExportFolderConfig />
           </div>
           <XoanUrlConfig template={header.template_type ?? 'CH1'} />
         </div>
       </div>
+
+      {/* NVL Info Strip */}
+      {canSeePrice && header.nvl_gold_24k != null && (
+        <div className="no-print" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.5rem', padding: '8px 14px', marginBottom: '1rem', background: 'var(--bg-base)', border: '1px solid var(--border-light)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)', alignItems: 'center' }}>
+          <span style={{ fontFamily: 'var(--font-body)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', marginRight: 4 }}>NVL Snapshot</span>
+          <span>Au: <b style={{ color: 'var(--text-primary)' }}>${Number(header.nvl_gold_24k).toLocaleString()}</b>/oz</span>
+          {header.nvl_pt_price != null && <span>Pt: <b>${Number(header.nvl_pt_price).toLocaleString()}</b></span>}
+          {header.nvl_ag_price != null && <span>Ag: <b>${Number(header.nvl_ag_price).toLocaleString()}</b></span>}
+          <span>Loss: <b>{((header.nvl_loss_gold ?? 0.06) * 100).toFixed(0)}%</b></span>
+          <span>Loss Pt: <b>{((header.nvl_loss_pt ?? 0.17) * 100).toFixed(0)}%</b></span>
+          {header.nvl_cif_rate != null && <span>CIF: <b>{(header.nvl_cif_rate * 100).toFixed(0)}%</b></span>}
+        </div>
+      )}
 
       {/* Workflow bar (manager/admin only) */}
       {availTrans.length > 0 && (

@@ -158,7 +158,12 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
           {isBaSao && <span style={{ fontSize: 'var(--text-xs)', color: '#DC2626', fontWeight: 700 }}>★ BA SAO</span>}
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-          {canSeePrice && !editMode && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 600 }}>CIF: {fmt2(item.cif_price)}</span>}
+          {canSeePrice && !editMode && (
+            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginRight: 4 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>Purchase: <b style={{ color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}>{fmt2(item.von_san_xuat)}</b></span>
+              {hasCIF && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>CIF: <b style={{ color: '#1E40AF', fontSize: 'var(--text-sm)' }}>{fmt2(item.cif_price)}</b></span>}
+            </div>
+          )}
           {canEdit && !isLocked && !editMode && (
             <>
               <button onClick={openEdit} style={{ background: 'none', border: '1px solid var(--border-base)', cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 12, padding: '3px 8px' }} title="Edit">
@@ -174,68 +179,91 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
 
       {/* DISPLAY mode */}
       {!editMode && (
-        <div style={{ padding: '0.75rem 1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem' }}>
-          {[
-            ...(item.vendor_model  ? [['Vendor Model#', item.vendor_model]]       : []),
-            ...(isAG3 && item.po_number             ? [['PO#',       item.po_number]]   : []),
-            ...(template === 'CH1_AG3' && item.sku_ag ? [['SKU# AG', item.sku_ag]]      : []),
-            ['Qty (pcs)', item.qt_pcs],
-            ...(item.kich_thuoc                     ? [['Kích thước', item.kich_thuoc]] : []),
-            ['Loại vàng', item.loai_vang ?? '—'],
-            ...(!isAG3 && item.so_mo                ? [['SO-MO', item.so_mo]]           : []),
-            ['Wt. (gr)', fmt4(item.t_pham_co_nvl_da ?? item.wt_gr)],
-            ...(!isAG3 ? [
-              ['T.Phẩm trừ NVL đá (gr)', fmt4(item.t_pham_tru_nvl_da)],
-              ['T.Phẩm vàng TT (gr)', fmt4(item.t_pham_vang_thuc_te)],
-            ] : []),
-            ...(canSeePrice ? [
-              ['Tiền vàng', fmt2(item.tien_vang)],
-              ['HP Purchase', fmt2(item.von_san_xuat)],
-              ...(hasCIF ? [['HP CIF', fmt2(item.cif_price)]] : []),
-              ...(hasTagFb && item.tag_price != null ? [['HP Tag', fmt2(item.tag_price)]] : []),
-              ...(hasTagFb && item.fb_price  != null ? [['HP FB',  fmt2(item.fb_price)]]  : []),
-              ...(isAG3 && item.qt_pcs > 1 ? [
-                ['Purchase/1sp', fmt2(item.von_san_xuat != null ? item.von_san_xuat / item.qt_pcs : null)],
-                ...(item.tag_price != null ? [['Tag/1sp', fmt2(item.tag_price / item.qt_pcs)]] : []),
+        <div style={{ padding: '0.75rem 1rem' }}>
+          {/* Section 1: Product Info */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: '0.5rem', marginBottom: '0.75rem' }}>
+            {[
+              ...(item.vendor_model  ? [['Vendor Model#', item.vendor_model]]       : []),
+              ...(isAG3 && item.po_number             ? [['PO#',       item.po_number]]   : []),
+              ...(template === 'CH1_AG3' && item.sku_ag ? [['SKU# AG', item.sku_ag]]      : []),
+              ['Qty (pcs)', item.qt_pcs],
+              ...(item.kich_thuoc                     ? [['Kích thước', item.kich_thuoc]] : []),
+              ['Loại vàng', item.loai_vang ?? '—'],
+              ...(!isAG3 && item.so_mo                ? [['SO-MO', item.so_mo]]           : []),
+              ['Wt. (gr)', fmt4(item.t_pham_co_nvl_da ?? item.wt_gr)],
+              ...(!isAG3 ? [
+                ['T.Phẩm trừ đá (gr)', fmt4(item.t_pham_tru_nvl_da)],
+                ['Vàng TT (gr)', fmt4(item.t_pham_vang_thuc_te)],
               ] : []),
-              ...(template === 'CH1' && item.erp_bom_cost != null ? [
-                ['ERP BOM ($)', fmt2(item.erp_bom_cost)],
-                ['Chênh lệch', item.von_san_xuat ? (((item.von_san_xuat - item.erp_bom_cost) / item.von_san_xuat) * 100).toFixed(1) + '%' : '—'],
-              ] : []),
-            ] : []),
-            ...(canSeePrice && hasFees && (item.gia_cong || item.duc || item.thiet_ke || item.resin || item.phi_phu_kien) ? [
-              ['Gia công/SP', fmt2(item.gia_cong)],
-              ['Đúc/SP', fmt2(item.duc)],
-              ['Thiết kế/SP', fmt2(item.thiet_ke)],
-              ['Resin/SP', fmt2(item.resin)],
-              ['Phụ kiện', fmt2(item.phi_phu_kien)],
-            ] : []),
-            ...(!isAG3 && !isAdm && item.bao_hiem    ? [['Bảo hiểm', fmt2(item.bao_hiem)]]    : []),
-            ...(!isAG3 && !isAdm && item.ngay_gui    ? [['Ngày gửi', item.ngay_gui]]           : []),
-            ...(!isAG3 && !isAdm && item.tracking_no ? [['Tracking#', item.tracking_no]]       : []),
-            ...(!isAG3 && !isAdm && item.hoa_don     ? [['Hóa Đơn (V-INV)', item.hoa_don]]     : []),
-            ...(item.store                           ? [['Store', item.store]]                  : []),
-            ...(!isAG3 && !isAdm && item.nini_adm    ? [['Notes', item.nini_adm]]               : []),
-            ...(isAG3 && item.chi_tiet_tap           ? [['Chi tiết/Tập', item.chi_tiet_tap]]    : []),
-          ].map(([label, val]) => (
-            <div key={String(label)}>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
-              <div style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', color: isBaSao && (String(label) === 'Notes' || String(label) === 'Chi tiết/Tập') ? '#DC2626' : 'inherit', fontWeight: isBaSao && (String(label) === 'Notes' || String(label) === 'Chi tiết/Tập') ? 700 : 400 }}>{val ?? '—'}</div>
-            </div>
-          ))}
-          {canSeePrice && gems.length > 0 && (
-            <div style={{ gridColumn: '1 / -1', borderTop: '1px solid var(--border-light)', paddingTop: '0.5rem', marginTop: '0.25rem' }}>
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 4 }}>Vốn SX Breakdown</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)' }}>
-                <span>Tiền vàng: {fmt2(item.tien_vang)}</span>
-                {hasGems && <><span style={{ color: 'var(--text-muted)' }}>+</span>
-                <span>T.Giá Xoàn: {fmt2(gems.reduce((s: number, g: any) => s + (g.t_gia_xoan ?? 0), 0))}</span>
-                <span style={{ color: 'var(--text-muted)' }}>+</span>
-                <span>T.Phí: {fmt2(gems.reduce((s: number, g: any) => s + (g.t_phi ?? 0), 0))}</span></>}
-                {hasFees && <><span style={{ color: 'var(--text-muted)' }}>+</span>
-                <span>Gia công: {fmt2((item.gia_cong ?? 0) + (item.duc ?? 0) + (item.thiet_ke ?? 0) + (item.resin ?? 0) + (item.phi_phu_kien ?? 0))}</span></>}
-                <span style={{ color: 'var(--text-muted)' }}>=</span>
-                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>Vốn SX: {fmt2(item.von_san_xuat)}</span>
+              ...(item.store ? [['Store', item.store]] : []),
+              ...(!isAG3 && !isAdm && item.ngay_gui    ? [['Ngày gửi', item.ngay_gui]]           : []),
+              ...(!isAG3 && !isAdm && item.tracking_no ? [['Tracking#', item.tracking_no]]       : []),
+              ...(!isAG3 && !isAdm && item.hoa_don     ? [['V-INV', item.hoa_don]]               : []),
+              ...(!isAG3 && !isAdm && item.nini_adm    ? [['Notes', item.nini_adm]]               : []),
+              ...(isAG3 && item.chi_tiet_tap           ? [['Chi tiết/Tập', item.chi_tiet_tap]]    : []),
+            ].map(([label, val]) => (
+              <div key={String(label)}>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
+                <div style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', color: isBaSao && (String(label) === 'Notes' || String(label) === 'Chi tiết/Tập') ? '#DC2626' : 'inherit', fontWeight: isBaSao && (String(label) === 'Notes' || String(label) === 'Chi tiết/Tập') ? 700 : 400 }}>{val ?? '—'}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Section 2: Pricing & Costs */}
+          {canSeePrice && (
+            <div style={{ background: 'rgba(30, 64, 175, 0.03)', border: '1px solid rgba(30, 64, 175, 0.1)', padding: '0.65rem 0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#1E40AF', marginBottom: '0.5rem' }}>
+                <i className="fa-solid fa-chart-line" style={{ marginRight: 5, fontSize: 10 }} />Giá & Chi phí
+              </div>
+
+              {/* Vốn SX Breakdown pipeline */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', alignItems: 'center', marginBottom: '0.5rem' }}>
+                <span style={{ background: 'rgba(30,64,175,0.06)', padding: '2px 6px' }}>Vàng {fmt2(item.tien_vang)}</span>
+                {hasGems && gems.length > 0 && <>
+                  <span style={{ color: 'var(--text-muted)' }}>+</span>
+                  <span style={{ background: 'rgba(30,64,175,0.06)', padding: '2px 6px' }}>Xoàn {fmt2(gems.reduce((s: number, g: any) => s + (g.t_gia_xoan ?? 0), 0))}</span>
+                  <span style={{ color: 'var(--text-muted)' }}>+</span>
+                  <span style={{ background: 'rgba(30,64,175,0.06)', padding: '2px 6px' }}>Phí gắn {fmt2(gems.reduce((s: number, g: any) => s + (g.t_phi ?? 0), 0))}</span>
+                </>}
+                {hasFees && (item.gia_cong || item.duc || item.thiet_ke || item.resin || item.phi_phu_kien) ? <>
+                  <span style={{ color: 'var(--text-muted)' }}>+</span>
+                  <span style={{ background: 'rgba(30,64,175,0.06)', padding: '2px 6px' }}>Gia công {fmt2((item.gia_cong ?? 0) + (item.duc ?? 0) + (item.thiet_ke ?? 0) + (item.resin ?? 0) + (item.phi_phu_kien ?? 0))}</span>
+                </> : null}
+                <span style={{ color: '#1E40AF', fontWeight: 700 }}>=</span>
+                <span style={{ background: '#1E40AF', color: '#fff', padding: '2px 8px', fontWeight: 700 }}>Purchase {fmt2(item.von_san_xuat)}</span>
+                {hasCIF && <>
+                  <span style={{ color: 'var(--text-muted)' }}>→</span>
+                  <span style={{ background: 'rgba(30,64,175,0.12)', padding: '2px 8px', fontWeight: 700, color: '#1E40AF' }}>CIF {fmt2(item.cif_price)}</span>
+                </>}
+              </div>
+
+              {/* Additional price fields */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '0.4rem' }}>
+                {[
+                  ...(hasTagFb && item.tag_price != null ? [['HP Tag', fmt2(item.tag_price)]] : []),
+                  ...(hasTagFb && item.fb_price  != null ? [['HP FB',  fmt2(item.fb_price)]]  : []),
+                  ...(isAG3 && item.qt_pcs > 1 ? [
+                    ['Purchase/1sp', fmt2(item.von_san_xuat != null ? item.von_san_xuat / item.qt_pcs : null)],
+                    ...(item.tag_price != null ? [['Tag/1sp', fmt2(item.tag_price / item.qt_pcs)]] : []),
+                  ] : []),
+                  ...(template === 'CH1' && item.erp_bom_cost != null ? [
+                    ['ERP BOM ($)', fmt2(item.erp_bom_cost)],
+                    ['Chênh lệch', item.von_san_xuat ? (((item.von_san_xuat - item.erp_bom_cost) / item.von_san_xuat) * 100).toFixed(1) + '%' : '—'],
+                  ] : []),
+                  ...(hasFees && (item.gia_cong || item.duc || item.thiet_ke || item.resin || item.phi_phu_kien) ? [
+                    ['Gia công', fmt2(item.gia_cong)],
+                    ['Đúc', fmt2(item.duc)],
+                    ['Thiết kế', fmt2(item.thiet_ke)],
+                    ['Resin', fmt2(item.resin)],
+                    ['Phụ kiện', fmt2(item.phi_phu_kien)],
+                  ] : []),
+                  ...(!isAG3 && !isAdm && item.bao_hiem ? [['Bảo hiểm', fmt2(item.bao_hiem)]] : []),
+                ].map(([label, val]) => (
+                  <div key={String(label)}>
+                    <div style={{ fontSize: 10, color: '#1E40AF', opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{label}</div>
+                    <div style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', color: '#1E40AF' }}>{val}</div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -392,38 +420,38 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
             <p style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', margin: 0 }}>Chưa có hột.</p>
           ) : (
             <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'collapse', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', width: '100%' }}>
+              <table style={{ borderCollapse: 'collapse', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', width: '100%' }}>
                 <thead>
                   <tr>{(template === 'CH2'
                     ? ['Mã Xoàn', 'P.Chất', 'Size Range', 'SL', 'TL Sau (ct)', 'TL(gr)', 'Đơn Giá', 'T.Giá Xoàn', '$1/Viên', 'T.Phí', '']
                     : ['Mã Xoàn', 'P.Chất', 'Size Range', 'SL', 'TL Trước (ct)', 'TL Sau (ct)', 'TL(gr)', 'Đơn Giá', 'T.Giá Xoàn', '$1/Viên', 'T.Phí', '']
                   ).map(h => (
-                    <th key={h} style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', textAlign: 'left', fontWeight: 600, color: 'var(--text-secondary)', background: 'var(--bg-base)', whiteSpace: 'nowrap' }}>{h}</th>
+                    <th key={h} style={{ padding: '5px 8px', borderBottom: '2px solid var(--border-base)', textAlign: 'left', fontWeight: 600, fontSize: 'var(--text-xs)', letterSpacing: '0.04em', color: 'var(--text-secondary)', background: 'var(--bg-base)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}</tr>
                 </thead>
                 <tbody>
                   {gems.map((g: any) => (
                     <tr key={g.id} onMouseEnter={e => (e.currentTarget.style.background = 'var(--bg-hover)')} onMouseLeave={e => (e.currentTarget.style.background = '')}>
-                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{g.ma_xoan ?? '—'}</td>
-                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.p_chat ?? 'VVS1'}</td>
-                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.size_xoan_range ?? '—'}</td>
-                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.sl_hot}</td>
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{g.ma_xoan ?? '—'}</td>
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>{g.p_chat ?? 'VVS1'}</td>
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.size_xoan_range ?? '—'}</td>
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', textAlign: 'center' }}>{g.sl_hot}</td>
                       {template !== 'CH2' && (
-                        <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', background: g.tl_truoc_xu_ly_ct == null ? 'rgba(220,38,38,0.08)' : '' }}>
-                          {g.tl_truoc_xu_ly_ct != null ? g.tl_truoc_xu_ly_ct.toFixed(4) : <span style={{ color: '#DC2626' }}>— nhập tay</span>}
+                        <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', background: g.tl_truoc_xu_ly_ct == null ? 'rgba(220,38,38,0.08)' : '' }}>
+                          {g.tl_truoc_xu_ly_ct != null ? g.tl_truoc_xu_ly_ct.toFixed(4) : <span style={{ color: '#DC2626', fontSize: 'var(--text-xs)' }}>— nhập tay</span>}
                         </td>
                       )}
-                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>{g.tl_sau_xu_ly_ct?.toFixed(4) ?? '—'}</td>
-                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt4(g.tl_xoan_gr)} <span style={{ fontSize: 9, color: 'var(--color-info)' }}>auto</span></td>
-                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt2(g.don_gia)}</td>
-                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{fmt2(g.t_gia_xoan)} <span style={{ fontSize: 9, color: 'var(--color-info)' }}>auto</span></td>
-                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>$1</td>
-                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{fmt2(g.t_phi)} <span style={{ fontSize: 9, color: 'var(--color-info)' }}>auto</span></td>
-                      <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>{g.tl_sau_xu_ly_ct?.toFixed(4) ?? '—'}</td>
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt4(g.tl_xoan_gr)} <span style={{ fontSize: 9, color: 'var(--color-info)' }}>auto</span></td>
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt2(g.don_gia)}</td>
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 700, color: '#1E40AF' }}>{fmt2(g.t_gia_xoan)}</td>
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)', textAlign: 'center' }}>$1</td>
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{fmt2(g.t_phi)}</td>
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', whiteSpace: 'nowrap' }}>
                         {canEdit && !isLocked && (
                           <>
-                            <button onClick={() => setGemModal({ open: true, gem: g })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginRight: 4, fontSize: 11 }} title="Sửa"><i className="fa-solid fa-pen" /></button>
-                            <button onClick={() => setConfirmDeleteGem(g)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 11 }} title="Xóa"><i className="fa-solid fa-trash" /></button>
+                            <button onClick={() => setGemModal({ open: true, gem: g })} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginRight: 4, fontSize: 12 }} title="Sửa"><i className="fa-solid fa-pen" /></button>
+                            <button onClick={() => setConfirmDeleteGem(g)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 12 }} title="Xóa"><i className="fa-solid fa-trash" /></button>
                           </>
                         )}
                       </td>
@@ -431,17 +459,17 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr style={{ background: 'var(--bg-base)', borderTop: '1px solid var(--border-base)' }}>
-                    <td colSpan={template === 'CH2' ? 5 : 6} style={{ padding: '3px 8px', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Tổng</td>
-                    <td style={{ padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>
+                  <tr style={{ background: '#1A1814', color: '#FAFAF7' }}>
+                    <td colSpan={template === 'CH2' ? 5 : 6} style={{ padding: '5px 8px', fontSize: 'var(--text-xs)', color: 'rgba(250,250,247,0.5)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Tổng</td>
+                    <td style={{ padding: '5px 8px', fontWeight: 600 }}>
                       {gems.reduce((s: number, g: any) => s + (g.tl_xoan_gr ?? 0), 0).toFixed(4)}
                     </td>
-                    <td />{/* Đơn Giá */}
-                    <td style={{ padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 700 }}>
+                    <td />
+                    <td style={{ padding: '5px 8px', fontWeight: 700, color: '#93C5FD' }}>
                       {fmt2(gems.reduce((s: number, g: any) => s + (g.t_gia_xoan ?? 0), 0))}
                     </td>
                     <td />
-                    <td style={{ padding: '3px 8px', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', fontWeight: 700 }}>
+                    <td style={{ padding: '5px 8px', fontWeight: 700 }}>
                       {fmt2(gems.reduce((s: number, g: any) => s + (g.t_phi ?? 0), 0))}
                     </td>
                     <td />

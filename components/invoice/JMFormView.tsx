@@ -172,6 +172,11 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
     if (ok !== null) onRefresh()
   }
 
+  const PRICE_BG     = 'rgba(30, 64, 175, 0.04)'
+  const PRICE_HEAD   = 'rgba(30, 64, 175, 0.08)'
+  const TOTAL_BG     = '#1A1814'
+  const TOTAL_COLOR  = '#FAFAF7'
+
   const th: React.CSSProperties = {
     padding: '6px 8px', background: 'var(--bg-base)',
     fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)',
@@ -216,15 +221,15 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                 <th key={c.key} style={{
                   ...th,
                   width: c.width, minWidth: c.width,
-                  color: c.computed ? 'var(--color-info)' : 'var(--text-secondary)',
+                  color: c.price ? '#1E40AF' : c.computed ? 'var(--color-info)' : 'var(--text-secondary)',
                   textAlign: c.price || c.mono ? 'right' : 'left',
                   position: (i === 0 || c.image || c.sku) ? 'sticky' : 'sticky',
                   left:     i === 0 ? 0 : c.image ? 44 : c.sku ? 102 : undefined,
                   zIndex:   i === 0 || c.image || c.sku ? 20 : 10,
-                  background: c.sku ? 'var(--sku-highlight-bg)' : 'var(--bg-base)',
+                  background: c.sku ? 'var(--sku-highlight-bg)' : c.price ? PRICE_HEAD : 'var(--bg-base)',
                 }}>
                   {c.label}
-                  {c.computed && <span style={{ display: 'block', fontSize: 9, fontWeight: 400, letterSpacing: 0, color: 'var(--color-info)', textTransform: 'none' }}>auto</span>}
+                  {c.computed && <span style={{ display: 'block', fontSize: 9, fontWeight: 400, letterSpacing: 0, color: c.price ? '#1E40AF' : 'var(--color-info)', textTransform: 'none' }}>auto</span>}
                 </th>
               ))}
               {canEdit && !isLocked && <th style={{ ...th, width: 40, zIndex: 10 }} />}
@@ -302,12 +307,12 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                       }
 
                       if (col.computed) {
-                        return <td key={col.key} style={{ ...td, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', textAlign: 'right', background: 'var(--bg-base)' }}>{displayVal}</td>
+                        return <td key={col.key} style={{ ...td, fontFamily: 'var(--font-mono)', color: col.price ? '#1E40AF' : 'var(--text-muted)', fontWeight: col.price ? 600 : 400, textAlign: 'right', background: col.price ? PRICE_BG : 'var(--bg-base)' }}>{displayVal}</td>
                       }
 
                       // tag/fb: computed (read-only) for AG3, manually editable for CH1/CH2/ADM
                       if ((col.key === 'tag_price' || col.key === 'fb_price') && isAG3) {
-                        return <td key={col.key} style={{ ...td, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', textAlign: 'right', background: 'var(--bg-base)' }}>{displayVal}</td>
+                        return <td key={col.key} style={{ ...td, fontFamily: 'var(--font-mono)', color: '#1E40AF', fontWeight: 600, textAlign: 'right', background: PRICE_BG }}>{displayVal}</td>
                       }
 
                       return (
@@ -320,6 +325,9 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                           tdStyle={{ ...td,
                             fontFamily: col.mono ? 'var(--font-mono)' : 'inherit',
                             textAlign: (col.price || col.mono) ? 'right' : 'left',
+                            background: col.price ? PRICE_BG : undefined,
+                            color: col.price ? '#1E40AF' : undefined,
+                            fontWeight: col.price ? 600 : undefined,
                           }}
                           onStartEdit={() => startEdit(item.id, col.key, item[col.key])}
                           onChange={v => setEditCell(prev => prev ? { ...prev, value: v } : null)}
@@ -344,20 +352,20 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
 
           {items.length > 0 && (
             <tfoot>
-              <tr style={{ borderTop: '2px solid var(--border-strong)', fontWeight: 600, background: 'var(--bg-base)' }}>
+              <tr style={{ fontWeight: 600, background: TOTAL_BG, color: TOTAL_COLOR }}>
                 {visibleCols.map((col, i) => {
                   const total = TOTALS[col.key]
+                  const isMajorTotal = col.key === 'von_san_xuat' || col.key === 'cif_price'
                   if (i === descIdx) {
-                    return <td key={col.key} style={{ ...td, fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>TOTAL</td>
+                    return <td key={col.key} style={{ ...td, borderColor: 'rgba(255,255,255,0.1)', fontSize: 'var(--text-xs)', color: 'rgba(250,250,247,0.6)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>TOTAL ({items.length} items)</td>
                   }
                   if (total != null) {
-                    return <td key={col.key} style={{ ...td, fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: (col.key === 'von_san_xuat' || col.key === 'cif_price') ? 800 : 600 }}>{total}</td>
+                    return <td key={col.key} style={{ ...td, borderColor: 'rgba(255,255,255,0.1)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: isMajorTotal ? 800 : 600, fontSize: isMajorTotal ? 'var(--text-base)' : 'var(--text-sm)', color: isMajorTotal ? '#93C5FD' : TOTAL_COLOR }}>{total}</td>
                   }
-                  return <td key={col.key} style={td} />
+                  return <td key={col.key} style={{ ...td, borderColor: 'rgba(255,255,255,0.1)' }} />
                 })}
-                {canEdit && !isLocked && <td style={td} />}
+                {canEdit && !isLocked && <td style={{ ...td, borderColor: 'rgba(255,255,255,0.1)' }} />}
               </tr>
-
             </tfoot>
           )}
         </table>

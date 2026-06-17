@@ -8,8 +8,8 @@ function fmt4(n: number | null | undefined) { return n != null ? n.toFixed(4) : 
 function TotalField({ label, value, mono, bold, muted }: { label: string; value: any; mono?: boolean; bold?: boolean; muted?: boolean }) {
   return (
     <div>
-      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontFamily: mono ? 'var(--font-mono)' : 'var(--font-body)', fontSize: 'var(--text-sm)', fontWeight: bold ? 700 : 400, color: muted ? 'var(--text-muted)' : 'var(--text-primary)' }}>
+      <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(250,250,247,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontFamily: mono ? 'var(--font-mono)' : 'var(--font-body)', fontSize: bold ? 'var(--text-base)' : 'var(--text-sm)', fontWeight: bold ? 700 : 400, color: muted ? 'rgba(250,250,247,0.5)' : bold ? '#93C5FD' : '#FAFAF7' }}>
         {value}
       </div>
     </div>
@@ -62,9 +62,9 @@ export function DetailView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
       ))}
 
       {/* Invoice Total Summary */}
-      <div style={{ marginTop: '1.5rem', border: '2px solid var(--border-strong)', background: 'var(--bg-base)', padding: '1rem 1.25rem' }}>
-        <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.75rem' }}>
-          Invoice Total
+      <div style={{ marginTop: '1.5rem', background: '#1A1814', color: '#FAFAF7', padding: '1rem 1.25rem' }}>
+        <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(250,250,247,0.5)', marginBottom: '0.75rem' }}>
+          Invoice Total — {items.length} items
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem' }}>
           <TotalField label="Tổng Qty (pcs)" value={totQty} />
@@ -72,9 +72,18 @@ export function DetailView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
           {totGemWt > 0 && <TotalField label="Σ TL Xoàn (gr)" value={fmt4(totGemWt)} mono muted />}
           {canSeePrice && <TotalField label="Tổng Tiền vàng" value={fmt2(totGoldV)} mono />}
           {canSeePrice && <TotalField label="Tổng Vốn SX" value={fmt2(totVonSX)} mono bold />}
-          {canSeePrice && template !== 'CH2' && <TotalField label="Tổng CIF" value={fmt2(totCif)} mono />}
+          {canSeePrice && template !== 'CH2' && <TotalField label="Tổng CIF" value={fmt2(totCif)} mono bold />}
         </div>
       </div>
+
+      {/* Sticky bottom summary bar */}
+      {canSeePrice && items.length > 1 && (
+        <div style={{ position: 'sticky', bottom: 0, zIndex: 50, background: '#1E40AF', color: '#fff', padding: '8px 16px', display: 'flex', justifyContent: 'center', gap: '2rem', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', fontWeight: 600, boxShadow: '0 -2px 8px rgba(0,0,0,0.15)' }}>
+          <span>{items.length} items</span>
+          <span>Purchase: {fmt2(totVonSX)}</span>
+          {template !== 'CH2' && <span>CIF: {fmt2(totCif)}</span>}
+        </div>
+      )}
     </div>
   )
 }
