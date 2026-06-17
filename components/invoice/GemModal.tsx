@@ -80,10 +80,20 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
     }
   }, [open, gem])
 
-  // Extract trailing size from gem code: "L-RD409-2.1" → "2.1", "BG-L14-0.05" → "0.05"
+  // Extract size from gem code:
+  //   "RD-11119-2.1"    → "2.1"       (last dash segment is numeric)
+  //   "PR-L18 1.6*1.6"  → "1.6*1.6"   (space-separated size at end)
+  //   "BG-L14"           → ""          (no size embedded)
   function extractSizeFromCode(maXoan: string): string {
-    const last = maXoan.split('-').pop() ?? ''
-    return /^\d/.test(last) || last.includes('*') ? last : ''
+    // Try space-separated last token first: "PR-L18 1.6*1.6" → "1.6*1.6"
+    const spaceTokens = maXoan.trim().split(/\s+/)
+    if (spaceTokens.length > 1) {
+      const last = spaceTokens[spaceTokens.length - 1]
+      if (/^\d/.test(last) || last.includes('*')) return last
+    }
+    // Fallback: last dash segment: "RD-11119-2.1" → "2.1"
+    const dashLast = maXoan.split('-').pop() ?? ''
+    return /^\d/.test(dashLast) ? dashLast : ''
   }
 
   // Auto-map to size_xoan_range + don_gia via DB range query.

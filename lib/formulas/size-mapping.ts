@@ -99,7 +99,8 @@ const OV_RANGES: RangeEntry[] = [
 export function detectStoneType(maXoan: string): string | null {
   if (!maXoan) return null
   const u = maXoan.toUpperCase()
-  // Lab-grown: L-XX prefix → LG-XX (except L-RD → RD-LG for historical reasons)
+
+  // Lab-grown: "L-XX..." prefix
   if (u.startsWith('L-RD'))                          return 'RD-LG'
   if (u.startsWith('L-PR'))                          return 'LG-PR'
   if (u.startsWith('L-BG'))                          return 'LG-BG'
@@ -108,6 +109,15 @@ export function detectStoneType(maXoan: string): string | null {
   if (u.startsWith('L-HS'))                          return 'LG-HS'
   if (u.startsWith('L-TD'))                          return 'LG-TD'
   if (u.startsWith('L-') && maXoan.length > 2)       return detectStoneType(maXoan.slice(2))
+
+  // Lab-grown: "{TYPE}-L{digits}" pattern — e.g. "PR-L18 1.6*1.6", "RD-L409-2.1"
+  const lgMatch = u.match(/^(RD|PR|BG|MQ|PS|OV|HS|TD)-L\d/)
+  if (lgMatch) {
+    const base = lgMatch[1]
+    if (base === 'RD') return 'RD-LG'
+    return `LG-${base}`
+  }
+
   if (u.startsWith('RD-LG') || u.startsWith('RDL'))  return 'RD-LG'
   if (u.startsWith('RDCZ'))                           return 'RD'
   if (u.startsWith('RD'))                             return 'RD'
@@ -126,12 +136,23 @@ export function detectStoneType(maXoan: string): string | null {
 }
 
 /**
- * Parse the numeric size value from rawSize string.
- * PR uses "W*W" format — take first dimension.
+ * Parse the numeric size value from a raw size string.
+ * Handles formats: "2.1", "1.6*1.6", "L18 1.6*1.6", "0.05"
  */
 export function parseSizeValue(rawSize: string): number {
-  const first = rawSize.split(/[*xX×]/)[0]
-  return parseFloat(first) || 0
+  // Try direct parse first (simple case: "2.1", "0.05")
+  const direct = parseFloat(rawSize)
+  if (!isNaN(direct)) return direct
+
+  // Extract the last numeric-looking token from the string
+  // Handles "L18 1.6*1.6" → find "1.6*1.6" → take first dimension → 1.6
+  const tokens = rawSize.trim().split(/\s+/)
+  for (let i = tokens.length - 1; i >= 0; i--) {
+    const first = tokens[i].split(/[*xX×]/)[0]
+    const n = parseFloat(first)
+    if (!isNaN(n)) return n
+  }
+  return 0
 }
 
 /**
