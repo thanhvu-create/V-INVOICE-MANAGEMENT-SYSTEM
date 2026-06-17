@@ -8,8 +8,8 @@ function fmt4(n: number | null | undefined) { return n != null ? n.toFixed(4) : 
 function TotalField({ label, value, mono, bold, muted }: { label: string; value: any; mono?: boolean; bold?: boolean; muted?: boolean }) {
   return (
     <div>
-      <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(250,250,247,0.45)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
-      <div style={{ fontFamily: mono ? 'var(--font-mono)' : 'var(--font-body)', fontSize: bold ? 'var(--text-base)' : 'var(--text-sm)', fontWeight: bold ? 700 : 400, color: muted ? 'rgba(250,250,247,0.5)' : bold ? '#93C5FD' : '#FAFAF7' }}>
+      <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontFamily: mono ? 'var(--font-mono)' : 'var(--font-body)', fontSize: bold ? 'var(--text-base)' : 'var(--text-sm)', fontWeight: bold ? 700 : 400, color: muted ? 'rgba(255,255,255,0.7)' : bold ? '#FFFFFF' : '#FAFAF7' }}>
         {value}
       </div>
     </div>
@@ -63,7 +63,7 @@ export function DetailView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
 
       {/* Invoice Total Summary */}
       <div style={{ marginTop: '1.5rem', background: '#e91d79', color: '#FAFAF7', padding: '1rem 1.25rem' }}>
-        <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(250,250,247,0.5)', marginBottom: '0.75rem' }}>
+        <div style={{ fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.7)', marginBottom: '0.75rem' }}>
           Invoice Total — {items.length} items
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem' }}>

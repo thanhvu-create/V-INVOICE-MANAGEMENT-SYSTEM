@@ -126,9 +126,9 @@ export function WorkflowBar({ invoiceId, currentStatus, availableTransitions, on
                   if (!canGo) return
                   const b = e.currentTarget
                   if (!isCurrent) {
-                    b.style.background = 'var(--border-strong)'
+                    b.style.background = 'var(--color-accent)'
                     b.style.color      = 'var(--text-inverse)'
-                    b.style.borderColor = 'var(--border-strong)'
+                    b.style.borderColor = 'var(--color-accent)'
                   }
                 }}
                 onMouseLeave={e => {

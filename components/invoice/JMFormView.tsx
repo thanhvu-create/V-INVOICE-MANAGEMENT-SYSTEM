@@ -357,14 +357,14 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                   const total = TOTALS[col.key]
                   const isMajorTotal = col.key === 'von_san_xuat' || col.key === 'cif_price'
                   if (i === descIdx) {
-                    return <td key={col.key} style={{ ...td, borderColor: 'rgba(255,255,255,0.1)', fontSize: 'var(--text-xs)', color: 'rgba(250,250,247,0.6)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>TOTAL ({items.length} items)</td>
+                    return <td key={col.key} style={{ ...td, borderColor: 'rgba(255,255,255,0.25)', fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.8)', letterSpacing: '0.12em', textTransform: 'uppercase' }}>TOTAL ({items.length} items)</td>
                   }
                   if (total != null) {
-                    return <td key={col.key} style={{ ...td, borderColor: 'rgba(255,255,255,0.1)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: isMajorTotal ? 800 : 600, fontSize: isMajorTotal ? 'var(--text-base)' : 'var(--text-sm)', color: isMajorTotal ? '#93C5FD' : TOTAL_COLOR }}>{total}</td>
+                    return <td key={col.key} style={{ ...td, borderColor: 'rgba(255,255,255,0.25)', fontFamily: 'var(--font-mono)', textAlign: 'right', fontWeight: isMajorTotal ? 800 : 600, fontSize: isMajorTotal ? 'var(--text-base)' : 'var(--text-sm)', color: isMajorTotal ? '#FFFFFF' : TOTAL_COLOR }}>{total}</td>
                   }
-                  return <td key={col.key} style={{ ...td, borderColor: 'rgba(255,255,255,0.1)' }} />
+                  return <td key={col.key} style={{ ...td, borderColor: 'rgba(255,255,255,0.25)' }} />
                 })}
-                {canEdit && !isLocked && <td style={{ ...td, borderColor: 'rgba(255,255,255,0.1)' }} />}
+                {canEdit && !isLocked && <td style={{ ...td, borderColor: 'rgba(255,255,255,0.25)' }} />}
               </tr>
             </tfoot>
           )}

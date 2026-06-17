@@ -149,7 +149,7 @@ button {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.btn-outline:hover { background: var(--border-strong); color: var(--text-inverse); border-color: var(--border-strong); }
+.btn-outline:hover { background: var(--color-accent); color: var(--text-inverse); border-color: var(--color-accent); }
 
 /* Danger: red outline → charcoal on hover (NOT pink) */
 .btn-danger {
@@ -162,7 +162,7 @@ button {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.btn-danger:hover { background: var(--border-strong); color: var(--text-inverse); border-color: var(--border-strong); }
+.btn-danger:hover { background: var(--color-accent); color: var(--text-inverse); border-color: var(--color-accent); }
 
 /* ── Form label (eyebrow style) ─────────────────────────────────────────── */
 .form-label {
