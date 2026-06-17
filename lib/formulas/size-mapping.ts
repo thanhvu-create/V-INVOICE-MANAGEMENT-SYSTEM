@@ -93,13 +93,40 @@ const OV_RANGES: RangeEntry[] = [
 ]
 
 /**
+ * Detect the nvl_hot.stone_type from a mã xoàn code.
+ * Returns the DB stone_type string, or null for unknown types.
+ */
+export function detectStoneType(maXoan: string): string | null {
+  if (!maXoan) return null
+  const u = maXoan.toUpperCase()
+  if (u.startsWith('L-RD'))                          return 'RD-LG'
+  if (u.startsWith('L-') && maXoan.length > 2)       return detectStoneType(maXoan.slice(2))
+  if (u.startsWith('RD-LG') || u.startsWith('RDL'))  return 'RD-LG'
+  if (u.startsWith('RDCZ'))                           return 'RD'
+  if (u.startsWith('RD'))                             return 'RD'
+  if (u.startsWith('PR'))                             return 'PR'
+  if (u.startsWith('BG'))                             return 'BG'
+  if (u.startsWith('MQ'))                             return 'MQ'
+  if (u.startsWith('PS'))                             return 'PS'
+  if (u.startsWith('OV'))                             return 'OV'
+  if (u.startsWith('BQT'))                            return 'BQT'
+  if (u.startsWith('XC'))                             return 'XC'
+  if (u.startsWith('PL') || u.startsWith('PEARL'))    return 'PEARL'
+  return null
+}
+
+/**
+ * Parse the numeric size value from rawSize string.
+ * PR uses "W*W" format — take first dimension.
+ */
+export function parseSizeValue(rawSize: string): number {
+  const first = rawSize.split(/[*xX×]/)[0]
+  return parseFloat(first) || 0
+}
+
+/**
  * Map gem tracking data → NVL Hột size_range key (for catalog price lookup).
- *
- * @param maXoan   Mã xoàn — e.g. "RD-11119-2.1", "BG-L14", "PR-L13"
- * @param rawSize  Col H from tracking: "2.1" (mm, for RD/RD-LG/PR) or "2.3*2.3" (PR)
- * @param tbVien   Col L from tracking: TB viên ct/viên (for BG/MQ/PS/OV)
- *                 For manual entry in GemModal, pass parseFloat(rawSize).
- * @returns        nvl_hot.size_range string, or null when no match / unknown type
+ * @deprecated Use detectStoneType() + DB range query (/api/nvl-hot?type=X&size=Y) instead.
  */
 export function mapSizeToRange(maXoan: string, rawSize: string, tbVien: number): string | null {
   if (!maXoan) return null

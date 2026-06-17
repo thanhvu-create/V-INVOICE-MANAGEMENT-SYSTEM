@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
-import { mapSizeToRange } from '@/lib/formulas/size-mapping'
+import { detectStoneType, parseSizeValue } from '@/lib/formulas/size-mapping'
 
 interface GemForm {
   ma_xoan:           string
@@ -86,22 +86,36 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
     return /^\d/.test(last) || last.includes('*') ? last : ''
   }
 
-  // Auto-map to size_xoan_range + don_gia.
-  // Size source priority: size_raw field (manual) → embedded in ma_xoan code
-  // Only overwrites size_xoan_range when: size_raw is filled, OR size_xoan_range is currently empty
+  // Auto-map to size_xoan_range + don_gia via DB range query.
+  // Detects stone_type from ma_xoan prefix, parses size, then calls /api/nvl-hot?type=X&size=Y
   useEffect(() => {
-    if (!form.ma_xoan || !nvlHotList.length) return
-    if (form.size_xoan_range && !form.size_raw) return  // existing range, user not overriding → skip
+    if (!form.ma_xoan) return
+    if (form.size_xoan_range && !form.size_raw) return
+
     const sizeToUse = form.size_raw || extractSizeFromCode(form.ma_xoan)
     if (!sizeToUse) return
-    const tbVien = parseFloat(sizeToUse) || 0
-    const range  = mapSizeToRange(form.ma_xoan, sizeToUse, tbVien)
-    if (!range) return
-    const found  = nvlHotList.find(r => r.size_range === range)
-    if (!found) return
-    setForm(v => ({ ...v, size_xoan_range: range, don_gia: String(found.mk_price) }))
+
+    const stoneType = detectStoneType(form.ma_xoan)
+    if (!stoneType) return
+
+    const sizeNum = parseSizeValue(sizeToUse)
+    if (sizeNum <= 0) return
+
+    let cancelled = false
+    fetch(`/api/nvl-hot?type=${encodeURIComponent(stoneType)}&size=${sizeNum}`)
+      .then(r => r.json())
+      .then(j => {
+        if (cancelled || !j.success || !j.data) return
+        setForm(v => ({
+          ...v,
+          size_xoan_range: j.data.size_range,
+          don_gia: String(j.data.mk_price),
+        }))
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.ma_xoan, form.size_raw, nvlHotList])
+  }, [form.ma_xoan, form.size_raw])
 
   if (!open) return null
 

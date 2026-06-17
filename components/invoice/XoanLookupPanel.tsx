@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import { apiCall } from '@/lib/api'
-import { mapSizeToRange } from '@/lib/formulas/size-mapping'
+import { detectStoneType, parseSizeValue } from '@/lib/formulas/size-mapping'
 
 interface GemRow {
   ma_xoan:      string
@@ -18,12 +18,15 @@ interface NVLHotRow {
   stone_type: string
   grade:      string
   size_range: string
+  size_min:   number | null
+  size_max:   number | null
+  size_unit:  string
   mk_price:   number
 }
 
 interface EnrichedRow extends GemRow {
-  mapped_range: string | null  // computed via mapSizeToRange
-  don_gia:      number         // looked up from NVL Hot catalog
+  mapped_range: string | null
+  don_gia:      number
 }
 
 interface Props {
@@ -67,7 +70,11 @@ function parseAndFilter(buf: ArrayBuffer, mo: string | null): GemRow[] {
     const rowMO  = String(r[4] ?? '').trim()
     const status = String(r[12] ?? '').trim().toLowerCase()
     if (!rowMO) continue
-    if (mo && rowMO !== mo) continue
+    if (mo && rowMO !== mo) {
+      // Excel numeric cells lose trailing zeros (26.36160 → "26.3616") — compare as floats
+      const n1 = parseFloat(rowMO), n2 = parseFloat(mo)
+      if (isNaN(n1) || isNaN(n2) || n1 !== n2) continue
+    }
     if (status !== 'xuất') continue
     // Col F (index 5) = Mã xoàn; Col H (index 7) = Size gốc; Col I (index 8) = SL
     // Col J (index 9) = Trọng lượng (dùng làm TB viên); Col M (index 12) = Trạng thái
@@ -105,9 +112,12 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
   const enrichedRows: EnrichedRow[] | null = useMemo(() => {
     if (!rows) return null
     return rows.map(r => {
-      const mapped_range = mapSizeToRange(r.ma_xoan, r.size_xoan, r.tl_sau_xu_ly)
-      const found        = mapped_range ? nvlHotList.find(c => c.size_range === mapped_range) : null
-      return { ...r, mapped_range, don_gia: found?.mk_price ?? 0 }
+      const stoneType = detectStoneType(r.ma_xoan)
+      const sizeNum   = parseSizeValue(r.size_xoan) || r.tl_sau_xu_ly
+      const found     = stoneType && sizeNum > 0
+        ? nvlHotList.find(c => c.stone_type === stoneType && c.size_min != null && c.size_max != null && sizeNum >= c.size_min && sizeNum <= c.size_max)
+        : null
+      return { ...r, mapped_range: found?.size_range ?? null, don_gia: found?.mk_price ?? 0 }
     })
   }, [rows, nvlHotList])
 
