@@ -195,6 +195,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                 ['T.Phẩm trừ đá (gr)', fmt4(item.t_pham_tru_nvl_da)],
                 ['Vàng TT (gr)', fmt4(item.t_pham_vang_thuc_te)],
               ] : []),
+              ...(item.customer_name ? [['Tên khách', item.customer_name]] : []),
               ...(item.store ? [['Store', item.store]] : []),
               ...(!isAG3 && !isAdm && item.ngay_gui    ? [['Ngày gửi', item.ngay_gui]]           : []),
               ...(!isAG3 && !isAdm && item.tracking_no ? [['Tracking#', item.tracking_no]]       : []),

@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       qt_pcs:            row.qty,
       wt_gr:             row.weightTotal,
       t_pham_co_nvl_da:  row.weightTotal,
-      nini_adm:          row.niniAdm           || null,
+      customer_name:     row.niniAdm           || null,  // TÊN KHÁCH (cột P) → per-product customer
     }))
 
     const { data: inserted, error: insertErr } = await db

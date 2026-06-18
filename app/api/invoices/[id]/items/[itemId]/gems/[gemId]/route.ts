@@ -10,7 +10,7 @@ async function triggerRecalc(db: ReturnType<typeof createServiceClient>, itemId:
   const [{ data: item }, { data: diamonds }, { data: invoice }] = await Promise.all([
     db.from('invoice_products').select('*').eq('id', itemId).single(),
     db.from('invoice_diamonds').select('*').eq('product_id', itemId),
-    db.from('invoices').select('template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_tag_multiplier, nvl_fr_multiplier').eq('id', invoiceId).single(),
+    db.from('invoices').select('template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_cif_rate, nvl_tag_multiplier, nvl_fr_multiplier').eq('id', invoiceId).single(),
   ])
   if (item && invoice) {
     const gemList = diamonds ?? []
@@ -34,10 +34,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const body = await req.json()
     const db   = createServiceClient()
 
-    const { data: inv } = await db.from('invoices').select('status, created_by, template_type').eq('id', params.id).single()
+    const { data: inv } = await db.from('invoices').select('status, is_locked, created_by, template_type').eq('id', params.id).single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
     const editError = checkEditPermission({
-      isLocked:  inv.status === 'finalized',
+      isLocked:  inv.is_locked || (inv.status === 'finalized'),
       status:    inv.status,
       role:      ctx.role,
       createdBy: inv.created_by,
@@ -87,10 +87,10 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const ctx = await requireRole('user')
     const db  = createServiceClient()
 
-    const { data: inv } = await db.from('invoices').select('status, created_by').eq('id', params.id).single()
+    const { data: inv } = await db.from('invoices').select('status, is_locked, created_by').eq('id', params.id).single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
     const editError = checkEditPermission({
-      isLocked:  inv.status === 'finalized',
+      isLocked:  inv.is_locked || (inv.status === 'finalized'),
       status:    inv.status,
       role:      ctx.role,
       createdBy: inv.created_by,

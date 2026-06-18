@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     let query = db
       .from('invoices')
       .select(`
-        id, invoice_code, channel, template_type, status, created_by, created_at, finalized_at,
+        id, invoice_code, template_type, status, created_by, created_at, finalized_at,
         invoice_products ( id, seq )
       `, { count: 'exact' })
       .order('created_at', { ascending: false })
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     if (dateFrom) query = query.gte('created_at', dateFrom)
     if (dateTo)   query = query.lte('created_at', dateTo + 'T23:59:59')
     if (search) {
-      query = query.or(`invoice_code.ilike.%${search}%,channel.ilike.%${search}%`)
+      query = query.ilike('invoice_code', `%${search}%`)
     }
 
     const { data, count, error } = await query
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   try {
     const ctx = await requireRole('user')
     const body = await req.json()
-    const { invoice_code, channel, template_type } = body
+    const { invoice_code, template_type } = body
 
     if (!invoice_code?.trim()) {
       return NextResponse.json({ success: false, message: 'Invoice code is required' }, { status: 400 })
@@ -108,7 +108,6 @@ export async function POST(req: NextRequest) {
       .from('invoices')
       .insert({
         invoice_code:  invoice_code.trim(),
-        channel:       channel?.trim() || null,
         template_type,
         status:        'draft',
         created_by:    ctx.userId,

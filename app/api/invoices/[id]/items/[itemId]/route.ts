@@ -16,13 +16,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const { data: invoice } = await db
       .from('invoices')
-      .select('status, created_by, template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_tag_multiplier, nvl_fr_multiplier')
+      .select('status, is_locked, created_by, template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_cif_rate, nvl_tag_multiplier, nvl_fr_multiplier')
       .eq('id', params.id)
       .single()
 
     if (!invoice) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
     const editError = checkEditPermission({
-      isLocked:  invoice.status === 'finalized',
+      isLocked:  invoice.is_locked || (invoice.status === 'finalized'),
       status:    invoice.status,
       role:      ctx.role,
       createdBy: invoice.created_by,
@@ -34,7 +34,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       'description', 'store', 'location', 'so_mo',
       'qt_pcs', 'wt_gr', 't_pham_co_nvl_da', 'loai_vang',
       'class', 'sub_class', 'gia_cong', 'duc', 'thiet_ke',
-      'resin', 'phi_phu_kien', 'nini_adm',
+      'resin', 'phi_phu_kien', 'nini_adm', 'customer_name',
       'ngay_gui', 'tracking_no', 'hoa_don', 'kich_thuoc',
       'image_url', 'bao_hiem', 'vendor_model',
       'po_number', 'sku_ag', 'chi_tiet_tap',
@@ -98,13 +98,13 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
     const { data: invoice } = await db
       .from('invoices')
-      .select('status, created_by')
+      .select('status, is_locked, created_by')
       .eq('id', params.id)
       .single()
 
     if (!invoice) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
     const editError = checkEditPermission({
-      isLocked:  invoice.status === 'finalized',
+      isLocked:  invoice.is_locked || (invoice.status === 'finalized'),
       status:    invoice.status,
       role:      ctx.role,
       createdBy: invoice.created_by,

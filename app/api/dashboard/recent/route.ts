@@ -12,7 +12,7 @@ export async function GET() {
     const { data, error } = await db
       .from('invoices')
       .select(`
-        id, invoice_code, channel, template_type, status, created_at, finalized_at,
+        id, invoice_code, template_type, status, created_at, finalized_at,
         item_count:invoice_products(count)
       `)
       .order('created_at', { ascending: false })

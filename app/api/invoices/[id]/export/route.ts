@@ -150,7 +150,6 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     // Info sheet
     const infoData = {
       'Invoice Code':  invoice.invoice_code,
-      'Channel':       invoice.channel       ?? '',
       'Template Type': invoice.template_type ?? '',
       'Status':        invoice.status,
       'Created At':    invoice.created_at?.slice(0, 10) ?? '',

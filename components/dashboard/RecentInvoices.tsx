@@ -3,7 +3,6 @@ import { StatusBadge } from '@/components/ui/StatusBadge'
 interface RecentRow {
   id:            string
   invoice_code:  string
-  channel:       string | null
   template_type: string | null
   status:        string
   created_at:    string
@@ -97,10 +96,8 @@ export function RecentInvoices({ rows, loading }: { rows: RecentRow[]; loading: 
                 </span>
               )}
 
-              {/* Channel — drops to its own line on mobile */}
-              <span className="recent-inv-chan" style={{ flex: 1, fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {row.channel ?? '—'}
-              </span>
+              {/* Spacer — pushes meta to the right */}
+              <span className="recent-inv-chan" style={{ flex: 1 }} />
 
               {/* Date + Status + Count grouped so they stay together */}
               <div className="recent-inv-meta" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0 }}>

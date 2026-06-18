@@ -50,12 +50,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const { data: inv } = await db
       .from('invoices')
-      .select('status, created_by')
+      .select('status, is_locked, created_by')
       .eq('id', params.id)
       .single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
     const editError = checkEditPermission({
-      isLocked:  inv.status === 'finalized',
+      isLocked:  inv.is_locked || (inv.status === 'finalized'),
       status:    inv.status,
       role:      ctx.role,
       createdBy: inv.created_by,
@@ -65,7 +65,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const body = await req.json()
     const allowed = [
-      'invoice_code', 'channel', 'template_type',
+      'invoice_code', 'template_type',
       'nvl_gold_24k', 'nvl_pt_price', 'nvl_ag_price', 'nvl_pd_price',
       'nvl_loss_gold', 'nvl_loss_pt', 'nvl_cif_rate',
       'nvl_tag_multiplier', 'nvl_fr_multiplier',
@@ -89,7 +89,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     // Bulk recalc all products when NVL snapshot or template changes
     const nvlChanged = [
       'nvl_gold_24k', 'nvl_pt_price', 'nvl_ag_price', 'nvl_pd_price',
-      'nvl_loss_gold', 'nvl_loss_pt', 'template_type',
+      'nvl_loss_gold', 'nvl_loss_pt', 'nvl_cif_rate', 'template_type',
       'nvl_tag_multiplier', 'nvl_fr_multiplier',
     ].some(k => k in updates)
 
@@ -110,10 +110,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
             // Recalc each diamond's derived fields first
             if (diamonds?.length) {
               await Promise.all(diamonds.map(d =>
-                db.from('invoice_diamonds').update(recalcDiamond(d)).eq('id', d.id)
+                db.from('invoice_diamonds').update(recalcDiamond(d, template)).eq('id', d.id)
               ))
             }
-            const updatedDiamonds = diamonds ? diamonds.map(d => ({ ...d, ...recalcDiamond(d) })) : []
+            const updatedDiamonds = diamonds ? diamonds.map(d => ({ ...d, ...recalcDiamond(d, template) })) : []
             const recalc = recalcItem(fullProd, updatedDiamonds as any, nvl, template)
             await db.from('invoice_products').update(recalc).eq('id', prod.id)
           }
@@ -134,9 +134,9 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     await requireRole('admin')
     const db = createServiceClient()
 
-    const { data: inv } = await db.from('invoices').select('status').eq('id', params.id).single()
+    const { data: inv } = await db.from('invoices').select('status, is_locked').eq('id', params.id).single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
-    if (inv.status === 'finalized') {
+    if (inv.is_locked || inv.status === 'finalized') {
       return NextResponse.json({ success: false, message: 'Invoice is finalized and cannot be deleted' }, { status: 403 })
     }
 

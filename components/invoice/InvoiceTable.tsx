@@ -8,7 +8,6 @@ import type { Role } from '@/types'
 interface InvoiceRow {
   id:            string
   invoice_code:  string
-  channel:       string | null
   template_type: string | null
   status:        string
   created_at:    string
@@ -137,7 +136,6 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
               <th style={th}>Invoice Code</th>
               <th style={th}>Status</th>
               <th style={th}>Template</th>
-              <th style={th}>Channel</th>
               <th style={th}>Created</th>
               <th style={{ ...th, textAlign: 'right' }} />
             </tr>
@@ -177,9 +175,6 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
                       </span>
                     ) : '—'}
                   </td>
-                  <td style={{ ...td, color: 'var(--text-secondary)', fontSize: 'var(--text-xs)' }}>
-                    {row.channel || '—'}
-                  </td>
                   <td style={{ ...td, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
                     {row.created_at.slice(0, 10)}
                   </td>
@@ -217,7 +212,6 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
               </div>
               <div className="invoice-card-row2">
                 {row.template_type && <span>{row.template_type}</span>}
-                {row.channel && <span>{row.channel}</span>}
                 <span>{row.created_at.slice(0, 10)}</span>
               </div>
             </Link>

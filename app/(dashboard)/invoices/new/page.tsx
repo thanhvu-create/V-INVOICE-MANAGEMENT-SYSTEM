@@ -35,7 +35,6 @@ export default function NewInvoicePage() {
   const [form, setForm] = useState({
     invoice_code:  '',
     template_type: 'CH1',
-    channel:       '',
   })
   const [error,   setError]   = useState('')
   const [loading, setLoading] = useState(false)
@@ -58,7 +57,6 @@ export default function NewInvoicePage() {
         body: JSON.stringify({
           invoice_code:  form.invoice_code.trim().toUpperCase(),
           template_type: form.template_type,
-          channel:       form.channel.trim() || null,
         }),
       })
       const json = await res.json()
@@ -112,14 +110,6 @@ export default function NewInvoicePage() {
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 4 }}>
               CH1/CH2 = 2F có xoàn · ADM = 2F có xoàn gộp · CH1_AG3/VNSI_AG3 = không xoàn
             </div>
-          </div>
-
-          {/* Channel */}
-          <div style={field}>
-            <label style={label}>Channel (TÊN KHÁCH)</label>
-            <input style={input} type="text" value={form.channel}
-              onChange={e => setForm(f => ({ ...f, channel: e.target.value }))}
-              placeholder="e.g. CH1-Khách, ADM1, CH2…" />
           </div>
 
           {/* NVL snapshot preview */}

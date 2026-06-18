@@ -164,6 +164,7 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
     if (isAG3)    header.push('Qt/1sp', 'Wt/1sp (gr)', 'HP Purchase/1sp', 'HP Tag/1sp')
     if (isADM)    header.push('Ngày gửi', 'Hóa đơn (V-INV)')
   }
+  header.push('Tên khách')  // per-product customer
   header.push(isAG3 ? 'Chi tiết/1sp' : 'Ghi chú (NINI)')
   if (isAG3) header.push('', '', '')  // V=empty spacer, W=hoa_don (unlabeled in Excel), X=ngay_gui (unlabeled)
   rows.push(header)
@@ -210,6 +211,7 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
         row.push(1, wtPerUnit, purPerUnit, tagPerUnit)
       }
     }
+    row.push(item.customer_name ?? '')  // per-product customer
     row.push(isAG3 ? (item.chi_tiet_tap ?? '') : (item.nini_adm ?? ''))
     if (isAG3) row.push('', item.hoa_don ?? '', item.ngay_gui ?? '')  // V=empty, W=hoa_don, X=ngay_gui
 
@@ -330,8 +332,9 @@ function buildSummaryRowsADM(items: any[]) {
 
   for (const item of items ?? []) {
     const gems    = (item.invoice_diamonds ?? []) as any[]
-    // Always at least 2 rows: main + nini_adm sub-row
-    const numRows = Math.max(gems.length, item.nini_adm ? 2 : 1)
+    const custName = item.customer_name ?? item.nini_adm   // fallback to nini_adm for pre-migration data
+    // Always at least 2 rows: main + customer-name sub-row
+    const numRows = Math.max(gems.length, custName ? 2 : 1)
     const vonSX   = typeof n(item.von_san_xuat) === 'number' ? (n(item.von_san_xuat) as number) : 0
 
     for (let g = 0; g < numRows; g++) {
@@ -353,8 +356,8 @@ function buildSummaryRowsADM(items: any[]) {
         row[22] = vonSX > 0 ? vonSX : ''
         row[23] = vonSX > 0 ? vonSX * 1.10 : ''
       }
-      // nini_adm goes in sub-row g=1, col C (matches Excel C5 pattern)
-      if (g === 1 && item.nini_adm) row[2] = item.nini_adm
+      // Customer name goes in sub-row g=1, col C (matches Excel C5 pattern)
+      if (g === 1 && custName) row[2] = custName
 
       if (gem) {
         row[11] = gem.ma_xoan         ?? ''
@@ -457,13 +460,13 @@ function buildSummaryRows(invoice: any, items: any[]) {
         row[31] = item.hoa_don     ?? ''
       }
 
-      // Gem columns (11-21) — CH2 uses tl_sau as primary (no tl_truoc column)
+      // Gem columns (11-21) — CH2 prefers tl_sau but falls back to tl_truoc (XoanLookupPanel fills tl_truoc only)
       if (gem) {
         row[11] = gem.ma_xoan         ?? ''
         row[12] = gem.p_chat          ?? ''
         row[13] = gem.size_xoan_range ?? ''
         row[14] = n(gem.sl_hot)
-        row[15] = isCH2 ? n(gem.tl_sau_xu_ly_ct) : n(gem.tl_truoc_xu_ly_ct)
+        row[15] = isCH2 ? n(gem.tl_sau_xu_ly_ct ?? gem.tl_truoc_xu_ly_ct) : n(gem.tl_truoc_xu_ly_ct)
         row[16] = isCH2 ? '' : n(gem.tl_sau_xu_ly_ct)
         row[17] = n(gem.tl_xoan_gr)
         row[18] = n(gem.don_gia)
@@ -566,7 +569,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         let dataRowCount = 0
         for (const item of processedItems) {
           const gems = (item.invoice_diamonds ?? []) as any[]
-          if (_isADMgt) dataRowCount += Math.max(gems.length, item.nini_adm ? 2 : 1)
+          const custName = item.customer_name ?? item.nini_adm
+          if (_isADMgt) dataRowCount += Math.max(gems.length, custName ? 2 : 1)
           else          dataRowCount += Math.max(gems.length, 1)
         }
         summaryGrandTotalRowIdx = 3 + dataRowCount
@@ -641,6 +645,35 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         )
       }
     }
+    // ── ADM customer-name sub-rows: shrink + style (avoid tall empty row) ────
+    // The customer name sits in col C of the g=1 sub-row. When the product has
+    // <2 gems, that sub-row carries ONLY the customer name (no gem data), so the
+    // default 80px image-height row looks empty. Shrink it and style the label.
+    if (isADMf && processedItems.length > 0) {
+      let rowCursor = 3  // first data row (after 3 header rows)
+      for (const item of processedItems) {
+        const gems     = (item.invoice_diamonds ?? []) as any[]
+        const custName = item.customer_name ?? item.nini_adm
+        const numRows  = Math.max(gems.length, custName ? 2 : 1)
+        if (custName && gems.length < 2) {
+          const custRowIdx = rowCursor + 1  // g=1 — dedicated customer row
+          summaryExtraFmt.push(
+            { updateDimensionProperties: { range: { sheetId: 1, dimension: 'ROWS', startIndex: custRowIdx, endIndex: custRowIdx + 1 }, properties: { pixelSize: 24 }, fields: 'pixelSize' } },
+            { repeatCell: {
+              range: { sheetId: 1, startRowIndex: custRowIdx, endRowIndex: custRowIdx + 1, startColumnIndex: 2, endColumnIndex: 3 },
+              cell: { userEnteredFormat: {
+                textFormat: { italic: true, fontSize: 9, foregroundColor: { red: 0.35, green: 0.35, blue: 0.35 } },
+                horizontalAlignment: 'LEFT',
+                verticalAlignment: 'MIDDLE',
+              }},
+              fields: 'userEnteredFormat(textFormat,horizontalAlignment,verticalAlignment)',
+            }},
+          )
+        }
+        rowCursor += numRows
+      }
+    }
+
     if (summaryGrandTotalRowIdx >= 0) {
       summaryExtraFmt.push(
         { updateDimensionProperties: { range: { sheetId: 1, dimension: 'ROWS', startIndex: summaryGrandTotalRowIdx, endIndex: summaryGrandTotalRowIdx + 1 }, properties: { pixelSize: 32 }, fields: 'pixelSize' } },

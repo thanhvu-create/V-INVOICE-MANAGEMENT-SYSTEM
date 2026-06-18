@@ -9,12 +9,12 @@ type Params = { params: { id: string; itemId: string } }
 async function guardAndCheck(db: ReturnType<typeof createServiceClient>, invoiceId: string, ctx: AuthContext) {
   const { data } = await db
     .from('invoices')
-    .select('status, created_by, template_type')
+    .select('status, is_locked, created_by, template_type')
     .eq('id', invoiceId)
     .single()
   if (!data) throw { status: 404, message: 'Not found' }
   const editError = checkEditPermission({
-    isLocked:  data.status === 'finalized',
+    isLocked:  data.is_locked || (data.status === 'finalized'),
     status:    data.status,
     role:      ctx.role,
     createdBy: data.created_by,
@@ -28,7 +28,7 @@ async function triggerRecalc(db: ReturnType<typeof createServiceClient>, itemId:
   const [{ data: item }, { data: diamonds }, { data: invoice }] = await Promise.all([
     db.from('invoice_products').select('*').eq('id', itemId).single(),
     db.from('invoice_diamonds').select('*').eq('product_id', itemId),
-    db.from('invoices').select('template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_tag_multiplier, nvl_fr_multiplier').eq('id', invoiceId).single(),
+    db.from('invoices').select('template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_cif_rate, nvl_tag_multiplier, nvl_fr_multiplier').eq('id', invoiceId).single(),
   ])
   if (item && invoice) {
     const gemList = diamonds ?? []

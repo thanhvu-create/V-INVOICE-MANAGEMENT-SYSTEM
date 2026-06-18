@@ -35,6 +35,7 @@ BEGIN
         'pd_price',       NEW.nvl_pd_price,
         'loss_gold',      NEW.nvl_loss_gold,
         'loss_pt',        NEW.nvl_loss_pt,
+        'cif_rate',       NEW.nvl_cif_rate,
         'tag_multiplier', NEW.nvl_tag_multiplier,
         'fr_multiplier',  NEW.nvl_fr_multiplier
       ),
@@ -43,6 +44,14 @@ BEGIN
     NEW.snapshot_at  := now();
     NEW.is_locked    := true;
   END IF;
+
+  -- Revert: unlock khi admin đẩy về draft
+  IF NEW.status = 'draft' AND OLD.status = 'finalized' THEN
+    NEW.is_locked     := false;
+    NEW.snapshot_data := NULL;
+    NEW.snapshot_at   := NULL;
+  END IF;
+
   RETURN NEW;
 END;
 $$;

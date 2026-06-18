@@ -16,13 +16,13 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     const { data: invoice } = await db
       .from('invoices')
-      .select('status, created_by, template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_tag_multiplier, nvl_fr_multiplier')
+      .select('status, is_locked, created_by, template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_cif_rate, nvl_tag_multiplier, nvl_fr_multiplier')
       .eq('id', params.id)
       .single()
 
     if (!invoice) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
     const editError = checkEditPermission({
-      isLocked:  invoice.status === 'finalized',
+      isLocked:  invoice.is_locked || (invoice.status === 'finalized'),
       status:    invoice.status,
       role:      ctx.role,
       createdBy: invoice.created_by,
@@ -64,6 +64,7 @@ export async function POST(req: NextRequest, { params }: Params) {
         resin:             body.resin             ?? 0,
         phi_phu_kien:      body.phi_phu_kien      ?? 0,
         bao_hiem:          body.bao_hiem          ?? null,
+        customer_name:     body.customer_name     ?? null,
         nini_adm:          body.nini_adm          ?? null,
         ngay_gui:          body.ngay_gui          ?? null,
         tracking_no:       body.tracking_no       ?? null,

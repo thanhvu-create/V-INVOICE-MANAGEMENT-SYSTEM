@@ -9,7 +9,6 @@ export interface Invoice {
   invoice_code:  string          // V-INV code e.g. "P60501"
   template_type: InvoiceTemplate
   status:        InvoiceStatus
-  channel:       string | null   // "CH1-Khách", "ADM", ...
   // NVL Snapshot — frozen after finalized
   nvl_gold_24k:       number | null
   nvl_pt_price:       number | null
@@ -57,6 +56,7 @@ export interface InvoiceProduct {
   thiet_ke:         number | null
   resin:            number | null
   phi_phu_kien:     number | null
+  customer_name:    string | null  // tên khách hàng — per product (từ cột TÊN KHÁCH của SPHT)
   nini_adm:         string | null  // ghi chú / memo (CH1/CH2/ADM)
   bao_hiem:         number | null
   ngay_gui:         string | null

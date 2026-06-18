@@ -130,7 +130,6 @@ export default function InvoiceDetailPage() {
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <StatusBadge status={header.status} />
             {header.template_type && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)', padding: '2px 8px' }}>{header.template_type}</span>}
-            {header.channel && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>{header.channel}</span>}
           </div>
         </div>
 

@@ -14,14 +14,15 @@ export type InvoiceTemplate = 'CH1' | 'CH2' | 'ADM' | 'CH1_AG3' | 'VNSI_AG3' | '
  * Maps to invoices columns: nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt
  */
 export interface NVLSnapshot {
-  spot_gold_24k:  number  // $/oz raw 24K spot price
-  spot_pt:        number  // $/oz Platinum
-  spot_ag:        number  // $/oz Silver
-  spot_pd:        number  // $/oz Palladium
-  loss_gold:      number  // fraction e.g. 0.06  (6% casting loss for gold)
-  loss_pt:        number  // fraction e.g. 0.17  (17% casting loss for PT/PD)
-  tag_multiplier: number  // tag_price = cif_price × tag_multiplier (AG3)
-  fr_multiplier:  number  // fb_price  = cif_price × fr_multiplier  (AG3)
+  spot_gold_24k:  number        // $/oz raw 24K spot price
+  spot_pt:        number        // $/oz Platinum
+  spot_ag:        number        // $/oz Silver
+  spot_pd:        number        // $/oz Palladium
+  loss_gold:      number        // fraction e.g. 0.06  (6% casting loss for gold)
+  loss_pt:        number        // fraction e.g. 0.17  (17% casting loss for PT/PD)
+  tag_multiplier: number        // tag_price = cif_price × tag_multiplier (AG3)
+  fr_multiplier:  number        // fb_price  = cif_price × fr_multiplier  (AG3)
+  cif_rate:       number | null // per-invoice CIF override; null = use template default
 }
 
 /**
@@ -130,14 +131,11 @@ export function calcVonSanXuat(
  * NOTE: ADM has an *internal* SUMMARY CIF of 10% (SUMMARY!X = W × 1.10) but the
  * JM FORM export col M uses L × 1.05. We store the JM FORM value (5%).
  */
-export function calcCIFPrice(purchase: number, template: InvoiceTemplate): number | null {
-  if (template === 'CH1' || template === 'ADM' || template === 'CH1_AG3') {
-    return purchase * 1.05
-  }
-  if (template === 'VNSI_AG3') {
-    return purchase * 1.10
-  }
-  return null  // CH2, MANUAL
+export function calcCIFPrice(purchase: number, template: InvoiceTemplate, cifRateOverride?: number | null): number | null {
+  if (template === 'CH2' || template === 'MANUAL') return null
+  const defaultRate = template === 'VNSI_AG3' ? 0.10 : 0.05
+  const rate = (cifRateOverride != null) ? cifRateOverride : defaultRate
+  return purchase * (1 + rate)
 }
 
 /**
@@ -157,7 +155,7 @@ export function recalcItem(
 
   const withGold = { ...item, tien_vang: goldValue }
   const vonSX    = calcVonSanXuat(withGold, diamonds, template)
-  const cif      = calcCIFPrice(vonSX, template)
+  const cif      = calcCIFPrice(vonSX, template, nvl.cif_rate)
 
   const isAG3 = template === 'CH1_AG3' || template === 'VNSI_AG3'
   const tag = isAG3
@@ -193,5 +191,6 @@ export function nvlFromInvoice(invoice: Record<string, any>): NVLSnapshot {
     loss_pt:        invoice.nvl_loss_pt          ?? 0.17,
     tag_multiplier: invoice.nvl_tag_multiplier   ?? 0,
     fr_multiplier:  invoice.nvl_fr_multiplier    ?? 0,
+    cif_rate:       invoice.nvl_cif_rate         ?? null,
   }
 }

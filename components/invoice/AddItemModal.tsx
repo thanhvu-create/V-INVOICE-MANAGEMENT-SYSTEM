@@ -26,10 +26,11 @@ interface Form {
   thiet_ke:     string
   resin:        string
   phi_phu_kien: string
-  bao_hiem:     string
-  nini_adm:     string
-  chi_tiet_tap: string
-  image_url:    string
+  bao_hiem:      string
+  customer_name: string
+  nini_adm:      string
+  chi_tiet_tap:  string
+  image_url:     string
 }
 
 const BASE_LOAI_VANG = ['18KY', '18KW', '18KR', '18KG', '22KY', '22KW', '24K', '14KY', '14KW', '14KR', '10KY', '10KW', 'PT950', 'PT850', 'AG', 'PD']
@@ -41,7 +42,7 @@ const EMPTY: Form = {
   qt_pcs: '1', wt_gr: '',
   gia_cong: '0', duc: '0', thiet_ke: '0', resin: '0', phi_phu_kien: '0',
   bao_hiem: '0',
-  nini_adm: '', chi_tiet_tap: '', image_url: '',
+  customer_name: '', nini_adm: '', chi_tiet_tap: '', image_url: '',
 }
 
 interface Props {
@@ -110,6 +111,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
       resin:            hasFees ? (parseFloat(form.resin)        || 0) : 0,
       phi_phu_kien:     hasFees ? (parseFloat(form.phi_phu_kien) || 0) : 0,
       bao_hiem:         (isAG3 || isAdm) ? null : (parseFloat(form.bao_hiem) || null),
+      customer_name:    form.customer_name.trim() || null,
       nini_adm:         isAG3 ? null : (form.nini_adm.trim() || null),
       chi_tiet_tap:     isAG3 ? (form.chi_tiet_tap.trim() || null) : null,
       image_url:        form.image_url.trim()   || null,
@@ -201,6 +203,12 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
           <div style={{ marginBottom: '0.75rem' }}>
             <label style={labelStyle}>Description</label>
             <input style={inputStyle} value={form.description} onChange={f('description')} />
+          </div>
+
+          {/* Tên khách — per product (all templates) */}
+          <div style={{ marginBottom: '0.75rem' }}>
+            <label style={labelStyle}>Tên khách</label>
+            <input style={inputStyle} placeholder='e.g. "CH1-Khách", "ADM1", "CH1-SR"' value={form.customer_name} onChange={f('customer_name')} />
           </div>
 
           <div style={grid2}>
