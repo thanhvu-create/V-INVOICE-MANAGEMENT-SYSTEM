@@ -239,7 +239,7 @@ function buildNVLRows(invoice: any) {
   return rows
 }
 
-const SUMMARY_COLS = 32
+const SUMMARY_COLS = 33  // includes "Tên khách" col (index 3, after SO/MO)
 const SUMMARY_COLS_AG3 = 10
 
 // AG3 templates (CH1_AG3, VNSI_AG3) have a simplified SUMMARY: only 10 cols, no gem/fabrication section.
@@ -296,46 +296,44 @@ function buildSummaryRowsAG3(items: any[]) {
   return rows
 }
 
-// ADM SUMMARY: 24 cols (A–X). W=HPUSA, X=CIF 10% (SUMMARY internal).
-// No fabrication fee columns. nini_adm appears in sub-row g=1 col C.
-// U col (don_gia_phi) = 0 for ADM — fee per pcs is waived.
+// ADM SUMMARY: 25 cols (A–Y). Col D (index 3) = Tên khách. X=HPUSA, Y=CIF 10%.
+// No fabrication fee columns. U col (don_gia_phi) = 0 for ADM — fee per pcs is waived.
 function buildSummaryRowsADM(items: any[]) {
-  const C = 24
+  const C = 25
   const rows: (string | number)[][] = []
 
   // Row 1 — group headers
   const r1 = Array(C).fill('')
   r1[0]='STT'; r1[1]='HÌNH ẢNH'; r1[2]='THÔNG TIN SẢN PHẨM'
-  r1[7]='Tiền vàng ($)'; r1[8]='TL SẢN PHẨM (gr)'
-  r1[11]='THÔNG TIN XOÀN'; r1[18]='GIÁ XOÀN'; r1[20]='Phí nhận hột'
-  r1[22]='HPUSA'; r1[23]='CIF 10% ($)'
+  r1[8]='Tiền vàng ($)'; r1[9]='TL SẢN PHẨM (gr)'
+  r1[12]='THÔNG TIN XOÀN'; r1[19]='GIÁ XOÀN'; r1[21]='Phí nhận hột'
+  r1[23]='HPUSA'; r1[24]='CIF 10% ($)'
   rows.push(r1)
 
   // Row 2 — sub-headers
   const r2 = Array(C).fill('')
-  r2[2]='SO/MO'; r2[3]='Kích Thước'; r2[4]='Số lượng'; r2[5]='Mã số mẫu'; r2[6]='Loại vàng'
-  r2[8]='T.Phẩm (có NVL đá)'; r2[9]='T.Phẩm (trừ NVL đá)'; r2[10]='T.Phẩm (vàng TT)'
-  r2[11]='Mã Xoàn'; r2[12]='P.Chất'; r2[13]='Size (mm)'; r2[14]='SL'
-  r2[15]='TL (ct.) trước xử lý'; r2[16]='TL (ct.) sau xử lý'; r2[17]='TL Xoàn (gr)'
-  r2[18]='Đơn giá'; r2[19]='Tổng giá'; r2[20]='Đơn giá phí'; r2[21]='T.Phí'
-  r2[22]='Vốn sản xuất'
+  r2[2]='SO/MO'; r2[3]='Tên khách'; r2[4]='Kích Thước'; r2[5]='Số lượng'; r2[6]='Mã số mẫu'; r2[7]='Loại vàng'
+  r2[9]='T.Phẩm (có NVL đá)'; r2[10]='T.Phẩm (trừ NVL đá)'; r2[11]='T.Phẩm (vàng TT)'
+  r2[12]='Mã Xoàn'; r2[13]='P.Chất'; r2[14]='Size (mm)'; r2[15]='SL'
+  r2[16]='TL (ct.) trước xử lý'; r2[17]='TL (ct.) sau xử lý'; r2[18]='TL Xoàn (gr)'
+  r2[19]='Đơn giá'; r2[20]='Tổng giá'; r2[21]='Đơn giá phí'; r2[22]='T.Phí'
+  r2[23]='Vốn sản xuất'
   rows.push(r2)
 
   // Row 3 — Chinese
   const r3 = Array(C).fill('')
-  r3[0]='编号'; r3[1]='图片'; r3[2]='产品编号'; r3[3]='尺寸'; r3[4]='数量'; r3[5]='型号'; r3[6]='金属类型'
-  r3[7]='金价'; r3[10]='净金重'
-  r3[11]='石编号'; r3[12]='石头质量'; r3[13]='大小'; r3[14]='石数'; r3[15]='车前石重'
-  r3[17]='石重/克'; r3[18]='石单价'; r3[19]='石总价'; r3[20]='镶单价'; r3[21]='镶工总价'
-  r3[22]='总计'; r3[23]='到岸价'
+  r3[0]='编号'; r3[1]='图片'; r3[2]='产品编号'; r3[3]='客户'; r3[4]='尺寸'; r3[5]='数量'; r3[6]='型号'; r3[7]='金属类型'
+  r3[8]='金价'; r3[11]='净金重'
+  r3[12]='石编号'; r3[13]='石头质量'; r3[14]='大小'; r3[15]='石数'; r3[16]='车前石重'
+  r3[18]='石重/克'; r3[19]='石单价'; r3[20]='石总价'; r3[21]='镶单价'; r3[22]='镶工总价'
+  r3[23]='总计'; r3[24]='到岸价'
   rows.push(r3)
 
   for (const item of items ?? []) {
-    const gems    = (item.invoice_diamonds ?? []) as any[]
+    const gems     = (item.invoice_diamonds ?? []) as any[]
     const custName = item.customer_name ?? item.nini_adm   // fallback to nini_adm for pre-migration data
-    // Always at least 2 rows: main + customer-name sub-row
-    const numRows = Math.max(gems.length, custName ? 2 : 1)
-    const vonSX   = typeof n(item.von_san_xuat) === 'number' ? (n(item.von_san_xuat) as number) : 0
+    const numRows  = Math.max(gems.length, 1)
+    const vonSX    = typeof n(item.von_san_xuat) === 'number' ? (n(item.von_san_xuat) as number) : 0
 
     for (let g = 0; g < numRows; g++) {
       const gem = gems[g] as any | undefined
@@ -345,32 +343,31 @@ function buildSummaryRowsADM(items: any[]) {
         row[0]  = n(item.seq)
         row[1]  = driveImageFormula(item.image_url)
         row[2]  = item.so_mo        ?? ''
-        row[3]  = item.kich_thuoc   ?? ''
-        row[4]  = n(item.qt_pcs)
-        row[5]  = item.vendor_model ?? ''
-        row[6]  = item.loai_vang    ?? ''
-        row[7]  = n(item.tien_vang)
-        row[8]  = n(item.t_pham_co_nvl_da)
-        row[9]  = n(item.t_pham_tru_nvl_da)
-        row[10] = n(item.t_pham_vang_thuc_te ?? item.t_pham_tru_nvl_da)
-        row[22] = vonSX > 0 ? vonSX : ''
-        row[23] = vonSX > 0 ? vonSX * 1.10 : ''
+        row[3]  = custName          ?? ''
+        row[4]  = item.kich_thuoc   ?? ''
+        row[5]  = n(item.qt_pcs)
+        row[6]  = item.vendor_model ?? ''
+        row[7]  = item.loai_vang    ?? ''
+        row[8]  = n(item.tien_vang)
+        row[9]  = n(item.t_pham_co_nvl_da)
+        row[10] = n(item.t_pham_tru_nvl_da)
+        row[11] = n(item.t_pham_vang_thuc_te ?? item.t_pham_tru_nvl_da)
+        row[23] = vonSX > 0 ? vonSX : ''
+        row[24] = vonSX > 0 ? vonSX * 1.10 : ''
       }
-      // Customer name goes in sub-row g=1, col C (matches Excel C5 pattern)
-      if (g === 1 && custName) row[2] = custName
 
       if (gem) {
-        row[11] = gem.ma_xoan         ?? ''
-        row[12] = gem.p_chat          ?? ''
-        row[13] = gem.size_xoan_range ?? ''
-        row[14] = n(gem.sl_hot)
-        row[15] = n(gem.tl_truoc_xu_ly_ct)
-        row[16] = n(gem.tl_sau_xu_ly_ct)
-        row[17] = n(gem.tl_xoan_gr)
-        row[18] = n(gem.don_gia)
-        row[19] = n(gem.t_gia_xoan)
-        row[20] = 0   // don_gia_phi = 0 for ADM
-        row[21] = 0   // t_phi = 0 for ADM
+        row[12] = gem.ma_xoan         ?? ''
+        row[13] = gem.p_chat          ?? ''
+        row[14] = gem.size_xoan_range ?? ''
+        row[15] = n(gem.sl_hot)
+        row[16] = n(gem.tl_truoc_xu_ly_ct)
+        row[17] = n(gem.tl_sau_xu_ly_ct)
+        row[18] = n(gem.tl_xoan_gr)
+        row[19] = n(gem.don_gia)
+        row[20] = n(gem.t_gia_xoan)
+        row[21] = 0   // don_gia_phi = 0 for ADM
+        row[22] = 0   // t_phi = 0 for ADM
       }
 
       rows.push(row)
@@ -393,45 +390,46 @@ function buildSummaryRows(invoice: any, items: any[]) {
   const r1: (string | number)[] = Array(SUMMARY_COLS).fill('')
   r1[0]  = 'STT';            r1[1]  = 'HÌNH ẢNH'
   r1[2]  = 'THÔNG TIN SẢN PHẨM'
-  r1[7]  = 'Tiền vàng ($)'
-  r1[8]  = 'TRỌNG Lượng (gr)'
-  r1[11] = 'THÔNG TIN XOÀN'
-  r1[20] = 'Phí nhận hột'
-  r1[22] = 'Gia công / 1 SP'; r1[23] = 'Đúc / 1sp'
-  r1[24] = 'Thiết Kế / 1sp'; r1[25] = 'Resin / 1sp'
-  r1[26] = 'Phí phụ kiện (mua bên ngoài)'
-  r1[27] = 'HPUSA'
-  r1[29] = 'Ngày gửi';        r1[30] = 'Tracking# gửi hàng USA'
-  r1[31] = 'Hóa Đôn (V-INVOICE)'
+  r1[8]  = 'Tiền vàng ($)'
+  r1[9]  = 'TRỌNG Lượng (gr)'
+  r1[12] = 'THÔNG TIN XOÀN'
+  r1[21] = 'Phí nhận hột'
+  r1[23] = 'Gia công / 1 SP'; r1[24] = 'Đúc / 1sp'
+  r1[25] = 'Thiết Kế / 1sp'; r1[26] = 'Resin / 1sp'
+  r1[27] = 'Phí phụ kiện (mua bên ngoài)'
+  r1[28] = 'HPUSA'
+  r1[30] = 'Ngày gửi';        r1[31] = 'Tracking# gửi hàng USA'
+  r1[32] = 'Hóa Đôn (V-INVOICE)'
   rows.push(r1)
 
-  // Row 2 — sub-headers (col 15/16 differ for CH2: no TL trước, only TL sau)
+  // Row 2 — sub-headers (col 16/17 differ for CH2: no TL trước, only TL sau)
   const r2: (string | number)[] = Array(SUMMARY_COLS).fill('')
-  r2[2]  = 'SO/MO';           r2[3]  = 'Kích Thước'
-  r2[4]  = 'Số lượng';        r2[5]  = 'Mã số mẫu';  r2[6]  = 'Loại vàng'
-  r2[8]  = 'T.Phẩm (có NVL đá)'; r2[9] = 'T.Phẩm (trừ NVL đá)'; r2[10] = 'T.Phẩm (vàng TT)'
-  r2[11] = 'Mã Xoàn';         r2[12] = 'P. chất';    r2[13] = 'Size Xoàn'
-  r2[14] = 'SL hột'
-  r2[15] = isCH2 ? 'TL (ct.) sau xử lý' : 'TL (ct.) trước xử lý'
-  r2[16] = isCH2 ? '' : 'TL (ct.) sau xử lý'
-  r2[17] = 'TL Xoàn (gr)';    r2[18] = 'Đơn giá ($)'; r2[19] = 'T.GIÁ XOÀN'
-  r2[20] = 'Đơn giá phí';     r2[21] = 'T.Phí'
-  r2[27] = 'Vốn sản xuất';    r2[28] = 'Bảo hiểm'
+  r2[2]  = 'SO/MO';           r2[3]  = 'Tên khách';  r2[4]  = 'Kích Thước'
+  r2[5]  = 'Số lượng';        r2[6]  = 'Mã số mẫu';  r2[7]  = 'Loại vàng'
+  r2[9]  = 'T.Phẩm (có NVL đá)'; r2[10] = 'T.Phẩm (trừ NVL đá)'; r2[11] = 'T.Phẩm (vàng TT)'
+  r2[12] = 'Mã Xoàn';         r2[13] = 'P. chất';    r2[14] = 'Size Xoàn'
+  r2[15] = 'SL hột'
+  r2[16] = isCH2 ? 'TL (ct.) sau xử lý' : 'TL (ct.) trước xử lý'
+  r2[17] = isCH2 ? '' : 'TL (ct.) sau xử lý'
+  r2[18] = 'TL Xoàn (gr)';    r2[19] = 'Đơn giá ($)'; r2[20] = 'T.GIÁ XOÀN'
+  r2[21] = 'Đơn giá phí';     r2[22] = 'T.Phí'
+  r2[28] = 'Vốn sản xuất';    r2[29] = 'Bảo hiểm'
   rows.push(r2)
 
   // Row 3 — Chinese translations
   const r3: (string | number)[] = Array(SUMMARY_COLS).fill('')
-  r3[0]='编号'; r3[1]='图片'; r3[2]='产品编号'; r3[3]='尺寸'; r3[4]='数量'; r3[5]='型号'; r3[6]='金属类型'
-  r3[7]='金价'; r3[9]='产品重量'; r3[10]='净金重'
-  r3[11]='石编号'; r3[12]='石头质量'; r3[13]='大小'; r3[14]='石数'; r3[15]='车前石重'
-  r3[17]='石重/克'; r3[18]='石单价(连耗)'; r3[19]='石总价'; r3[20]='镶单价'; r3[21]='镶工总价'
-  r3[22]='产品费'; r3[23]='倒膜费'; r3[24]='起版费'; r3[25]='蜡版费'; r3[26]='附件价'
-  r3[27]='总计'; r3[28]='到岸价'
+  r3[0]='编号'; r3[1]='图片'; r3[2]='产品编号'; r3[3]='客户'; r3[4]='尺寸'; r3[5]='数量'; r3[6]='型号'; r3[7]='金属类型'
+  r3[8]='金价'; r3[10]='产品重量'; r3[11]='净金重'
+  r3[12]='石编号'; r3[13]='石头质量'; r3[14]='大小'; r3[15]='石数'; r3[16]='车前石重'
+  r3[18]='石重/克'; r3[19]='石单价(连耗)'; r3[20]='石总价'; r3[21]='镶单价'; r3[22]='镶工总价'
+  r3[23]='产品费'; r3[24]='倒膜费'; r3[25]='起版费'; r3[26]='蜡版费'; r3[27]='附件价'
+  r3[28]='总计'; r3[29]='到岸价'
   rows.push(r3)
 
   // Data — dynamic rows: 1 main row + 1 row per gem (no fixed block limit)
   for (const item of items ?? []) {
     const gems = (item.invoice_diamonds ?? []) as any[]
+    const custName = item.customer_name ?? item.nini_adm
     const numRows = Math.max(gems.length, 1)
 
     for (let g = 0; g < numRows; g++) {
@@ -443,36 +441,37 @@ function buildSummaryRows(invoice: any, items: any[]) {
         row[0]  = n(item.seq)
         row[1]  = driveImageFormula(item.image_url)
         row[2]  = item.so_mo        ?? ''
-        row[3]  = item.kich_thuoc   ?? ''
-        row[4]  = n(item.qt_pcs)
-        row[5]  = item.vendor_model ?? ''
-        row[6]  = item.loai_vang    ?? ''
-        row[7]  = n(item.tien_vang)
-        row[8]  = n(item.t_pham_co_nvl_da)
-        row[9]  = n(item.t_pham_tru_nvl_da)
-        row[10] = n(item.t_pham_vang_thuc_te ?? item.t_pham_tru_nvl_da)
-        row[22] = n(item.gia_cong);     row[23] = n(item.duc)
-        row[24] = n(item.thiet_ke);     row[25] = n(item.resin)
-        row[26] = n(item.phi_phu_kien)
-        row[27] = n(item.von_san_xuat); row[28] = n(item.bao_hiem)
-        row[29] = item.ngay_gui    ?? ''
-        row[30] = item.tracking_no ?? ''
-        row[31] = item.hoa_don     ?? ''
+        row[3]  = custName          ?? ''
+        row[4]  = item.kich_thuoc   ?? ''
+        row[5]  = n(item.qt_pcs)
+        row[6]  = item.vendor_model ?? ''
+        row[7]  = item.loai_vang    ?? ''
+        row[8]  = n(item.tien_vang)
+        row[9]  = n(item.t_pham_co_nvl_da)
+        row[10] = n(item.t_pham_tru_nvl_da)
+        row[11] = n(item.t_pham_vang_thuc_te ?? item.t_pham_tru_nvl_da)
+        row[23] = n(item.gia_cong);     row[24] = n(item.duc)
+        row[25] = n(item.thiet_ke);     row[26] = n(item.resin)
+        row[27] = n(item.phi_phu_kien)
+        row[28] = n(item.von_san_xuat); row[29] = n(item.bao_hiem)
+        row[30] = item.ngay_gui    ?? ''
+        row[31] = item.tracking_no ?? ''
+        row[32] = item.hoa_don     ?? ''
       }
 
-      // Gem columns (11-21) — CH2 prefers tl_sau but falls back to tl_truoc (XoanLookupPanel fills tl_truoc only)
+      // Gem columns (12-22) — CH2 prefers tl_sau but falls back to tl_truoc (XoanLookupPanel fills tl_truoc only)
       if (gem) {
-        row[11] = gem.ma_xoan         ?? ''
-        row[12] = gem.p_chat          ?? ''
-        row[13] = gem.size_xoan_range ?? ''
-        row[14] = n(gem.sl_hot)
-        row[15] = isCH2 ? n(gem.tl_sau_xu_ly_ct ?? gem.tl_truoc_xu_ly_ct) : n(gem.tl_truoc_xu_ly_ct)
-        row[16] = isCH2 ? '' : n(gem.tl_sau_xu_ly_ct)
-        row[17] = n(gem.tl_xoan_gr)
-        row[18] = n(gem.don_gia)
-        row[19] = n(gem.t_gia_xoan)
-        row[20] = 1
-        row[21] = n(gem.t_phi)
+        row[12] = gem.ma_xoan         ?? ''
+        row[13] = gem.p_chat          ?? ''
+        row[14] = gem.size_xoan_range ?? ''
+        row[15] = n(gem.sl_hot)
+        row[16] = isCH2 ? n(gem.tl_sau_xu_ly_ct ?? gem.tl_truoc_xu_ly_ct) : n(gem.tl_truoc_xu_ly_ct)
+        row[17] = isCH2 ? '' : n(gem.tl_sau_xu_ly_ct)
+        row[18] = n(gem.tl_xoan_gr)
+        row[19] = n(gem.don_gia)
+        row[20] = n(gem.t_gia_xoan)
+        row[21] = 1
+        row[22] = n(gem.t_phi)
       }
 
       rows.push(row)
@@ -569,15 +568,13 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         let dataRowCount = 0
         for (const item of processedItems) {
           const gems = (item.invoice_diamonds ?? []) as any[]
-          const custName = item.customer_name ?? item.nini_adm
-          if (_isADMgt) dataRowCount += Math.max(gems.length, custName ? 2 : 1)
-          else          dataRowCount += Math.max(gems.length, 1)
+          dataRowCount += Math.max(gems.length, 1)
         }
         summaryGrandTotalRowIdx = 3 + dataRowCount
         const gt = Array(_gtNCols).fill('')
-        gt[0] = 'TỔNG'; gt[4] = sumF('qt_pcs'); gt[7] = sumF('tien_vang')
-        if (_isADMgt) { gt[22] = sumF('von_san_xuat'); gt[23] = sumF('von_san_xuat') * 1.10 }
-        else          { gt[8] = sumF('t_pham_co_nvl_da'); gt[27] = sumF('von_san_xuat') }
+        gt[0] = 'TỔNG'; gt[5] = sumF('qt_pcs'); gt[8] = sumF('tien_vang')
+        if (_isADMgt) { gt[23] = sumF('von_san_xuat'); gt[24] = sumF('von_san_xuat') * 1.10 }
+        else          { gt[9] = sumF('t_pham_co_nvl_da'); gt[28] = sumF('von_san_xuat') }
         summaryRows.push(gt)
       }
     }
@@ -645,31 +642,36 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         )
       }
     }
-    // ── ADM customer-name sub-rows: shrink + style (avoid tall empty row) ────
-    // The customer name sits in col C of the g=1 sub-row. When the product has
-    // <2 gems, that sub-row carries ONLY the customer name (no gem data), so the
-    // default 80px image-height row looks empty. Shrink it and style the label.
-    if (isADMf && processedItems.length > 0) {
+    // ── Inter-item separators (ADM/CH1/CH2): medium top border + customer cell ─
+    // Each product spans numRows (main + gem rows). A medium top border at every
+    // block boundary makes products easy to tell apart. The customer cell (col D)
+    // is also given a subtle highlight so it stands out from the gem grid.
+    if (!isAG3f && processedItems.length > 0) {
+      const itemDivider = { style: 'SOLID_MEDIUM', width: 2, color: { red: 0.45, green: 0.45, blue: 0.45 } }
       let rowCursor = 3  // first data row (after 3 header rows)
-      for (const item of processedItems) {
-        const gems     = (item.invoice_diamonds ?? []) as any[]
-        const custName = item.customer_name ?? item.nini_adm
-        const numRows  = Math.max(gems.length, custName ? 2 : 1)
-        if (custName && gems.length < 2) {
-          const custRowIdx = rowCursor + 1  // g=1 — dedicated customer row
+      for (let i = 0; i < processedItems.length; i++) {
+        const gems    = (processedItems[i].invoice_diamonds ?? []) as any[]
+        const numRows = Math.max(gems.length, 1)
+        // Divider above every product except the first (header already bounds it)
+        if (i > 0) {
           summaryExtraFmt.push(
-            { updateDimensionProperties: { range: { sheetId: 1, dimension: 'ROWS', startIndex: custRowIdx, endIndex: custRowIdx + 1 }, properties: { pixelSize: 24 }, fields: 'pixelSize' } },
-            { repeatCell: {
-              range: { sheetId: 1, startRowIndex: custRowIdx, endRowIndex: custRowIdx + 1, startColumnIndex: 2, endColumnIndex: 3 },
-              cell: { userEnteredFormat: {
-                textFormat: { italic: true, fontSize: 9, foregroundColor: { red: 0.35, green: 0.35, blue: 0.35 } },
-                horizontalAlignment: 'LEFT',
-                verticalAlignment: 'MIDDLE',
-              }},
-              fields: 'userEnteredFormat(textFormat,horizontalAlignment,verticalAlignment)',
-            }},
+            { updateBorders: { range: { sheetId: 1, startRowIndex: rowCursor, endRowIndex: rowCursor + 1, startColumnIndex: 0, endColumnIndex: summaryNCols }, top: itemDivider } },
           )
         }
+        // Highlight the customer cell (col D = index 3) on the product's main row
+        summaryExtraFmt.push(
+          { repeatCell: {
+            range: { sheetId: 1, startRowIndex: rowCursor, endRowIndex: rowCursor + 1, startColumnIndex: 3, endColumnIndex: 4 },
+            cell: { userEnteredFormat: {
+              textFormat: { bold: true, fontSize: 9 },
+              backgroundColor: { red: 0.96, green: 0.97, blue: 0.92 },
+              horizontalAlignment: 'LEFT',
+              verticalAlignment: 'MIDDLE',
+              wrapStrategy: 'WRAP',
+            }},
+            fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy)',
+          }},
+        )
         rowCursor += numRows
       }
     }
@@ -706,27 +708,27 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         summaryMerges.push({ mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 2, startColumnIndex: c, endColumnIndex: c + 1 }, mergeType: 'MERGE_ALL' } })
       }
     } else if (isADMf) {
-      // ADM: 24 cols
+      // ADM: 25 cols (Tên khách at col 3)
       summaryMerges.push(
-        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 2,  endColumnIndex: 7  }, mergeType: 'MERGE_ALL' } }, // THÔNG TIN SP
-        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 8,  endColumnIndex: 11 }, mergeType: 'MERGE_ALL' } }, // TL SẢN PHẨM
-        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 11, endColumnIndex: 18 }, mergeType: 'MERGE_ALL' } }, // THÔNG TIN XOÀN
-        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 18, endColumnIndex: 20 }, mergeType: 'MERGE_ALL' } }, // GIÁ XOÀN
-        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 20, endColumnIndex: 22 }, mergeType: 'MERGE_ALL' } }, // Phí nhận hột
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 2,  endColumnIndex: 8  }, mergeType: 'MERGE_ALL' } }, // THÔNG TIN SP (incl. Tên khách)
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 9,  endColumnIndex: 12 }, mergeType: 'MERGE_ALL' } }, // TL SẢN PHẨM
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 12, endColumnIndex: 19 }, mergeType: 'MERGE_ALL' } }, // THÔNG TIN XOÀN
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 19, endColumnIndex: 21 }, mergeType: 'MERGE_ALL' } }, // GIÁ XOÀN
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 21, endColumnIndex: 23 }, mergeType: 'MERGE_ALL' } }, // Phí nhận hột
       )
-      for (const c of [0, 1, 7, 23]) {
+      for (const c of [0, 1, 8, 24]) {
         summaryMerges.push({ mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 2, startColumnIndex: c, endColumnIndex: c + 1 }, mergeType: 'MERGE_ALL' } })
       }
     } else {
-      // CH1 / CH2: 32 cols
+      // CH1 / CH2: 33 cols (Tên khách at col 3)
       summaryMerges.push(
-        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 2,  endColumnIndex: 7  }, mergeType: 'MERGE_ALL' } }, // THÔNG TIN SP
-        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 8,  endColumnIndex: 11 }, mergeType: 'MERGE_ALL' } }, // TRỌNG Lượng
-        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 11, endColumnIndex: 20 }, mergeType: 'MERGE_ALL' } }, // THÔNG TIN XOÀN
-        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 20, endColumnIndex: 22 }, mergeType: 'MERGE_ALL' } }, // Phí nhận hột
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 2,  endColumnIndex: 8  }, mergeType: 'MERGE_ALL' } }, // THÔNG TIN SP (incl. Tên khách)
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 9,  endColumnIndex: 12 }, mergeType: 'MERGE_ALL' } }, // TRỌNG Lượng
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 12, endColumnIndex: 21 }, mergeType: 'MERGE_ALL' } }, // THÔNG TIN XOÀN
+        { mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 21, endColumnIndex: 23 }, mergeType: 'MERGE_ALL' } }, // Phí nhận hột
       )
-      // Fabrication single cols 22-26 + shipping cols 29-31 have no sub-header in row 1
-      for (const c of [0, 1, 7, 22, 23, 24, 25, 26, 29, 30, 31]) {
+      // Fabrication single cols 23-27 + shipping cols 30-32 have no sub-header in row 1
+      for (const c of [0, 1, 8, 23, 24, 25, 26, 27, 30, 31, 32]) {
         summaryMerges.push({ mergeCells: { range: { sheetId: 1, startRowIndex: 0, endRowIndex: 2, startColumnIndex: c, endColumnIndex: c + 1 }, mergeType: 'MERGE_ALL' } })
       }
     }
@@ -740,18 +742,18 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       scw(0,1,45); scw(1,2,95); scw(2,3,140); scw(3,4,70); scw(4,5,55)
       scw(5,6,90); scw(6,7,70); scw(7,8,85); scw(8,9,90); scw(9,10,85)
     } else if (isADMf) {
-      scw(0,1,45); scw(1,2,95); scw(2,3,140); scw(3,4,70); scw(4,5,55)
-      scw(5,6,90); scw(6,7,70); scw(7,8,85); scw(8,9,95); scw(9,10,95); scw(10,11,95)
-      scw(11,12,110); scw(12,13,65); scw(13,14,80); scw(14,15,50); scw(15,16,85)
-      scw(16,17,85); scw(17,18,80); scw(18,19,80); scw(19,20,80); scw(20,21,80); scw(21,22,70)
-      scw(22,23,85); scw(23,24,85)
+      scw(0,1,45); scw(1,2,95); scw(2,3,140); scw(3,4,150); scw(4,5,70); scw(5,6,55)
+      scw(6,7,90); scw(7,8,70); scw(8,9,85); scw(9,10,95); scw(10,11,95); scw(11,12,95)
+      scw(12,13,110); scw(13,14,65); scw(14,15,80); scw(15,16,50); scw(16,17,85)
+      scw(17,18,85); scw(18,19,80); scw(19,20,80); scw(20,21,80); scw(21,22,80); scw(22,23,70)
+      scw(23,24,85); scw(24,25,85)
     } else {
-      scw(0,1,45); scw(1,2,100); scw(2,3,140); scw(3,4,70); scw(4,5,55)
-      scw(5,6,90); scw(6,7,70); scw(7,8,85); scw(8,9,95); scw(9,10,95); scw(10,11,95)
-      scw(11,12,110); scw(12,13,65); scw(13,14,80); scw(14,15,50); scw(15,16,85)
-      scw(16,17,85); scw(17,18,80); scw(18,19,80); scw(19,20,80); scw(20,21,80); scw(21,22,70)
-      scw(22,23,72); scw(23,24,68); scw(24,25,72); scw(25,26,68); scw(26,27,72)
-      scw(27,28,85); scw(28,29,80); scw(29,30,100); scw(30,31,120); scw(31,32,100)
+      scw(0,1,45); scw(1,2,100); scw(2,3,140); scw(3,4,150); scw(4,5,70); scw(5,6,55)
+      scw(6,7,90); scw(7,8,70); scw(8,9,85); scw(9,10,95); scw(10,11,95); scw(11,12,95)
+      scw(12,13,110); scw(13,14,65); scw(14,15,80); scw(15,16,50); scw(16,17,85)
+      scw(17,18,85); scw(18,19,80); scw(19,20,80); scw(20,21,80); scw(21,22,80); scw(22,23,70)
+      scw(23,24,72); scw(24,25,68); scw(25,26,72); scw(26,27,68); scw(27,28,72)
+      scw(28,29,85); scw(29,30,80); scw(30,31,100); scw(31,32,120); scw(32,33,100)
     }
 
     // ── SUMMARY number formats (data rows start at row 3) ────────────────────
@@ -768,18 +770,18 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       sfmt(8, 9,  '0.####', 'NUMBER')   // TL T.Phẩm
       sfmt(9, 10, '#,##0.00')           // Trị giá
     } else if (isADMf) {
-      sfmt(7, 8,  '#,##0.00')           // Tiền vàng
-      sfmt(8, 11, '0.####', 'NUMBER')   // T.Phẩm weights
-      sfmt(15,18, '0.####', 'NUMBER')   // TL trước/sau/xoàn
-      sfmt(18,20, '#,##0.00')           // GIÁ XOÀN
-      sfmt(20,22, '#,##0.00')           // Phí nhận hột
-      sfmt(22,24, '#,##0.00')           // HPUSA, CIF
+      sfmt(8, 9,  '#,##0.00')           // Tiền vàng
+      sfmt(9, 12, '0.####', 'NUMBER')   // T.Phẩm weights
+      sfmt(16,19, '0.####', 'NUMBER')   // TL trước/sau/xoàn
+      sfmt(19,21, '#,##0.00')           // GIÁ XOÀN
+      sfmt(21,23, '#,##0.00')           // Phí nhận hột
+      sfmt(23,25, '#,##0.00')           // HPUSA, CIF
     } else {
-      sfmt(7, 8,  '#,##0.00')           // Tiền vàng
-      sfmt(8, 11, '0.####', 'NUMBER')   // T.Phẩm weights
-      sfmt(15,18, '0.####', 'NUMBER')   // TL trước/sau/xoàn gr
-      sfmt(18,22, '#,##0.00')           // Đơn giá, T.GIÁ, Phí nhận hột cols
-      sfmt(22,28, '#,##0.00')           // Gia công–HPUSA
+      sfmt(8, 9,  '#,##0.00')           // Tiền vàng
+      sfmt(9, 12, '0.####', 'NUMBER')   // T.Phẩm weights
+      sfmt(16,19, '0.####', 'NUMBER')   // TL trước/sau/xoàn gr
+      sfmt(19,23, '#,##0.00')           // Đơn giá, T.GIÁ, Phí nhận hột cols
+      sfmt(23,29, '#,##0.00')           // Gia công–HPUSA
     }
 
     // ── JM FORM column widths ────────────────────────────────────────────────
