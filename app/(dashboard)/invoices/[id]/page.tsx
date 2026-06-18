@@ -27,7 +27,7 @@ export default function InvoiceDetailPage() {
 
   const [data,            setData]         = useState<{ header: any; items: any[] } | null>(null)
   const [loading,         setLoading]      = useState(true)
-  const [view,            setView]         = useState<InvoiceView>('jm-form')
+  const [view,            setView]         = useState<InvoiceView>('detail')
   const [addItemOpen,     setAddItemOpen]  = useState(false)
   const [exportingSheets, setExportingSheets] = useState(false)
   const [syncingNVL,      setSyncingNVL]      = useState(false)
@@ -196,7 +196,7 @@ export default function InvoiceDetailPage() {
 
       {/* View toggle */}
       <div className="no-print" style={{ display: 'flex', borderBottom: '1px solid var(--border-base)', marginBottom: '1.5rem' }}>
-        {(['jm-form', 'detail'] as const).map(v => (
+        {(['detail', 'jm-form'] as const).map(v => (
           <button key={v} onClick={() => setView(v)} style={{
             padding: '10px 24px', border: 'none', background: 'transparent',
             borderBottom: view === v ? '2px solid var(--border-strong)' : '2px solid transparent',
