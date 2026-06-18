@@ -9,12 +9,12 @@ type Params = { params: { id: string; itemId: string } }
 async function guardAndCheck(db: ReturnType<typeof createServiceClient>, invoiceId: string, ctx: AuthContext) {
   const { data } = await db
     .from('invoices')
-    .select('status, is_locked, created_by, template_type')
+    .select('status, created_by, template_type')
     .eq('id', invoiceId)
     .single()
   if (!data) throw { status: 404, message: 'Not found' }
   const editError = checkEditPermission({
-    isLocked:  data.is_locked || (data.status === 'finalized'),
+    isLocked:  data.status === 'finalized',
     status:    data.status,
     role:      ctx.role,
     createdBy: data.created_by,

@@ -34,10 +34,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const body = await req.json()
     const db   = createServiceClient()
 
-    const { data: inv } = await db.from('invoices').select('status, is_locked, created_by, template_type').eq('id', params.id).single()
+    const { data: inv } = await db.from('invoices').select('status, created_by, template_type').eq('id', params.id).single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
     const editError = checkEditPermission({
-      isLocked:  inv.is_locked || (inv.status === 'finalized'),
+      isLocked:  inv.status === 'finalized',
       status:    inv.status,
       role:      ctx.role,
       createdBy: inv.created_by,
@@ -87,10 +87,10 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const ctx = await requireRole('user')
     const db  = createServiceClient()
 
-    const { data: inv } = await db.from('invoices').select('status, is_locked, created_by').eq('id', params.id).single()
+    const { data: inv } = await db.from('invoices').select('status, created_by').eq('id', params.id).single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
     const editError = checkEditPermission({
-      isLocked:  inv.is_locked || (inv.status === 'finalized'),
+      isLocked:  inv.status === 'finalized',
       status:    inv.status,
       role:      ctx.role,
       createdBy: inv.created_by,
