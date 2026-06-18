@@ -766,22 +766,24 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       },
     })
     if (isAG3f) {
-      sfmt(7, 8,  '#,##0.00')           // Tiền vàng
-      sfmt(8, 9,  '0.####', 'NUMBER')   // TL T.Phẩm
-      sfmt(9, 10, '#,##0.00')           // Trị giá
+      sfmt(7, 8,  '#,##0')              // Tiền vàng — rounded
+      sfmt(8, 9,  '0.00', 'NUMBER')     // TL T.Phẩm (gr) — 2 decimals
+      sfmt(9, 10, '#,##0')              // Trị giá — rounded
     } else if (isADMf) {
-      sfmt(8, 9,  '#,##0.00')           // Tiền vàng
-      sfmt(9, 12, '0.####', 'NUMBER')   // T.Phẩm weights
-      sfmt(16,19, '0.####', 'NUMBER')   // TL trước/sau/xoàn
-      sfmt(19,21, '#,##0.00')           // GIÁ XOÀN
-      sfmt(21,23, '#,##0.00')           // Phí nhận hột
-      sfmt(23,25, '#,##0.00')           // HPUSA, CIF
+      sfmt(8, 9,  '#,##0')              // Tiền vàng — rounded
+      sfmt(9, 12, '0.00', 'NUMBER')     // T.Phẩm weights (gr) — 2 decimals
+      sfmt(16,18, '0.000', 'NUMBER')    // TL trước/sau (ct) — 3 decimals
+      sfmt(18,19, '0.0000', 'NUMBER')   // TL Xoàn (gr) — 4 decimals
+      sfmt(19,21, '#,##0')              // GIÁ XOÀN — rounded
+      sfmt(21,23, '#,##0')              // Phí nhận hột — rounded
+      sfmt(23,25, '#,##0')              // HPUSA, CIF — rounded
     } else {
-      sfmt(8, 9,  '#,##0.00')           // Tiền vàng
-      sfmt(9, 12, '0.####', 'NUMBER')   // T.Phẩm weights
-      sfmt(16,19, '0.####', 'NUMBER')   // TL trước/sau/xoàn gr
-      sfmt(19,23, '#,##0.00')           // Đơn giá, T.GIÁ, Phí nhận hột cols
-      sfmt(23,29, '#,##0.00')           // Gia công–HPUSA
+      sfmt(8, 9,  '#,##0')              // Tiền vàng — rounded
+      sfmt(9, 12, '0.00', 'NUMBER')     // T.Phẩm weights (gr) — 2 decimals
+      sfmt(16,18, '0.000', 'NUMBER')    // TL trước/sau (ct) — 3 decimals
+      sfmt(18,19, '0.0000', 'NUMBER')   // TL Xoàn (gr) — 4 decimals
+      sfmt(19,23, '#,##0')              // Đơn giá, T.GIÁ, Phí nhận hột cols — rounded
+      sfmt(23,29, '#,##0')              // Gia công–HPUSA — rounded
     }
 
     // ── JM FORM column widths ────────────────────────────────────────────────
@@ -803,13 +805,24 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     // ── JM FORM number formats (data rows start at row 3) ────────────────────
     const jmNumFmt: any[] = []
+    {
+      // Wt.(gr) column = priceStart - 1 → product weight, 2 decimals
+      const priceStart0 = template2 === 'CH1_AG3' ? 12 : 11
+      jmNumFmt.push({
+        repeatCell: {
+          range: { sheetId: 0, startRowIndex: 2, startColumnIndex: priceStart0 - 1, endColumnIndex: priceStart0 },
+          cell: { userEnteredFormat: { numberFormat: { type: 'NUMBER', pattern: '0.00' }, horizontalAlignment: 'RIGHT' } },
+          fields: 'userEnteredFormat(numberFormat,horizontalAlignment)',
+        },
+      })
+    }
     if (canSeePrice) {
       // Price cols start after the base cols
       const priceStart = template2 === 'CH1_AG3' ? 12 : 11
       jmNumFmt.push({
         repeatCell: {
           range: { sheetId: 0, startRowIndex: 2, startColumnIndex: priceStart, endColumnIndex: jmColCount - 1 },
-          cell: { userEnteredFormat: { numberFormat: { type: 'CURRENCY', pattern: '#,##0.00' }, horizontalAlignment: 'RIGHT' } },
+          cell: { userEnteredFormat: { numberFormat: { type: 'CURRENCY', pattern: '#,##0' }, horizontalAlignment: 'RIGHT' } },
           fields: 'userEnteredFormat(numberFormat,horizontalAlignment)',
         },
       })

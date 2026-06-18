@@ -79,8 +79,8 @@ const NUM_FIELDS = new Set([
   'tag_price', 'fb_price',
 ])
 
-function fmt2(n: number | null | undefined) { return n != null ? `$${n.toFixed(2)}` : '—' }
-function fmt4(n: number | null | undefined) { return n != null ? n.toFixed(4) : '—' }
+function fmt2(n: number | null | undefined) { return n != null ? `$${Math.round(n)}` : '—' }  // prices — rounded
+function fmt4(n: number | null | undefined) { return n != null ? n.toFixed(2) : '—' }          // product weight (gr) — 2 decimals
 
 function parseFieldValue(field: string, raw: string): unknown {
   if (NUM_FIELDS.has(field)) { const n = parseFloat(raw); return isNaN(n) ? null : n }

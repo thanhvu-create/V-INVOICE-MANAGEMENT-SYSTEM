@@ -13,8 +13,9 @@ import type { InvoiceTemplate } from '@/lib/formulas/pricing'
 
 const BASE_METAL_TYPES = ['18KY', '18KW', '18KR', '18KG', '22KY', '22KW', '24K', '14KY', '14KW', '14KR', '10KY', '10KW', 'PT950', 'PT850', 'AG', 'PD']
 
-function fmt2(n: number | null | undefined) { return n != null ? `$${n.toFixed(2)}` : '—' }
-function fmt4(n: number | null | undefined) { return n != null ? n.toFixed(4) : '—' }
+function fmt2(n: number | null | undefined)   { return n != null ? `$${Math.round(n)}` : '—' }  // prices — rounded, no decimals
+function fmtGram(n: number | null | undefined){ return n != null ? n.toFixed(2) : '—' }          // product weight (gr) — 2 decimals
+function fmt4(n: number | null | undefined)   { return n != null ? n.toFixed(4) : '—' }          // gem weight (gr) — 4 decimals
 
 const labelStyle: React.CSSProperties = {
   display: 'block', fontSize: 'var(--text-xs)', textTransform: 'uppercase',
@@ -196,10 +197,10 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               ...(item.kich_thuoc                     ? [['Kích thước', item.kich_thuoc]] : []),
               ['Loại vàng', item.loai_vang ?? '—'],
               ...(!isAG3 && item.so_mo                ? [['SO-MO', item.so_mo]]           : []),
-              ['Wt. (gr)', fmt4(item.t_pham_co_nvl_da ?? item.wt_gr)],
+              ['Wt. (gr)', fmtGram(item.t_pham_co_nvl_da ?? item.wt_gr)],
               ...(!isAG3 ? [
-                ['T.Phẩm trừ đá (gr)', fmt4(item.t_pham_tru_nvl_da)],
-                ['Vàng TT (gr)', fmt4(item.t_pham_vang_thuc_te)],
+                ['T.Phẩm trừ đá (gr)', fmtGram(item.t_pham_tru_nvl_da)],
+                ['Vàng TT (gr)', fmtGram(item.t_pham_vang_thuc_te)],
               ] : []),
               ...(item.store ? [['Store', item.store]] : []),
               ...(!isAG3 && !isAdm && item.ngay_gui    ? [['Ngày gửi', item.ngay_gui]]           : []),
@@ -358,7 +359,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
           {canSeePrice && (
             <div style={{ background: 'var(--bg-base)', border: '1px solid var(--border-light)', padding: '0.75rem', marginBottom: '1rem', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0.5rem' }}>
               {[
-                ...(!isAG3 ? [['T.Phẩm vàng TT (gr)', fmt4(item.t_pham_tru_nvl_da)]] : []),
+                ...(!isAG3 ? [['T.Phẩm vàng TT (gr)', fmtGram(item.t_pham_tru_nvl_da)]] : []),
                 ['Tiền vàng', fmt2(item.tien_vang)],
                 ['HP Purchase', fmt2(item.von_san_xuat)],
                 ...(hasCIF ? [['HP CIF', fmt2(item.cif_price)]] : []),
@@ -446,10 +447,10 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', textAlign: 'center' }}>{g.sl_hot}</td>
                       {template !== 'CH2' && (
                         <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', background: g.tl_truoc_xu_ly_ct == null ? 'rgba(220,38,38,0.08)' : '' }}>
-                          {g.tl_truoc_xu_ly_ct != null ? g.tl_truoc_xu_ly_ct.toFixed(4) : <span style={{ color: '#DC2626', fontSize: 'var(--text-xs)' }}>— nhập tay</span>}
+                          {g.tl_truoc_xu_ly_ct != null ? g.tl_truoc_xu_ly_ct.toFixed(3) : <span style={{ color: '#DC2626', fontSize: 'var(--text-xs)' }}>— nhập tay</span>}
                         </td>
                       )}
-                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>{g.tl_sau_xu_ly_ct?.toFixed(4) ?? '—'}</td>
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>{g.tl_sau_xu_ly_ct?.toFixed(3) ?? '—'}</td>
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt4(g.tl_xoan_gr)} <span style={{ fontSize: 9, color: 'var(--color-info)' }}>auto</span></td>
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt2(g.don_gia)}</td>
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 700, color: '#1E40AF' }}>{fmt2(g.t_gia_xoan)}</td>

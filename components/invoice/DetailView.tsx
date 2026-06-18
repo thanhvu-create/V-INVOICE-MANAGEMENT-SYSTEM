@@ -2,8 +2,9 @@
 
 import { ItemCard } from './ItemCard'
 
-function fmt2(n: number | null | undefined) { return n != null ? `$${n.toFixed(2)}` : '—' }
-function fmt4(n: number | null | undefined) { return n != null ? n.toFixed(4) : '—' }
+function fmt2(n: number | null | undefined)   { return n != null ? `$${Math.round(n)}` : '—' }  // prices — rounded
+function fmtGram(n: number | null | undefined){ return n != null ? n.toFixed(2) : '—' }          // product weight (gr) — 2 decimals
+function fmt4(n: number | null | undefined)   { return n != null ? n.toFixed(4) : '—' }          // gem weight (gr) — 4 decimals
 
 function TotalField({ label, value, mono, bold, muted }: { label: string; value: any; mono?: boolean; bold?: boolean; muted?: boolean }) {
   return (
@@ -68,7 +69,7 @@ export function DetailView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem' }}>
           <TotalField label="Tổng Qty (pcs)" value={totQty} />
-          <TotalField label="Tổng T.Phẩm (gr)" value={fmt4(totWt)} mono />
+          <TotalField label="Tổng T.Phẩm (gr)" value={fmtGram(totWt)} mono />
           {totGemWt > 0 && <TotalField label="Σ TL Xoàn (gr)" value={fmt4(totGemWt)} mono muted />}
           {canSeePrice && <TotalField label="Tổng Tiền vàng" value={fmt2(totGoldV)} mono />}
           {canSeePrice && <TotalField label="Tổng Vốn SX" value={fmt2(totVonSX)} mono bold />}
