@@ -155,6 +155,11 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
           <DriveImage url={item.image_url} alt={item.sku} size={44} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>#{item.seq}</span>
           <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, background: 'var(--sku-highlight-bg)', padding: '1px 8px', color: '#92400E', fontSize: 'var(--text-sm)' }}>{item.sku}</span>
+          {item.customer_name && (
+            <span style={{ fontSize: 'var(--text-xs)', fontWeight: 600, color: '#9F1239', background: 'rgba(159,18,57,0.08)', padding: '2px 8px', borderRadius: 2, whiteSpace: 'nowrap' }}>
+              <i className="fa-solid fa-user" style={{ fontSize: 9, marginRight: 5, opacity: 0.7 }} />{item.customer_name}
+            </span>
+          )}
           {item.description && <span style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)' }}>{item.description}</span>}
           {isBaSao && <span style={{ fontSize: 'var(--text-xs)', color: '#DC2626', fontWeight: 700 }}>★ BA SAO</span>}
         </div>
@@ -196,7 +201,6 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                 ['T.Phẩm trừ đá (gr)', fmt4(item.t_pham_tru_nvl_da)],
                 ['Vàng TT (gr)', fmt4(item.t_pham_vang_thuc_te)],
               ] : []),
-              ...(item.customer_name ? [['Tên khách', item.customer_name]] : []),
               ...(item.store ? [['Store', item.store]] : []),
               ...(!isAG3 && !isAdm && item.ngay_gui    ? [['Ngày gửi', item.ngay_gui]]           : []),
               ...(!isAG3 && !isAdm && item.tracking_no ? [['Tracking#', item.tracking_no]]       : []),
