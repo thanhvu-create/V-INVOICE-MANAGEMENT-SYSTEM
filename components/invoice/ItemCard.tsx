@@ -75,6 +75,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
       qt_pcs:            String(item.qt_pcs            ?? ''),
       kich_thuoc:        item.kich_thuoc               ?? '',
       description:       item.description              ?? '',
+      customer_name:     item.customer_name            ?? '',
       class:             item.class                    ?? '',
       sub_class:         item.sub_class                ?? '',
       loai_vang:         item.loai_vang                ?? '',
@@ -290,6 +291,8 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               /></div>
             <div><label style={labelStyle}>Description</label>
               <input style={inputStyle} value={form.description} onChange={f('description')} /></div>
+            <div><label style={labelStyle}>Tên khách</label>
+              <input style={inputStyle} value={form.customer_name ?? ''} onChange={f('customer_name')} placeholder="e.g. ADM1, CH1-Khách" /></div>
             <div><label style={labelStyle}>Class</label>
               <input style={inputStyle} value={form.class} onChange={f('class')} /></div>
             <div><label style={labelStyle}>Sub Class</label>

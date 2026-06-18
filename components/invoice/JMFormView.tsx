@@ -43,8 +43,6 @@ const JM_COLS: Col[] = [
   { key: 'class',            label: 'Class',                                              width: 80  },
   { key: 'sub_class',        label: 'Sub Class',                                          width: 80  },
   { key: 'description',      label: 'Description',                                        width: 220 },
-  // Tên khách — per product, all templates
-  { key: 'customer_name',    label: 'Tên khách',                                          width: 140 },
   { key: 'qt_pcs',           label: 'Qty',              mono: true,                       width: 55  },
   { key: 't_pham_co_nvl_da', label: 'Wt. (gr)',         mono: true,                       width: 100 },
   // Output prices — all templates
@@ -69,7 +67,7 @@ const EDITABLE_FIELDS = new Set([
   'store', 'location', 'vendor_model', 'so_mo',
   'po_number', 'sku_ag',
   'qt_pcs', 'description', 'class', 'sub_class',
-  't_pham_co_nvl_da', 'customer_name',
+  't_pham_co_nvl_da',
   'nini_adm', 'chi_tiet_tap',
   'erp_bom_cost',
   'tag_price', 'fb_price',
