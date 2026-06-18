@@ -193,6 +193,7 @@ export default function NVLPricesPage() {
     loss_pt:        latest.loss_pt   ?? 0.17,
     tag_multiplier: latest.tag_multiplier ?? 0,
     fr_multiplier:  latest.fr_multiplier  ?? 0,
+    cif_rate:       null,  // use template default
   } : null
 
   const allGoldKarats   = [...GOLD_KARATS,  ...customKarats.filter(k => !METAL_KARATS.some(m => m.toUpperCase() === k))]
