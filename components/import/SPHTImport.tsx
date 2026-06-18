@@ -74,8 +74,8 @@ function parseSingleSheet(buf: ArrayBuffer, sheetName: string): Record<string, I
 
     const importRow: ImportRow = {
       rowNum:      DATA_START_1IDX + i,
-      store:       '',
-      location:    '',
+      store:       'HP',
+      location:    'Safe 1',
       sku:         skuRaw ? String(Number(skuRaw) || skuRaw).toUpperCase() : `SKU-${i + 1}`,
       soMo,
       description: String(row[6]  ?? '').trim(),
