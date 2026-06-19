@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getAuthContext } from '@/lib/auth/getRole'
 import { getGoogleAccessToken } from '@/lib/google/getAccessToken'
+import { templateLabel } from '@/lib/templates'
 
 const SHEETS_BASE = 'https://sheets.googleapis.com/v4/spreadsheets'
 
@@ -521,7 +522,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       }),
     )
 
-    const title = `V-Invoice ${invoice.invoice_code ?? params.id} (${invoice.template_type ?? ''})`
+    const title = `V-Invoice ${invoice.invoice_code ?? params.id} (${templateLabel(invoice.template_type)})`
 
     // 1. Create spreadsheet with three sheets
     const created = await sheetsPost(accessToken, '', {

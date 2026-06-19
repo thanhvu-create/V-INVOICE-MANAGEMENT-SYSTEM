@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
+import { templateLabel } from '@/lib/templates'
 
 const TEMPLATE_OPTIONS = ['CH1', 'CH2', 'ADM', 'CH1_AG3', 'VNSI_AG3']
 
@@ -105,7 +106,7 @@ export default function NewInvoicePage() {
             <label style={label}>Template Type *</label>
             <select style={input} required value={form.template_type}
               onChange={e => setForm(f => ({ ...f, template_type: e.target.value }))}>
-              {TEMPLATE_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+              {TEMPLATE_OPTIONS.map(t => <option key={t} value={t}>{templateLabel(t)}</option>)}
             </select>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 4 }}>
               CH1/CH2 = 2F có xoàn · ADM = 2F có xoàn gộp · CH1_AG3/VNSI_AG3 = không xoàn

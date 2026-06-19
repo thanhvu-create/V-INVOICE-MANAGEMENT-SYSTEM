@@ -1,3 +1,5 @@
+import { templateLabel } from '@/lib/templates'
+
 interface Stats {
   by_status:            Record<string, number>
   by_template?:         Record<string, number>
@@ -72,7 +74,7 @@ export function SummaryCards({ stats, loading }: { stats: Stats | null; loading:
                     color: TEMPLATE_COLORS[tmpl] ?? 'var(--text-secondary)',
                     minWidth: 72,
                   }}>
-                    {tmpl}
+                    {templateLabel(tmpl)}
                   </span>
                   <div style={{ flex: 1, height: 4, background: 'var(--border-light)', borderRadius: 2, overflow: 'hidden' }}>
                     <div style={{

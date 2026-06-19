@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import * as XLSX from 'xlsx'
 import { toast } from '@/components/ui/Toast'
 import { useUser } from '@/contexts/UserContext'
+import { templateLabel } from '@/lib/templates'
 import type { ImportRow } from '@/types'
 
 const SPHT_URL_KEY = 'spht_sheet_url'
@@ -663,7 +664,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
             flexWrap: 'wrap',
           }}>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-              Lọc theo template <strong>{template}</strong>:
+              Lọc theo template <strong>{templateLabel(template)}</strong>:
             </span>
             {allowedChannels.map(ch => (
               <span key={ch} style={{
@@ -716,13 +717,13 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
       {activeCode && activeRows.length === 0 && allActiveRows.length > 0 && (
         <div style={{ padding: '1.5rem', border: '1px solid var(--border-base)', background: 'var(--bg-surface)' }}>
           <div style={{ fontWeight: 600, marginBottom: '0.5rem', fontSize: 'var(--text-sm)', color: 'var(--color-danger)' }}>
-            Không có sản phẩm nào khớp template <strong>{template}</strong>
+            Không có sản phẩm nào khớp template <strong>{templateLabel(template)}</strong>
           </div>
           <div style={{ fontSize: 'var(--text-sm)', color: 'var(--text-secondary)', lineHeight: 1.6 }}>
             Mã <strong>{activeCode}</strong> có {allActiveRows.length} SP thuộc kênh:{' '}
             {Array.from(new Set(allActiveRows.map(r => r.niniAdm).filter(Boolean))).join(', ')}.
             <br />
-            Template <strong>{template}</strong> chỉ nhận kênh: {allowedChannels.join(', ') || '(tất cả)'}.
+            Template <strong>{templateLabel(template)}</strong> chỉ nhận kênh: {allowedChannels.join(', ') || '(tất cả)'}.
           </div>
         </div>
       )}

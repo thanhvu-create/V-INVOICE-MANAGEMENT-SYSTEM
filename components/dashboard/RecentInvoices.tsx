@@ -1,4 +1,5 @@
 import { StatusBadge } from '@/components/ui/StatusBadge'
+import { templateLabel } from '@/lib/templates'
 
 interface RecentRow {
   id:            string
@@ -92,7 +93,7 @@ export function RecentInvoices({ rows, loading }: { rows: RecentRow[]; loading: 
                   padding: '1px 5px', whiteSpace: 'nowrap', letterSpacing: '0.04em',
                   flexShrink: 0,
                 }}>
-                  {row.template_type}
+                  {templateLabel(row.template_type)}
                 </span>
               )}
 

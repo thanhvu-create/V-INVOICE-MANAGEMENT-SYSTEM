@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { StatusBadge } from '@/components/ui/StatusBadge'
 import { DriveImage } from '@/components/invoice/DriveImage'
+import { templateLabel } from '@/lib/templates'
 import type { Role } from '@/types'
 
 interface InvoiceRow {
@@ -171,7 +172,7 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
                   <td style={{ ...td, fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
                     {row.template_type ? (
                       <span style={{ border: '1px solid var(--border-base)', padding: '2px 6px', fontFamily: 'var(--font-mono)' }}>
-                        {row.template_type}
+                        {templateLabel(row.template_type)}
                       </span>
                     ) : '—'}
                   </td>
@@ -211,7 +212,7 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
                 <StatusBadge status={row.status} />
               </div>
               <div className="invoice-card-row2">
-                {row.template_type && <span>{row.template_type}</span>}
+                {row.template_type && <span>{templateLabel(row.template_type)}</span>}
                 <span>{row.created_at.slice(0, 10)}</span>
               </div>
             </Link>
