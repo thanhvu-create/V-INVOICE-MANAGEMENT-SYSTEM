@@ -10,9 +10,8 @@ import type { ImportRow } from '@/types'
 const SPHT_URL_KEY = 'spht_sheet_url'
 
 // SPHT file structure: first header at row 11, data from row 12 onward.
-// Sheet has a repeated header mid-sheet (row ~75 local / row 102 Google Sheet)
-// which is auto-skipped by the CH!="US" filter.
-// DATA_START = 12 ensures both data sections are captured.
+// Row selection (cột A filter, ship status, data end row) is template-specific —
+// see importRuleFor(). A repeated header mid-sheet is skipped by the cột A filter.
 const DATA_START_1IDX = 12
 
 // Column indices (0-based)
@@ -36,6 +35,25 @@ function rowMatchesTemplate(tenKhach: string, template: string): boolean {
   return allowed.some(ch => tenKhach.trim().toLowerCase() === ch.toLowerCase())
 }
 
+// Per-template parse rule — how rows are selected from the SPHT sheet.
+interface ImportRule {
+  matchColA:      (ch: string) => boolean  // which cột A (CH) values qualify
+  requireShipped: boolean                  // require cột Q === 'Đã ship'
+  dataEndRow:     number | null            // 1-indexed inclusive last data row; null = to end of sheet
+  useColPFilter:  boolean                  // also filter by TÊN KHÁCH (cột P) against TEMPLATE_CHANNELS (preview stage)
+}
+
+function importRuleFor(template: string): ImportRule {
+  switch (template) {
+    case 'CH2':       // CH2 + CH3 — cửa hàng nội địa 214 / 359
+      return { matchColA: ch => ch === '214' || ch === '359', requireShipped: false, dataEndRow: 99, useColPFilter: false }
+    case 'VNSI_AG3':  // KENHSI — kênh sỉ
+      return { matchColA: ch => ch.toLowerCase().includes('sỉ'), requireShipped: false, dataEndRow: 99, useColPFilter: false }
+    default:          // CH1, ADM, VN_US_AG3 (CH1_AG3), MANUAL — hàng gửi US đã ship
+      return { matchColA: ch => ch === 'US', requireShipped: true, dataEndRow: null, useColPFilter: true }
+  }
+}
+
 // ── Sheet helpers ───────────────────────────────────────────────────────────
 
 function getHTSheets(buf: ArrayBuffer): string[] {
@@ -51,20 +69,21 @@ interface ParsedSPHT {
   rowsByVinv:  Record<string, ImportRow[]>
 }
 
-function parseSingleSheet(buf: ArrayBuffer, sheetName: string): Record<string, ImportRow[]> {
+function parseSingleSheet(buf: ArrayBuffer, sheetName: string, rule: ImportRule): Record<string, ImportRow[]> {
   const wb    = XLSX.read(new Uint8Array(buf), { type: 'array', sheets: sheetName })
   const sheet = wb.Sheets[sheetName]
   if (!sheet) return {}
 
   const all: any[][]  = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
-  const dataRows      = all.slice(DATA_START_1IDX - 1)
+  // slice(start, end): start = row 12 (index 11); end exclusive = dataEndRow (row N at index N-1 → included)
+  const dataRows      = all.slice(DATA_START_1IDX - 1, rule.dataEndRow ?? undefined)
   const rowsByVinv: Record<string, ImportRow[]> = {}
 
   dataRows.forEach((row, i) => {
     const ch        = String(row[0]  ?? '').trim()
     const hientrang = String(row[16] ?? '').trim()
     const vinv      = String(row[17] ?? '').trim()
-    if (ch !== 'US' || !vinv || hientrang !== 'Đã ship') return
+    if (!rule.matchColA(ch) || !vinv || (rule.requireShipped && hientrang !== 'Đã ship')) return
 
     const skuRaw = String(row[3] ?? '').trim()
     const soRaw  = String(row[4] ?? '').trim()
@@ -95,11 +114,11 @@ function parseSingleSheet(buf: ArrayBuffer, sheetName: string): Record<string, I
   return rowsByVinv
 }
 
-function parseSPHTSheets(buf: ArrayBuffer, sheetNames: string[]): ParsedSPHT {
+function parseSPHTSheets(buf: ArrayBuffer, sheetNames: string[], rule: ImportRule): ParsedSPHT {
   const merged: Record<string, ImportRow[]> = {}
 
   for (const name of sheetNames) {
-    const rows = parseSingleSheet(buf, name)
+    const rows = parseSingleSheet(buf, name, rule)
     for (const [vinv, items] of Object.entries(rows)) {
       if (!merged[vinv]) merged[vinv] = []
       merged[vinv].push(...items)
@@ -242,7 +261,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
   function confirmSheets(buf: ArrayBuffer, sheets: string[], checked: string[]) {
     if (checked.length === 0) { toast('Vui lòng chọn ít nhất 1 sheet.', 'warn', 3000); return }
     try {
-      const parsed = parseSPHTSheets(buf, checked)
+      const parsed = parseSPHTSheets(buf, checked, importRuleFor(template))
       setManualCode('')
       setStage({ s: 'ready', buf, sheets, selectedSheets: checked, parsed, selected: null })
     } catch (err) {
@@ -512,10 +531,11 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
 
   const readyStage = stage as ReadyStage
   const { buf, sheets, selectedSheets, parsed, selected } = readyStage
+  const rule = importRuleFor(template)
   const allowedChannels = channelsForTemplate(template)
 
   function filterByTemplate(rows: ImportRow[]) {
-    if (!allowedChannels.length) return rows
+    if (!rule.useColPFilter || !allowedChannels.length) return rows
     return rows.filter(r => rowMatchesTemplate(r.niniAdm, template))
   }
 
@@ -524,7 +544,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
   const activeCode     = selected ?? (manualCode.trim() || null)
   const allActiveRows  = selected ? allForSelected : allForManual
   const activeRows     = filterByTemplate(allActiveRows)
-  const skippedRows    = allActiveRows.filter(r => !rowMatchesTemplate(r.niniAdm, template))
+  const skippedRows    = rule.useColPFilter ? allActiveRows.filter(r => !rowMatchesTemplate(r.niniAdm, template)) : []
 
   return (
     <div>
@@ -664,9 +684,11 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
             flexWrap: 'wrap',
           }}>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
-              Lọc theo template <strong>{templateLabel(template)}</strong>:
+              {rule.useColPFilter
+                ? <>Lọc theo template <strong>{templateLabel(template)}</strong>:</>
+                : <>Template <strong>{templateLabel(template)}</strong> — lọc theo cột A (CH)</>}
             </span>
-            {allowedChannels.map(ch => (
+            {rule.useColPFilter && allowedChannels.map(ch => (
               <span key={ch} style={{
                 fontSize: 'var(--text-xs)', fontWeight: 700,
                 color: TEMPLATE_COLOR[ch] ?? 'var(--text-secondary)',
