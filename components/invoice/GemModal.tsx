@@ -45,7 +45,6 @@ interface NVLHotRow {
 }
 
 export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSaved }: Props) {
-  const isCH2 = template === 'CH2'
   const [form,       setForm]       = useState<GemForm>(EMPTY_FORM)
   const [saving,     setSaving]     = useState(false)
   const [nvlHotList, setNvlHotList] = useState<NVLHotRow[]>([])
@@ -132,9 +131,9 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
   const f = (key: keyof GemForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(v => ({ ...v, [key]: e.target.value }))
 
-  // Live computed preview — CH2 prefers tl_sau but falls back to tl_truoc (XoanLookupPanel fills tl_truoc); ADM has no setting fee
+  // Live computed preview — matches recalcDiamond: tl_truoc has priority, fallback to tl_sau; ADM has no setting fee
   const isADM      = template === 'ADM'
-  const tlTruoc    = parseFloat(isCH2 ? (form.tl_sau_xu_ly_ct || form.tl_truoc_xu_ly_ct) : form.tl_truoc_xu_ly_ct) || 0
+  const tlTruoc    = parseFloat(form.tl_truoc_xu_ly_ct || form.tl_sau_xu_ly_ct) || 0
   const slHot      = parseInt(form.sl_hot) || 0
   const donGia     = parseFloat(form.don_gia) || 0
   const tl_xoan_gr = tlTruoc > 0 ? tlTruoc / 5 : null
@@ -262,19 +261,17 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
           </div>
 
           {/* sl_hot + tl_truoc + tl_sau */}
-          <div style={{ display: 'grid', gridTemplateColumns: isCH2 ? '1fr 1fr' : '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
             <div>
               <label style={labelStyle}>SL Hột</label>
               <input type="number" min="1" step="1" style={inputStyle} value={form.sl_hot} onChange={f('sl_hot')} />
             </div>
-            {!isCH2 && (
-              <div>
-                <label style={labelStyle}>TL Trước XL (ct) *</label>
-                <input type="number" min="0" step="0.0001" style={inputStyle} placeholder="0.0000" value={form.tl_truoc_xu_ly_ct} onChange={f('tl_truoc_xu_ly_ct')} />
-              </div>
-            )}
             <div>
-              <label style={labelStyle}>{isCH2 ? 'TL XL (ct) *' : 'TL Sau XL (ct)'}</label>
+              <label style={labelStyle}>TL Trước XL (ct) *</label>
+              <input type="number" min="0" step="0.0001" style={inputStyle} placeholder="0.0000" value={form.tl_truoc_xu_ly_ct} onChange={f('tl_truoc_xu_ly_ct')} />
+            </div>
+            <div>
+              <label style={labelStyle}>TL Sau XL (ct)</label>
               <input type="number" min="0" step="0.0001" style={inputStyle} placeholder="0.0000" value={form.tl_sau_xu_ly_ct} onChange={f('tl_sau_xu_ly_ct')} />
             </div>
           </div>
