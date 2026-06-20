@@ -384,7 +384,6 @@ function buildSummaryRows(invoice: any, items: any[]) {
   if (isAG3) return buildSummaryRowsAG3(items)
   if (template === 'ADM') return buildSummaryRowsADM(items)
 
-  const isCH2 = template === 'CH2'
   const rows: (string | number)[][] = []
 
   // Row 1 — group headers
@@ -403,15 +402,15 @@ function buildSummaryRows(invoice: any, items: any[]) {
   r1[32] = 'Hóa Đôn (V-INVOICE)'
   rows.push(r1)
 
-  // Row 2 — sub-headers (col 16/17 differ for CH2: no TL trước, only TL sau)
+  // Row 2 — sub-headers (TL trước = col 16, TL sau = col 17 for all templates)
   const r2: (string | number)[] = Array(SUMMARY_COLS).fill('')
   r2[2]  = 'SO/MO';           r2[3]  = 'Tên khách';  r2[4]  = 'Kích Thước'
   r2[5]  = 'Số lượng';        r2[6]  = 'Mã số mẫu';  r2[7]  = 'Loại vàng'
   r2[9]  = 'T.Phẩm (có NVL đá)'; r2[10] = 'T.Phẩm (trừ NVL đá)'; r2[11] = 'T.Phẩm (vàng TT)'
   r2[12] = 'Mã Xoàn';         r2[13] = 'P. chất';    r2[14] = 'Size Xoàn'
   r2[15] = 'SL hột'
-  r2[16] = isCH2 ? 'TL (ct.) sau xử lý' : 'TL (ct.) trước xử lý'
-  r2[17] = isCH2 ? '' : 'TL (ct.) sau xử lý'
+  r2[16] = 'TL (ct.) trước xử lý'
+  r2[17] = 'TL (ct.) sau xử lý'
   r2[18] = 'TL Xoàn (gr)';    r2[19] = 'Đơn giá ($)'; r2[20] = 'T.GIÁ XOÀN'
   r2[21] = 'Đơn giá phí';     r2[22] = 'T.Phí'
   r2[28] = 'Vốn sản xuất';    r2[29] = 'Bảo hiểm'
@@ -460,14 +459,14 @@ function buildSummaryRows(invoice: any, items: any[]) {
         row[32] = item.hoa_don     ?? ''
       }
 
-      // Gem columns (12-22) — CH2 prefers tl_sau but falls back to tl_truoc (XoanLookupPanel fills tl_truoc only)
+      // Gem columns (12-22) — TL trước (16) + TL sau (17) shown separately for all templates
       if (gem) {
         row[12] = gem.ma_xoan         ?? ''
         row[13] = gem.p_chat          ?? ''
         row[14] = gem.size_xoan_range ?? ''
         row[15] = n(gem.sl_hot)
-        row[16] = isCH2 ? n(gem.tl_sau_xu_ly_ct ?? gem.tl_truoc_xu_ly_ct) : n(gem.tl_truoc_xu_ly_ct)
-        row[17] = isCH2 ? '' : n(gem.tl_sau_xu_ly_ct)
+        row[16] = n(gem.tl_truoc_xu_ly_ct)
+        row[17] = n(gem.tl_sau_xu_ly_ct)
         row[18] = n(gem.tl_xoan_gr)
         row[19] = n(gem.don_gia)
         row[20] = n(gem.t_gia_xoan)

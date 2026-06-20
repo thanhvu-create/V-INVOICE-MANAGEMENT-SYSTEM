@@ -442,8 +442,10 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>{g.p_chat ?? 'VVS1'}</td>
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.size_xoan_range ?? '—'}</td>
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', textAlign: 'center' }}>{g.sl_hot}</td>
-                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', background: g.tl_truoc_xu_ly_ct == null ? 'rgba(220,38,38,0.08)' : '' }}>
-                        {g.tl_truoc_xu_ly_ct != null ? g.tl_truoc_xu_ly_ct.toFixed(3) : <span style={{ color: '#DC2626', fontSize: 'var(--text-xs)' }}>— nhập tay</span>}
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', background: (g.tl_truoc_xu_ly_ct == null && g.tl_sau_xu_ly_ct == null) ? 'rgba(220,38,38,0.08)' : '' }}>
+                        {g.tl_truoc_xu_ly_ct != null
+                          ? g.tl_truoc_xu_ly_ct.toFixed(3)
+                          : (g.tl_sau_xu_ly_ct != null ? '—' : <span style={{ color: '#DC2626', fontSize: 'var(--text-xs)' }}>— nhập tay</span>)}
                       </td>
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>{g.tl_sau_xu_ly_ct?.toFixed(3) ?? '—'}</td>
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt4(g.tl_xoan_gr)} <span style={{ fontSize: 9, color: 'var(--color-info)' }}>auto</span></td>

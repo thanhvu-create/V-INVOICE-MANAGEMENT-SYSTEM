@@ -131,13 +131,13 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
   const f = (key: keyof GemForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(v => ({ ...v, [key]: e.target.value }))
 
-  // Live computed preview — matches recalcDiamond: tl_truoc has priority, fallback to tl_sau; ADM has no setting fee
+  // Live computed preview — matches recalcDiamond: TL Sau overrides TL Trước when entered; ADM has no setting fee
   const isADM      = template === 'ADM'
-  const tlTruoc    = parseFloat(form.tl_truoc_xu_ly_ct || form.tl_sau_xu_ly_ct) || 0
+  const tlBase     = parseFloat(form.tl_sau_xu_ly_ct || form.tl_truoc_xu_ly_ct) || 0
   const slHot      = parseInt(form.sl_hot) || 0
   const donGia     = parseFloat(form.don_gia) || 0
-  const tl_xoan_gr = tlTruoc > 0 ? tlTruoc / 5 : null
-  const t_gia_xoan = tlTruoc > 0 && donGia > 0 ? tlTruoc * donGia : null
+  const tl_xoan_gr = tlBase > 0 ? tlBase / 5 : null
+  const t_gia_xoan = tlBase > 0 && donGia > 0 ? tlBase * donGia : null
   const t_phi      = isADM ? 0 : (slHot > 0 ? slHot * 1 : null)
 
   function handleRangeChange(range: string) {

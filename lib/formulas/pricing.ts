@@ -60,7 +60,7 @@ export function goldPricePerGram(loai_vang: string, nvl: NVLSnapshot): number | 
 
 /**
  * T.Phẩm vàng thực tế = T.Phẩm có NVL đá − Σ TL xoàn (gr)
- * tl_xoan_gr = tl_truoc_xu_ly_ct / 5 (written by recalcDiamond)
+ * tl_xoan_gr = (tl_sau_xu_ly_ct ?? tl_truoc_xu_ly_ct) / 5 (written by recalcDiamond)
  */
 export function calcWeightNoGem(totalGr: number, diamonds: InvoiceDiamond[]): number {
   const gemGr = diamonds.reduce((s, g) => s + (g.tl_xoan_gr ?? 0), 0)
@@ -76,8 +76,8 @@ export function recalcDiamond(
   d: Partial<InvoiceDiamond>,
   template: InvoiceTemplate = 'CH1',
 ): Partial<InvoiceDiamond> {
-  // CH2 has no tl_truoc column — use tl_sau as fallback so tl_xoan_gr/t_gia_xoan compute correctly
-  const tl_base   = d.tl_truoc_xu_ly_ct ?? d.tl_sau_xu_ly_ct ?? 0
+  // TL Sau (after processing) overrides TL Trước when entered; otherwise use TL Trước.
+  const tl_base   = d.tl_sau_xu_ly_ct ?? d.tl_truoc_xu_ly_ct ?? 0
   const don_gia   = d.don_gia ?? 0
   const sl_hot    = d.sl_hot  ?? 0
   const feePerPcs = template === 'ADM' ? 0 : 1
