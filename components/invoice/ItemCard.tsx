@@ -431,10 +431,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
             <div style={{ overflowX: 'auto' }}>
               <table style={{ borderCollapse: 'collapse', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', width: '100%' }}>
                 <thead>
-                  <tr>{(template === 'CH2'
-                    ? ['Mã Xoàn', 'P.Chất', 'Size Range', 'SL', 'TL Sau (ct)', 'TL(gr)', 'Đơn Giá', 'T.Giá Xoàn', '$1/Viên', 'T.Phí', '']
-                    : ['Mã Xoàn', 'P.Chất', 'Size Range', 'SL', 'TL Trước (ct)', 'TL Sau (ct)', 'TL(gr)', 'Đơn Giá', 'T.Giá Xoàn', '$1/Viên', 'T.Phí', '']
-                  ).map(h => (
+                  <tr>{['Mã Xoàn', 'P.Chất', 'Size Range', 'SL', 'TL Trước (ct)', 'TL Sau (ct)', 'TL(gr)', 'Đơn Giá', 'T.Giá Xoàn', '$1/Viên', 'T.Phí', ''].map(h => (
                     <th key={h} style={{ padding: '5px 8px', borderBottom: '2px solid var(--border-base)', textAlign: 'left', fontWeight: 600, fontSize: 'var(--text-xs)', letterSpacing: '0.04em', color: 'var(--text-secondary)', background: 'var(--bg-base)', whiteSpace: 'nowrap' }}>{h}</th>
                   ))}</tr>
                 </thead>
@@ -445,11 +442,9 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-secondary)' }}>{g.p_chat ?? 'VVS1'}</td>
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)' }}>{g.size_xoan_range ?? '—'}</td>
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', textAlign: 'center' }}>{g.sl_hot}</td>
-                      {template !== 'CH2' && (
-                        <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', background: g.tl_truoc_xu_ly_ct == null ? 'rgba(220,38,38,0.08)' : '' }}>
-                          {g.tl_truoc_xu_ly_ct != null ? g.tl_truoc_xu_ly_ct.toFixed(3) : <span style={{ color: '#DC2626', fontSize: 'var(--text-xs)' }}>— nhập tay</span>}
-                        </td>
-                      )}
+                      <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', background: g.tl_truoc_xu_ly_ct == null ? 'rgba(220,38,38,0.08)' : '' }}>
+                        {g.tl_truoc_xu_ly_ct != null ? g.tl_truoc_xu_ly_ct.toFixed(3) : <span style={{ color: '#DC2626', fontSize: 'var(--text-xs)' }}>— nhập tay</span>}
+                      </td>
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>{g.tl_sau_xu_ly_ct?.toFixed(3) ?? '—'}</td>
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt4(g.tl_xoan_gr)} <span style={{ fontSize: 9, color: 'var(--color-info)' }}>auto</span></td>
                       <td style={{ padding: '5px 8px', borderBottom: '1px solid var(--border-light)' }}>{fmt2(g.don_gia)}</td>
@@ -469,7 +464,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                 </tbody>
                 <tfoot>
                   <tr style={{ background: '#e91d79', color: '#FAFAF7' }}>
-                    <td colSpan={template === 'CH2' ? 5 : 6} style={{ padding: '5px 8px', fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Tổng</td>
+                    <td colSpan={6} style={{ padding: '5px 8px', fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Tổng</td>
                     <td style={{ padding: '5px 8px', fontWeight: 600 }}>
                       {gems.reduce((s: number, g: any) => s + (g.tl_xoan_gr ?? 0), 0).toFixed(4)}
                     </td>
