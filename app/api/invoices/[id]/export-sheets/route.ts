@@ -672,6 +672,14 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
             fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment,wrapStrategy)',
           }},
         )
+        // Multi-gem item: vertically merge the non-gem cols (product info 0–11 +
+        // fabrication/totals 23…N) across the item's rows. Gem cols 12–22 stay per-row.
+        if (numRows > 1) {
+          summaryExtraFmt.push(
+            { mergeCells: { range: { sheetId: 1, startRowIndex: rowCursor, endRowIndex: rowCursor + numRows, startColumnIndex: 0,  endColumnIndex: 12 },           mergeType: 'MERGE_COLUMNS' } },
+            { mergeCells: { range: { sheetId: 1, startRowIndex: rowCursor, endRowIndex: rowCursor + numRows, startColumnIndex: 23, endColumnIndex: summaryNCols }, mergeType: 'MERGE_COLUMNS' } },
+          )
+        }
         rowCursor += numRows
       }
     }
