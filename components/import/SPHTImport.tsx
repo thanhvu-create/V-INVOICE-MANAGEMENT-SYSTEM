@@ -9,10 +9,8 @@ import type { ImportRow } from '@/types'
 
 const SPHT_URL_KEY = 'spht_sheet_url'
 
-// SPHT file structure: first header at row 11, data from row 12 onward.
-// Row selection (cột A filter, ship status, data end row) is template-specific —
-// see importRuleFor(). A repeated header mid-sheet is skipped by the cột A filter.
-const DATA_START_1IDX = 12
+// SPHT file structure: header at row 11; a repeated header at row 102 starts a
+// second data section. Row selection is template-specific — see importRuleFor().
 
 // Column indices (0-based)
 // A[0]=CH  D[3]=SKU  E[4]=SO  F[5]=MO  G[6]=CHI TIẾT SP  H[7]=LOẠI VÀNG
@@ -35,22 +33,37 @@ function rowMatchesTemplate(tenKhach: string, template: string): boolean {
   return allowed.some(ch => tenKhach.trim().toLowerCase() === ch.toLowerCase())
 }
 
-// Per-template parse rule — how rows are selected from the SPHT sheet.
+// Read a trimmed string from a row's column index.
+const cell = (r: any, i: number) => String(r?.[i] ?? '').trim()
+
+// Per-template parse rule — one or more sheet segments, each with its own row filter.
+// Col indices: A[0]=CH  Q[16]=SỐ PO  R[17]=V-INV  P[15]=TÊN KHÁCH  V[21]=NGUỒN NHẬP
+interface ImportSegment {
+  startRow: number              // 1-indexed first data row
+  endRow:   number | null       // 1-indexed inclusive last data row; null = to end of sheet
+  match:    (r: any[]) => boolean  // row filter (V-INV presence is checked separately)
+}
 interface ImportRule {
-  matchColA:      (ch: string) => boolean  // which cột A (CH) values qualify
-  requireShipped: boolean                  // require cột Q === 'Đã ship'
-  dataEndRow:     number | null            // 1-indexed inclusive last data row; null = to end of sheet
-  useColPFilter:  boolean                  // also filter by TÊN KHÁCH (cột P) against TEMPLATE_CHANNELS (preview stage)
+  segments:      ImportSegment[]
+  useColPFilter: boolean        // also filter by TÊN KHÁCH (cột P) against TEMPLATE_CHANNELS (preview stage)
 }
 
 function importRuleFor(template: string): ImportRule {
   switch (template) {
-    case 'CH2':       // CH2 + CH3 — cửa hàng nội địa 214 / 359
-      return { matchColA: ch => ch === '214' || ch === '359', requireShipped: false, dataEndRow: 99, useColPFilter: false }
-    case 'VNSI_AG3':  // KENHSI — kênh sỉ
-      return { matchColA: ch => ch.toLowerCase().includes('sỉ'), requireShipped: false, dataEndRow: 99, useColPFilter: false }
-    default:          // CH1, ADM, VN_US_AG3 (CH1_AG3), MANUAL — hàng gửi US đã ship
-      return { matchColA: ch => ch === 'US', requireShipped: true, dataEndRow: null, useColPFilter: true }
+    case 'CH2':       // CH2 + CH3 — cửa hàng nội địa 214 / 359, rows 12–99
+      return { segments: [{ startRow: 12, endRow: 99, match: r => ['214', '359'].includes(cell(r, 0)) }], useColPFilter: false }
+    case 'VNSI_AG3':  // KENHSI — kênh sỉ, rows 12–99
+      return { segments: [{ startRow: 12, endRow: 99, match: r => cell(r, 0).toLowerCase().includes('sỉ') }], useColPFilter: false }
+    case 'CH1_AG3':   // VN_US_AG3 — 2 sections, AG3 nhận diện bằng NGUỒN NHẬP (cột V) = "AG-L3"
+      return {
+        segments: [
+          { startRow: 12,  endRow: 99,  match: r => cell(r, 21) === 'AG-L3' },                               // bảng 1 (section trên)
+          { startRow: 103, endRow: 325, match: r => cell(r, 21) === 'AG-L3' && cell(r, 16) === 'Đã ship' },   // bảng 2 (section dưới, đã ship)
+        ],
+        useColPFilter: false,
+      }
+    default:          // CH1, ADM, MANUAL — hàng gửi US đã ship, toàn sheet
+      return { segments: [{ startRow: 12, endRow: null, match: r => cell(r, 0) === 'US' && cell(r, 16) === 'Đã ship' }], useColPFilter: true }
   }
 }
 
@@ -74,42 +87,44 @@ function parseSingleSheet(buf: ArrayBuffer, sheetName: string, rule: ImportRule)
   const sheet = wb.Sheets[sheetName]
   if (!sheet) return {}
 
-  const all: any[][]  = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
-  // slice(start, end): start = row 12 (index 11); end exclusive = dataEndRow (row N at index N-1 → included)
-  const dataRows      = all.slice(DATA_START_1IDX - 1, rule.dataEndRow ?? undefined)
+  const all: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' })
   const rowsByVinv: Record<string, ImportRow[]> = {}
+  let fallbackIdx = 0
 
-  dataRows.forEach((row, i) => {
-    const ch        = String(row[0]  ?? '').trim()
-    const hientrang = String(row[16] ?? '').trim()
-    const vinv      = String(row[17] ?? '').trim()
-    if (!rule.matchColA(ch) || !vinv || (rule.requireShipped && hientrang !== 'Đã ship')) return
+  for (const seg of rule.segments) {
+    // slice(start, end): start = startRow (index startRow-1); end exclusive = endRow (row N at index N-1 → included)
+    const dataRows = all.slice(seg.startRow - 1, seg.endRow ?? undefined)
 
-    const skuRaw = String(row[3] ?? '').trim()
-    const soRaw  = String(row[4] ?? '').trim()
-    const moRaw  = String(row[5] ?? '').trim()
-    const soMo   = soRaw && moRaw ? `SO${soRaw}-MO${moRaw}` : soRaw ? `SO${soRaw}` : ''
-    const qty    = parseInt(String(row[8])) || 1
-    const wt     = parseFloat(String(row[9])) || 0
+    dataRows.forEach((row, i) => {
+      const vinv = cell(row, 17)
+      if (!vinv || !seg.match(row)) return
 
-    const importRow: ImportRow = {
-      rowNum:      DATA_START_1IDX + i,
-      store:       'HP',
-      location:    'Safe 1',
-      sku:         skuRaw ? String(Number(skuRaw) || skuRaw).toUpperCase() : `SKU-${i + 1}`,
-      soMo,
-      description: String(row[6]  ?? '').trim(),
-      qty,
-      weightTotal: wt,
-      loaiVang:    String(row[7]  ?? '').trim().toUpperCase(),
-      class:       '',
-      subClass:    '',
-      niniAdm:     String(row[15] ?? '').trim(),
-    }
+      const skuRaw = cell(row, 3)
+      const soRaw  = cell(row, 4)
+      const moRaw  = cell(row, 5)
+      const soMo   = soRaw && moRaw ? `SO${soRaw}-MO${moRaw}` : soRaw ? `SO${soRaw}` : ''
+      const qty    = parseInt(cell(row, 8)) || 1
+      const wt     = parseFloat(cell(row, 9)) || 0
 
-    if (!rowsByVinv[vinv]) rowsByVinv[vinv] = []
-    rowsByVinv[vinv].push(importRow)
-  })
+      const importRow: ImportRow = {
+        rowNum:      seg.startRow + i,
+        store:       'HP',
+        location:    'Safe 1',
+        sku:         skuRaw ? String(Number(skuRaw) || skuRaw).toUpperCase() : `SKU-${++fallbackIdx}`,
+        soMo,
+        description: cell(row, 6),
+        qty,
+        weightTotal: wt,
+        loaiVang:    cell(row, 7).toUpperCase(),
+        class:       '',
+        subClass:    '',
+        niniAdm:     cell(row, 15),
+      }
+
+      if (!rowsByVinv[vinv]) rowsByVinv[vinv] = []
+      rowsByVinv[vinv].push(importRow)
+    })
+  }
 
   return rowsByVinv
 }
