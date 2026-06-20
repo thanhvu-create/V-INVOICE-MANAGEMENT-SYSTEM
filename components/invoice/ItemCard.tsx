@@ -464,7 +464,11 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                 </tbody>
                 <tfoot>
                   <tr style={{ background: '#e91d79', color: '#FAFAF7' }}>
-                    <td colSpan={6} style={{ padding: '5px 8px', fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Tổng</td>
+                    <td colSpan={4} style={{ padding: '5px 8px', fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.75)', textTransform: 'uppercase', letterSpacing: '0.08em', textAlign: 'right' }}>Tổng</td>
+                    <td style={{ padding: '5px 8px', fontWeight: 600 }}>
+                      {gems.reduce((s: number, g: any) => s + (g.tl_truoc_xu_ly_ct ?? 0), 0).toFixed(3)}
+                    </td>
+                    <td />
                     <td style={{ padding: '5px 8px', fontWeight: 600 }}>
                       {gems.reduce((s: number, g: any) => s + (g.tl_xoan_gr ?? 0), 0).toFixed(4)}
                     </td>
