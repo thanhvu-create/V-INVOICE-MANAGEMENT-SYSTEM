@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       .from('class_subclass_rules')
       .select('description_prefix, class, sub_class')
 
-    function detectClass(description: string | null | undefined) {
+    const detectClass = (description: string | null | undefined) => {
       if (!description?.trim() || !classRules.length) return null
       const upper = description.trim().toUpperCase()
       const sorted = [...classRules].sort((a, b) => b.description_prefix.length - a.description_prefix.length)
