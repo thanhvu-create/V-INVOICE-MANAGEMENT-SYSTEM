@@ -5,6 +5,7 @@ import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 import { ComboInput } from '@/components/ui/ComboInput'
 import { extractVendorModel } from '@/lib/formulas/description-parse'
+import { getAssemblyPrices, getPhiPhuKien } from '@/lib/formulas/assembly-pricing'
 
 
 interface Form {
@@ -71,6 +72,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
   const [metalTypes,  setMetalTypes]  = useState<string[]>(BASE_LOAI_VANG)
   const [classRules,  setClassRules]  = useState<ClassRule[]>([])
   const [autoFilled,  setAutoFilled]  = useState(false)
+  const [autoFees,    setAutoFees]    = useState(false)
   const skuRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -89,7 +91,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
   const hasFees  = template === 'CH1' || template === 'CH2'
 
   useEffect(() => {
-    if (open) { setForm(EMPTY); setError(''); setAutoFilled(false) }
+    if (open) { setForm(EMPTY); setError(''); setAutoFilled(false); setAutoFees(false) }
   }, [open])
 
   function handleDescriptionChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -102,6 +104,18 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
         setAutoFilled(true)
         next.class     = detected.class
         next.sub_class = detected.sub_class
+        // Auto-fill fees when sub_class is detected and template has fee fields
+        if (hasFees) {
+          const prices = getAssemblyPrices(detected.sub_class)
+          if (prices) {
+            if (!parseFloat(v.gia_cong)) next.gia_cong = String(prices.gia_cong)
+            if (!parseFloat(v.duc))      next.duc      = String(prices.duc)
+            if (!parseFloat(v.thiet_ke)) next.thiet_ke = String(prices.thiet_ke)
+            if (!parseFloat(v.resin))    next.resin    = String(prices.resin)
+          }
+          if (!parseFloat(v.phi_phu_kien)) next.phi_phu_kien = String(getPhiPhuKien(v.loai_vang))
+          setAutoFees(true)
+        }
       } else {
         setAutoFilled(false)
       }
@@ -112,6 +126,36 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
         if (model) next.vendor_model = model
       }
 
+      return next
+    })
+  }
+
+  function handleSubClassChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const newSub = e.target.value
+    setAutoFilled(false)
+    setForm(v => {
+      const next: Form = { ...v, sub_class: newSub }
+      if (hasFees) {
+        const prices = getAssemblyPrices(newSub)
+        if (prices) {
+          if (!parseFloat(v.gia_cong)) next.gia_cong = String(prices.gia_cong)
+          if (!parseFloat(v.duc))      next.duc      = String(prices.duc)
+          if (!parseFloat(v.thiet_ke)) next.thiet_ke = String(prices.thiet_ke)
+          if (!parseFloat(v.resin))    next.resin    = String(prices.resin)
+          setAutoFees(true)
+        }
+      }
+      return next
+    })
+  }
+
+  function handleLoaiVangChange(v: string) {
+    setForm(prev => {
+      const next = { ...prev, loai_vang: v }
+      if (hasFees && !parseFloat(prev.phi_phu_kien)) {
+        next.phi_phu_kien = String(getPhiPhuKien(v))
+        setAutoFees(true)
+      }
       return next
     })
   }
@@ -291,7 +335,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
                 style={{ ...inputStyle, background: autoFilled ? '#F0FDF4' : 'var(--bg-surface)' }}
                 placeholder="BL, RI, ER, PD…"
                 value={form.sub_class}
-                onChange={e => { setAutoFilled(false); f('sub_class')(e) }}
+                onChange={handleSubClassChange}
               />
             </div>
 
@@ -299,7 +343,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
               <label style={labelStyle}>Loại Vàng</label>
               <ComboInput
                 value={form.loai_vang}
-                onChange={v => setForm(prev => ({ ...prev, loai_vang: v }))}
+                onChange={handleLoaiVangChange}
                 options={metalTypes}
                 placeholder="18KY, 18KW, PT950…"
                 uppercase
@@ -324,12 +368,30 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
           {/* Fees (CH1/CH2 only) */}
           {hasFees && (
             <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem', marginBottom: '0.75rem' }}>
-              <div style={{ fontSize: 'var(--text-xs)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>Chi phí (USD)</div>
+              <div style={{ fontSize: 'var(--text-xs)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                Chi phí (USD)
+                {autoFees && (
+                  <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', color: '#15803D', background: '#DCFCE7', padding: '1px 5px', textTransform: 'uppercase' }}>
+                    auto
+                  </span>
+                )}
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
-                {(['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien'] as const).map(key => (
+                {([
+                  ['gia_cong',    'Gia công'],
+                  ['duc',         'Đúc'],
+                  ['thiet_ke',    'Thiết kế'],
+                  ['resin',       'Resin'],
+                  ['phi_phu_kien','Phụ kiện'],
+                ] as const).map(([key, label]) => (
                   <div key={key}>
-                    <label style={{ ...labelStyle, fontSize: 10 }}>{key.replace('_', ' ')}</label>
-                    <input type="number" min="0" step="0.01" style={{ ...inputStyle, padding: '4px 6px' }} value={form[key]} onChange={f(key)} />
+                    <label style={{ ...labelStyle, fontSize: 10 }}>{label}</label>
+                    <input
+                      type="number" min="0" step="0.01"
+                      style={{ ...inputStyle, padding: '4px 6px', background: autoFees ? '#F0FDF4' : 'var(--bg-surface)' }}
+                      value={form[key]}
+                      onChange={e => { setAutoFees(false); f(key)(e) }}
+                    />
                   </div>
                 ))}
               </div>
