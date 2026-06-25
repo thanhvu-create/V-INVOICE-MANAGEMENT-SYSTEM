@@ -59,9 +59,10 @@ export function extractVendorModel(description: string | null | undefined): stri
   return null
 }
 
-// Extract size from description, e.g. "Size: 4.5VN" → "4.5VN", "Size: 8US" → "8US"
+// Extract size from description.
+// Supports single values ("4.5VN", "8US", "17CM") and ranges ("44-46", "44-46CM").
 export function extractKichThuoc(description: string | null | undefined): string | null {
   if (!description?.trim()) return null
-  const match = description.match(/size\s*[:\s]\s*(\d+(?:\.\d+)?\s*(?:VN|US|CM|IN|MM|M|in)?)/i)
+  const match = description.match(/size\s*[:\s]\s*(\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?\s*(?:VN|US|CM|IN|MM|M|in)?)/i)
   return match ? match[1].trim() : null
 }
