@@ -35,6 +35,16 @@ interface Form {
 
 const BASE_LOAI_VANG = ['18KY', '18KW', '18KR', '18KG', '22KY', '22KW', '24K', '14KY', '14KW', '14KR', '10KY', '10KW', 'PT950', 'PT850', 'AG', 'PD']
 
+interface ClassRule { description_prefix: string; class: string; sub_class: string }
+
+function detectClassSubClass(description: string, rules: ClassRule[]): { class: string; sub_class: string } | null {
+  if (!description.trim() || rules.length === 0) return null
+  const upper = description.trim().toUpperCase()
+  const sorted = [...rules].sort((a, b) => b.description_prefix.length - a.description_prefix.length)
+  const match = sorted.find(r => upper.startsWith(r.description_prefix))
+  return match ? { class: match.class, sub_class: match.sub_class } : null
+}
+
 const EMPTY: Form = {
   sku: '', vendor_model: '', so_mo: '', po_number: '', sku_ag: '',
   description: '', class: '', sub_class: '',
@@ -54,16 +64,22 @@ interface Props {
 }
 
 export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Props) {
-  const [form,       setForm]       = useState<Form>(EMPTY)
-  const [saving,     setSaving]     = useState(false)
-  const [error,      setError]      = useState('')
-  const [metalTypes, setMetalTypes] = useState<string[]>(BASE_LOAI_VANG)
+  const [form,        setForm]        = useState<Form>(EMPTY)
+  const [saving,      setSaving]      = useState(false)
+  const [error,       setError]       = useState('')
+  const [metalTypes,  setMetalTypes]  = useState<string[]>(BASE_LOAI_VANG)
+  const [classRules,  setClassRules]  = useState<ClassRule[]>([])
+  const [autoFilled,  setAutoFilled]  = useState(false)
   const skuRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     fetch('/api/metal-types')
       .then(r => r.json())
       .then(j => { if (j.success) setMetalTypes(j.data) })
+      .catch(() => {})
+    fetch('/api/class-subclass')
+      .then(r => r.json())
+      .then(j => { if (j.success) setClassRules(j.data) })
       .catch(() => {})
   }, [])
 
@@ -72,8 +88,21 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
   const hasFees  = template === 'CH1' || template === 'CH2'
 
   useEffect(() => {
-    if (open) { setForm(EMPTY); setError('') }
+    if (open) { setForm(EMPTY); setError(''); setAutoFilled(false) }
   }, [open])
+
+  function handleDescriptionChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const desc = e.target.value
+    setForm(v => {
+      const detected = detectClassSubClass(desc, classRules)
+      if (detected) {
+        setAutoFilled(true)
+        return { ...v, description: desc, class: detected.class, sub_class: detected.sub_class }
+      }
+      setAutoFilled(false)
+      return { ...v, description: desc }
+    })
+  }
 
   useEffect(() => {
     if (open) setTimeout(() => skuRef.current?.focus(), 50)
@@ -202,7 +231,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
           {/* Description */}
           <div style={{ marginBottom: '0.75rem' }}>
             <label style={labelStyle}>Description</label>
-            <input style={inputStyle} value={form.description} onChange={f('description')} />
+            <input style={inputStyle} value={form.description} onChange={handleDescriptionChange} />
           </div>
 
           {/* Tên khách — per product (all templates) */}
@@ -222,12 +251,36 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
             </div>
 
             <div>
-              <label style={labelStyle}>Class</label>
-              <input style={inputStyle} placeholder="18MTG, DIAJE…" value={form.class} onChange={f('class')} />
+              <label style={labelStyle}>
+                Class
+                {autoFilled && (
+                  <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', color: '#15803D', background: '#DCFCE7', padding: '1px 5px', textTransform: 'uppercase' }}>
+                    auto
+                  </span>
+                )}
+              </label>
+              <input
+                style={{ ...inputStyle, background: autoFilled ? '#F0FDF4' : 'var(--bg-surface)' }}
+                placeholder="18MTG, DIAJE…"
+                value={form.class}
+                onChange={e => { setAutoFilled(false); f('class')(e) }}
+              />
             </div>
             <div>
-              <label style={labelStyle}>Sub Class</label>
-              <input style={inputStyle} placeholder="BL, RI, ER, PD…" value={form.sub_class} onChange={f('sub_class')} />
+              <label style={labelStyle}>
+                Sub Class
+                {autoFilled && (
+                  <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 600, letterSpacing: '0.1em', color: '#15803D', background: '#DCFCE7', padding: '1px 5px', textTransform: 'uppercase' }}>
+                    auto
+                  </span>
+                )}
+              </label>
+              <input
+                style={{ ...inputStyle, background: autoFilled ? '#F0FDF4' : 'var(--bg-surface)' }}
+                placeholder="BL, RI, ER, PD…"
+                value={form.sub_class}
+                onChange={e => { setAutoFilled(false); f('sub_class')(e) }}
+              />
             </div>
 
             <div>

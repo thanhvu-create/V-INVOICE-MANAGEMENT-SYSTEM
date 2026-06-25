@@ -19,8 +19,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/invoices',            label: 'Invoices',   roles: ['admin', 'manager', 'user', 'viewer'] },
   { href: '/import',              label: 'Import',     roles: ['admin', 'manager', 'user'] },
   { href: '/admin/products',      label: 'NVL Prices',  roles: ['admin', 'manager'] },
-  { href: '/admin/gem-catalog',   label: 'Gem Catalog', roles: ['admin', 'manager'] },
-  { href: '/admin/users',         label: 'Users',       roles: ['admin'] },
+  { href: '/admin/gem-catalog',   label: 'Gem Catalog',    roles: ['admin', 'manager'] },
+  { href: '/admin/class-subclass', label: 'Class/SubClass', roles: ['admin', 'manager'] },
+  { href: '/admin/users',         label: 'Users',           roles: ['admin'] },
 ]
 
 const ROLE_LABEL: Record<Role, string> = {
