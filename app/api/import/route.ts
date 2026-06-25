@@ -48,22 +48,37 @@ export async function POST(req: NextRequest) {
     const nvl      = nvlFromInvoice(invoice)
     const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
 
-    const itemsToInsert = rows.map((row, idx) => ({
-      invoice_id:        invoiceId,
-      seq:               startSeq + idx,
-      sku:               row.sku               || null,
-      store:             row.store             || null,
-      location:          row.location          || null,
-      so_mo:             row.soMo              || null,
-      description:       row.description       || null,
-      class:             row.class             || null,
-      sub_class:         row.subClass          || null,
-      loai_vang:         row.loaiVang          || null,
-      qt_pcs:            row.qty,
-      wt_gr:             row.weightTotal,
-      t_pham_co_nvl_da:  row.weightTotal,
-      customer_name:     row.niniAdm           || null,  // TÊN KHÁCH (cột P) → per-product customer
-    }))
+    // Load class/sub_class rules for auto-detection from description prefix
+    const { data: classRules = [] } = await db
+      .from('class_subclass_rules')
+      .select('description_prefix, class, sub_class')
+
+    function detectClass(description: string | null | undefined) {
+      if (!description?.trim() || !classRules.length) return null
+      const upper = description.trim().toUpperCase()
+      const sorted = [...classRules].sort((a, b) => b.description_prefix.length - a.description_prefix.length)
+      return sorted.find(r => upper.startsWith(r.description_prefix)) ?? null
+    }
+
+    const itemsToInsert = rows.map((row, idx) => {
+      const detected = (!row.class && !row.subClass) ? detectClass(row.description) : null
+      return {
+        invoice_id:        invoiceId,
+        seq:               startSeq + idx,
+        sku:               row.sku               || null,
+        store:             row.store             || null,
+        location:          row.location          || null,
+        so_mo:             row.soMo              || null,
+        description:       row.description       || null,
+        class:             row.class             || detected?.class     || null,
+        sub_class:         row.subClass          || detected?.sub_class || null,
+        loai_vang:         row.loaiVang          || null,
+        qt_pcs:            row.qty,
+        wt_gr:             row.weightTotal,
+        t_pham_co_nvl_da:  row.weightTotal,
+        customer_name:     row.niniAdm           || null,
+      }
+    })
 
     const { data: inserted, error: insertErr } = await db
       .from('invoice_products')
