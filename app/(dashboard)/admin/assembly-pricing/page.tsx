@@ -297,8 +297,11 @@ export default function AssemblyPricingPage() {
       {/* Delete confirm */}
       {confirm && (
         <ConfirmDialog
+          open
+          title="Xóa rule"
           message={`Xóa rule Sub Class "${confirm.sub_class}"?`}
-          onConfirm={() => handleDelete(confirm)}
+          danger
+          onOk={() => handleDelete(confirm)}
           onCancel={() => setConfirm(null)}
         />
       )}
