@@ -3,7 +3,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { recalcItem, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
-import { extractVendorModel } from '@/lib/formulas/description-parse'
+import { extractVendorModel, extractKichThuoc } from '@/lib/formulas/description-parse'
+import { resolvePhiPhuKien } from '@/lib/formulas/assembly-pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 import type { ImportRow } from '@/types'
 
@@ -77,9 +78,7 @@ export async function POST(req: NextRequest) {
       if (!subClass?.trim() || !assemblyRules.length) return null
       const rule = assemblyRules.find(r => r.sub_class.toUpperCase() === subClass.trim().toUpperCase())
       if (!rule) return null
-      const v = loaiVang?.trim().toUpperCase() ?? ''
-      const phi = v.startsWith('PT') ? 50 : (v.includes('AG') || v.includes('SV') || v.includes('925')) ? 10 : (rule.phi_phu_kien ?? 30)
-      return { ...rule, phi_phu_kien: phi }
+      return { ...rule, phi_phu_kien: resolvePhiPhuKien(rule.phi_phu_kien, loaiVang, subClass) }
     }
 
     const itemsToInsert = rows.map((row, idx) => {
@@ -102,8 +101,9 @@ export async function POST(req: NextRequest) {
         qt_pcs:            row.qty,
         wt_gr:             row.weightTotal,
         t_pham_co_nvl_da:  row.weightTotal,
-        customer_name:     row.niniAdm           || null,
-        image_url:         row.imageUrl           || null,
+        customer_name:     row.niniAdm              || null,
+        image_url:         row.imageUrl             || null,
+        kich_thuoc:        extractKichThuoc(row.description) || null,
         gia_cong:          fees?.gia_cong     ?? 0,
         duc:               fees?.duc          ?? 0,
         thiet_ke:          fees?.thiet_ke     ?? 0,

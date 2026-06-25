@@ -2,14 +2,12 @@
  * Parse useful fields from a Vietnamese jewelry description string.
  *
  * Vendor Model extraction rule:
- *   The model code (mã mẫu) sits immediately adjacent to the weight token
- *   (e.g. "99.53GR" or "1.08GR").  It is the word directly BEFORE or
- *   directly AFTER that token, whichever looks like an alphanumeric code
- *   (contains both letters and digits).
+ *   Find the GR weight token, then check the adjacent token (before/after).
+ *   Priority: extract [A-Z]+\d{5} pattern (e.g. B12815, E11034).
+ *   Fallback: old alphanumeric token check for other code formats.
  *
- *   Examples:
- *     "15KY: DAY CHU CONG 99.53GR CY40CA1, SIZE: 17M6"  → "CY40CA1" (after)
- *     "18KY: LAC BI KHAC KIEU XOAY BBY8 20.58GR, SIZE:18.5" → "BBY8"  (before)
+ * Kích thước extraction:
+ *   Match "Size: <value>" pattern, e.g. "Size: 4.5VN", "Size: 8US", "Size: 17CM".
  */
 
 const EXCLUDED_TOKENS = new Set([
@@ -20,19 +18,24 @@ const EXCLUDED_TOKENS = new Set([
 
 function isModelCode(raw: string): boolean {
   if (!raw) return false
-  const t = raw.replace(/[,;:.]+$/, '').toUpperCase()  // strip trailing punctuation
+  const t = raw.replace(/[,;:.]+$/, '').toUpperCase()
   if (t.length < 2) return false
   if (EXCLUDED_TOKENS.has(t)) return false
-  if (/^\d+K[YWRG]$/.test(t)) return false            // karat patterns: 18KY, 14KW …
-  if (/^\d+\.?\d*$/.test(t)) return false              // pure number
-  return /[A-Z]/.test(t) && /\d/.test(t)               // must have both letter + digit
+  if (/^\d+K[YWRG]$/.test(t)) return false
+  if (/^\d+\.?\d*$/.test(t)) return false
+  return /[A-Z]/.test(t) && /\d/.test(t)
+}
+
+// Extract [A-Z]+\d{5} from a token (e.g. "B12815-6.7MM" → "B12815")
+function extractFiveDigitCode(token: string): string | null {
+  const m = token.match(/([A-Z]+\d{5})/)
+  return m ? m[1] : null
 }
 
 export function extractVendorModel(description: string | null | undefined): string | null {
   if (!description?.trim()) return null
   const upper = description.toUpperCase()
 
-  // Find weight token: digits + optional decimal + optional space + GR (word boundary)
   const weightMatch = upper.match(/(\d+\.?\d*)\s*GR\b/)
   if (!weightMatch || weightMatch.index == null) return null
 
@@ -40,15 +43,25 @@ export function extractVendorModel(description: string | null | undefined): stri
   const weightStart = weightMatch.index
 
   // ── Check token AFTER weight ──────────────────────────────────────────────
-  // Also split on ':' so "SIZE:16" → "SIZE" (excluded), not "SIZE:16" (falsely passes isModelCode)
   const afterRaw   = upper.slice(weightEnd).replace(/^[\s,;]+/, '')
   const afterToken = afterRaw.split(/[\s,;:]+/)[0] ?? ''
+  const afterCode  = extractFiveDigitCode(afterToken)
+  if (afterCode) return afterCode
   if (isModelCode(afterToken)) return afterToken.replace(/[,;:.]+$/, '')
 
   // ── Check token immediately BEFORE weight ────────────────────────────────
   const beforeTokens = upper.slice(0, weightStart).trimEnd().split(/\s+/)
   const lastBefore   = beforeTokens[beforeTokens.length - 1] ?? ''
+  const beforeCode   = extractFiveDigitCode(lastBefore)
+  if (beforeCode) return beforeCode
   if (isModelCode(lastBefore)) return lastBefore.replace(/[,;:.]+$/, '')
 
   return null
+}
+
+// Extract size from description, e.g. "Size: 4.5VN" → "4.5VN", "Size: 8US" → "8US"
+export function extractKichThuoc(description: string | null | undefined): string | null {
+  if (!description?.trim()) return null
+  const match = description.match(/size\s*[:\s]\s*(\d+(?:\.\d+)?\s*(?:VN|US|CM|IN|MM|M|in)?)/i)
+  return match ? match[1].trim() : null
 }

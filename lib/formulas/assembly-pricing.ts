@@ -7,7 +7,7 @@ export interface AssemblyPrices {
   duc:          number  // CA — Casting
   thiet_ke:     number  // 3D — Design
   resin:        number  // MO — Modeling/Resin
-  phi_phu_kien: number  // AC — Accessories
+  phi_phu_kien: number  // AC — Accessories (only ER/BL/NL)
 }
 
 export interface AssemblyPricingRule extends AssemblyPrices {
@@ -15,6 +15,9 @@ export interface AssemblyPricingRule extends AssemblyPrices {
   sub_class: string
   phi_phu_kien: number
 }
+
+// Only these sub_classes get phi_phu_kien > 0
+const PHI_PHU_KIEN_CLASSES = new Set(['ER', 'BL', 'NL'])
 
 // Hardcoded fallback (used when DB rules not yet loaded)
 const FALLBACK: Record<string, AssemblyPrices> = {
@@ -30,7 +33,7 @@ const FALLBACK: Record<string, AssemblyPrices> = {
 }
 
 // Lookup from DB rules array (preferred) with fallback to hardcoded.
-// Automatically resolves phi_phu_kien using loaiVang modifier when provided.
+// Automatically resolves phi_phu_kien using subClass + loaiVang.
 export function getAssemblyPrices(
   subClass:  string | null | undefined,
   dbRules?:  AssemblyPricingRule[],
@@ -46,15 +49,18 @@ export function getAssemblyPrices(
     base = FALLBACK[key] ?? null
   }
   if (!base) return null
-  return { ...base, phi_phu_kien: resolvePhiPhuKien(base.phi_phu_kien, loaiVang) }
+  return { ...base, phi_phu_kien: resolvePhiPhuKien(base.phi_phu_kien, loaiVang, key) }
 }
 
-// Resolve phi_phu_kien from BOTH sub_class base price and metal type.
-// PT → always $50, AG/SV/925 → always $10, others → use sub_class table value.
+// Resolve phi_phu_kien from sub_class + metal type.
+// Only applies to ER, BL, NL — all others return 0.
+// For eligible sub_classes: PT=$50, AG/SV/925=$10, others=table value.
 export function resolvePhiPhuKien(
   baseFromSubClass: number | null | undefined,
   loaiVang:         string | null | undefined,
+  subClass?:        string | null,
 ): number {
+  if (subClass && !PHI_PHU_KIEN_CLASSES.has(subClass.trim().toUpperCase())) return 0
   const v = loaiVang?.trim().toUpperCase() ?? ''
   if (v.startsWith('PT')) return 50
   if (v.includes('AG') || v.includes('SV') || v.includes('925')) return 10

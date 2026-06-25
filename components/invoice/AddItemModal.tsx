@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 import { ComboInput } from '@/components/ui/ComboInput'
-import { extractVendorModel } from '@/lib/formulas/description-parse'
+import { extractVendorModel, extractKichThuoc } from '@/lib/formulas/description-parse'
 import { getAssemblyPrices, resolvePhiPhuKien, type AssemblyPricingRule } from '@/lib/formulas/assembly-pricing'
 
 
@@ -129,6 +129,12 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
       if (!v.vendor_model.trim()) {
         const model = extractVendorModel(desc)
         if (model) next.vendor_model = model
+      }
+
+      // Auto-fill Kích thước only when currently empty
+      if (!v.kich_thuoc.trim()) {
+        const size = extractKichThuoc(desc)
+        if (size) next.kich_thuoc = size
       }
 
       return next

@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { recalcItem, recalcDiamond, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
+import { resolvePhiPhuKien } from '@/lib/formulas/assembly-pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 
 type Params = { params: { id: string; itemId: string } }
@@ -70,13 +71,11 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           const { data: existing } = await db.from('invoice_products').select('loai_vang').eq('id', params.itemId).single()
           loaiVang = existing?.loai_vang ?? null
         }
-        const v = loaiVang?.trim().toUpperCase() ?? ''
-        const phi = v.startsWith('PT') ? 50 : (v.includes('AG') || v.includes('SV') || v.includes('925')) ? 10 : (rule.phi_phu_kien ?? 30)
         updates.gia_cong     = rule.gia_cong
         updates.duc          = rule.duc
         updates.thiet_ke     = rule.thiet_ke
         updates.resin        = rule.resin
-        updates.phi_phu_kien = phi
+        updates.phi_phu_kien = resolvePhiPhuKien(rule.phi_phu_kien, loaiVang, String(updates.sub_class ?? ''))
       }
     }
 
@@ -88,8 +87,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       if (subClass) {
         const { data: asmRules } = await db.from('assembly_pricing_rules').select('sub_class, phi_phu_kien').eq('sub_class', subClass).single()
         const base = asmRules?.phi_phu_kien ?? existing?.phi_phu_kien ?? 30
-        const v = String(updates.loai_vang ?? '').trim().toUpperCase()
-        updates.phi_phu_kien = v.startsWith('PT') ? 50 : (v.includes('AG') || v.includes('SV') || v.includes('925')) ? 10 : base
+        updates.phi_phu_kien = resolvePhiPhuKien(base, String(updates.loai_vang ?? ''), subClass)
       }
     }
 
