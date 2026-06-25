@@ -36,6 +36,15 @@ function rowMatchesTemplate(tenKhach: string, template: string): boolean {
 // Read a trimmed string from a row's column index.
 const cell = (r: any, i: number) => String(r?.[i] ?? '').trim()
 
+// Read a cell's hyperlink URL (falls back to display value).
+// Google Sheets hyperlinks store the URL in cell.l.Target, not cell.v.
+function cellLink(sheet: XLSX.WorkSheet, row1: number, col0: number): string {
+  const addr = XLSX.utils.encode_cell({ r: row1 - 1, c: col0 })
+  const c = sheet[addr]
+  if (!c) return ''
+  return String((c.l as any)?.Target ?? (c.l as any)?.target ?? c.v ?? '').trim()
+}
+
 // Per-template parse rule — one or more sheet segments, each with its own row filter.
 // Col indices: A[0]=CH  Q[16]=SỐ PO  R[17]=V-INV  P[15]=TÊN KHÁCH  V[21]=NGUỒN NHẬP
 interface ImportSegment {
@@ -99,15 +108,16 @@ function parseSingleSheet(buf: ArrayBuffer, sheetName: string, rule: ImportRule)
       const vinv = cell(row, 17)
       if (!vinv || !seg.match(row)) return
 
-      const skuRaw = cell(row, 3)
-      const soRaw  = cell(row, 4)
-      const moRaw  = cell(row, 5)
-      const soMo   = soRaw && moRaw ? `SO${soRaw}-MO${moRaw}` : soRaw ? `SO${soRaw}` : ''
-      const qty    = parseInt(cell(row, 8)) || 1
-      const wt     = parseFloat(cell(row, 9)) || 0
+      const skuRaw  = cell(row, 3)
+      const soRaw   = cell(row, 4)
+      const moRaw   = cell(row, 5)
+      const soMo    = soRaw && moRaw ? `SO${soRaw}-MO${moRaw}` : soRaw ? `SO${soRaw}` : ''
+      const qty     = parseInt(cell(row, 8)) || 1
+      const wt      = parseFloat(cell(row, 9)) || 0
+      const sheetRow = seg.startRow + i  // 1-indexed sheet row number
 
       const importRow: ImportRow = {
-        rowNum:      seg.startRow + i,
+        rowNum:      sheetRow,
         store:       'HP',
         location:    'Safe 1',
         sku:         skuRaw ? String(Number(skuRaw) || skuRaw).toUpperCase() : `SKU-${++fallbackIdx}`,
@@ -119,7 +129,7 @@ function parseSingleSheet(buf: ArrayBuffer, sheetName: string, rule: ImportRule)
         class:       '',
         subClass:    '',
         niniAdm:     cell(row, 15),
-        imageUrl:    cell(row, 25),
+        imageUrl:    cellLink(sheet, sheetRow, 25),
       }
 
       if (!rowsByVinv[vinv]) rowsByVinv[vinv] = []
