@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
         store:             row.store             || null,
         location:          row.location          || null,
         so_mo:             isAG3 ? null : (row.soMo || null),
-        po_number:         isAG3 ? (row.soMo ? row.soMo.split('-MO')[0] : null) : null,
+        po_number:         isAG3 ? (row.soMo ? (row.soMo.match(/^SO(.*?)(?:-MO|$)/)?.[1] ?? row.soMo) : null) : null,
         description:       row.description       || null,
         vendor_model:      detectedModel         || null,
         class:             row.class             || detected?.class || null,
