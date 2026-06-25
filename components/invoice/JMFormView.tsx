@@ -1,10 +1,20 @@
 'use client'
 
-import { useState, Fragment } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { JMEditableCell } from './JMEditableCell'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { DriveImage } from './DriveImage'
 import { apiCall } from '@/lib/api'
+
+interface ClassRule { description_prefix: string; class: string; sub_class: string }
+
+function detectClassSubClass(description: string, rules: ClassRule[]): { class: string; sub_class: string } | null {
+  if (!description.trim() || rules.length === 0) return null
+  const upper = description.trim().toUpperCase()
+  const sorted = [...rules].sort((a, b) => b.description_prefix.length - a.description_prefix.length)
+  const match = sorted.find(r => upper.startsWith(r.description_prefix))
+  return match ? { class: match.class, sub_class: match.sub_class } : null
+}
 
 
 interface Col {
@@ -121,6 +131,14 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
   const [savingCell,   setSavingCell]   = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<any | null>(null)
   const [deleting,     setDeleting]     = useState(false)
+  const [classRules,   setClassRules]   = useState<ClassRule[]>([])
+
+  useEffect(() => {
+    fetch('/api/class-subclass')
+      .then(r => r.json())
+      .then(j => { if (j.success) setClassRules(j.data) })
+      .catch(() => {})
+  }, [])
 
   const isAG3    = template === 'CH1_AG3' || template === 'VNSI_AG3'
   const isAdm    = template === 'ADM'
@@ -147,7 +165,17 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
     const key = `${editCell.itemId}:${editCell.field}`
     setSavingCell(key)
     setEditCell(null)
-    const payload = { [editCell.field]: parseFieldValue(editCell.field, editCell.value) }
+    const payload: Record<string, unknown> = { [editCell.field]: parseFieldValue(editCell.field, editCell.value) }
+
+    // Auto-detect class/sub_class when description is edited
+    if (editCell.field === 'description') {
+      const detected = detectClassSubClass(editCell.value, classRules)
+      if (detected) {
+        payload.class     = detected.class
+        payload.sub_class = detected.sub_class
+      }
+    }
+
     const data = await apiCall<any>(
       () => fetch(`/api/invoices/${invoiceId}/items/${editCell.itemId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
