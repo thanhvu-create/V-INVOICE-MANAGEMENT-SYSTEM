@@ -50,9 +50,10 @@ export async function POST(req: NextRequest) {
     const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
 
     // Load class/sub_class rules for auto-detection from description prefix
-    const { data: classRules = [] } = await db
+    const { data: classRulesData } = await db
       .from('class_subclass_rules')
       .select('description_prefix, class, sub_class')
+    const classRules = classRulesData ?? []
 
     const detectClass = (description: string | null | undefined) => {
       if (!description?.trim() || !classRules.length) return null
