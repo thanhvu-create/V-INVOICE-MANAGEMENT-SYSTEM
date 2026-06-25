@@ -63,10 +63,10 @@ const JM_COLS: Col[] = [
   // CH1-only: ERP BOM reference + variance (Excel col N, O — between CIF and Tag)
   { key: 'erp_bom_cost',     label: 'ERP BOM ($)',       mono: true, price: true, ch1only: true, width: 105 },
   { key: 'chenh_lech',       label: 'Chênh lệch',        mono: true, computed: true, ch1only: true, width: 100 },
-  { key: 'tag_price',        label: 'HP Tag',            mono: true, price: true, width: 100 },
-  { key: 'fb_price',         label: 'HP FB',             mono: true, price: true, width: 100 },
+  { key: 'tag_price',        label: 'HP Tag',            mono: true, price: true, noAg3: true, width: 100 },
+  { key: 'fb_price',         label: 'HP FB',             mono: true, price: true, noAg3: true, width: 100 },
   // AG3-only: per-piece pricing display
-  { key: '_pu_wt',           label: 'Wt./1sp (gr)',      mono: true, computed: true, ag3only: true, width: 100 },
+  { key: '_pu_wt',           label: 'Wt./1sp (gr)',      mono: true, computed: true, price: true, ag3only: true, width: 100 },
   { key: '_purchase_unit',   label: 'Purchase/1sp',      mono: true, computed: true, price: true, ag3only: true, width: 110 },
   { key: '_tag_unit',        label: 'Tag/1sp',           mono: true, computed: true, price: true, ag3only: true, width: 100 },
   // Notes — CH1/CH2 only (Ghi chú column in JM Form tab)
@@ -262,7 +262,7 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                   position: (i === 0 || c.image || c.sku) ? 'sticky' : 'sticky',
                   left:     i === 0 ? 0 : c.image ? 44 : c.sku ? 102 : undefined,
                   zIndex:   i === 0 || c.image || c.sku ? 20 : 10,
-                  background: c.sku ? 'var(--sku-highlight-bg)' : c.price ? PRICE_HEAD : 'var(--bg-base)',
+                  background: c.sku ? 'var(--sku-highlight-bg)' : (c.price || c.autofill) ? PRICE_HEAD : 'var(--bg-base)',
                 }}>
                   {c.label}
                   {(c.computed || c.autofill) && <span style={{ display: 'block', fontSize: 9, fontWeight: 400, letterSpacing: 0, color: (c.price || c.autofill) ? '#1E40AF' : 'var(--color-info)', textTransform: 'none' }}>auto</span>}
@@ -334,7 +334,7 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                             editValue={isEditing ? editCell!.value : ''}
                             isComputed={false} isSaving={isSavingThis}
                             isLocked={isLocked} canEdit={canEdit}
-                            tdStyle={{ ...td, color: isThisBaSao ? '#DC2626' : 'var(--text-secondary)', fontWeight: isThisBaSao ? 700 : 400, cursor: canEdit && !isLocked ? 'text' : 'default' }}
+                            tdStyle={{ ...td, color: isThisBaSao ? '#DC2626' : col.autofill ? '#1E40AF' : 'var(--text-secondary)', fontWeight: isThisBaSao ? 700 : 400, background: col.autofill ? PRICE_BG : undefined, cursor: canEdit && !isLocked ? 'text' : 'default' }}
                             onStartEdit={() => startEdit(item.id, col.key, cellVal)}
                             onChange={v => setEditCell(prev => prev ? { ...prev, value: v } : null)}
                             onCommit={commitEdit} onCancel={cancelEdit}
