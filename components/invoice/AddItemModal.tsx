@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 import { ComboInput } from '@/components/ui/ComboInput'
+import { extractVendorModel } from '@/lib/formulas/description-parse'
 
 
 interface Form {
@@ -94,13 +95,24 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
   function handleDescriptionChange(e: React.ChangeEvent<HTMLInputElement>) {
     const desc = e.target.value
     setForm(v => {
+      const next: Form = { ...v, description: desc }
+
       const detected = detectClassSubClass(desc, classRules)
       if (detected) {
         setAutoFilled(true)
-        return { ...v, description: desc, class: detected.class, sub_class: detected.sub_class }
+        next.class     = detected.class
+        next.sub_class = detected.sub_class
+      } else {
+        setAutoFilled(false)
       }
-      setAutoFilled(false)
-      return { ...v, description: desc }
+
+      // Auto-fill Vendor Model# only when currently empty
+      if (!v.vendor_model.trim()) {
+        const model = extractVendorModel(desc)
+        if (model) next.vendor_model = model
+      }
+
+      return next
     })
   }
 

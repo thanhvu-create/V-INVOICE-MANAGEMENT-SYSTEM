@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { recalcItem, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
+import { extractVendorModel } from '@/lib/formulas/description-parse'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 import type { ImportRow } from '@/types'
 
@@ -61,7 +62,8 @@ export async function POST(req: NextRequest) {
     }
 
     const itemsToInsert = rows.map((row, idx) => {
-      const detected = (!row.class && !row.subClass) ? detectClass(row.description) : null
+      const detected      = (!row.class && !row.subClass) ? detectClass(row.description) : null
+      const detectedModel = extractVendorModel(row.description)
       return {
         invoice_id:        invoiceId,
         seq:               startSeq + idx,
@@ -70,6 +72,7 @@ export async function POST(req: NextRequest) {
         location:          row.location          || null,
         so_mo:             row.soMo              || null,
         description:       row.description       || null,
+        vendor_model:      detectedModel         || null,
         class:             row.class             || detected?.class     || null,
         sub_class:         row.subClass          || detected?.sub_class || null,
         loai_vang:         row.loaiVang          || null,

@@ -5,6 +5,7 @@ import { JMEditableCell } from './JMEditableCell'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { DriveImage } from './DriveImage'
 import { apiCall } from '@/lib/api'
+import { extractVendorModel } from '@/lib/formulas/description-parse'
 
 interface ClassRule { description_prefix: string; class: string; sub_class: string }
 
@@ -167,12 +168,18 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
     setEditCell(null)
     const payload: Record<string, unknown> = { [editCell.field]: parseFieldValue(editCell.field, editCell.value) }
 
-    // Auto-detect class/sub_class when description is edited
+    // Auto-detect class/sub_class + vendor_model when description is edited
     if (editCell.field === 'description') {
       const detected = detectClassSubClass(editCell.value, classRules)
       if (detected) {
         payload.class     = detected.class
         payload.sub_class = detected.sub_class
+      }
+      // Fill vendor_model only if the current item has none
+      const currentItem = items.find(i => i.id === editCell.itemId)
+      if (!currentItem?.vendor_model) {
+        const model = extractVendorModel(editCell.value)
+        if (model) payload.vendor_model = model
       }
     }
 
