@@ -5,7 +5,7 @@ import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 import { ComboInput } from '@/components/ui/ComboInput'
 import { extractVendorModel } from '@/lib/formulas/description-parse'
-import { getAssemblyPrices, getPhiPhuKien, type AssemblyPricingRule } from '@/lib/formulas/assembly-pricing'
+import { getAssemblyPrices, type AssemblyPricingRule } from '@/lib/formulas/assembly-pricing'
 
 
 interface Form {
@@ -113,12 +113,12 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
         if (hasFees) {
           const prices = getAssemblyPrices(detected.sub_class, assemblyRules)
           if (prices) {
-            if (!parseFloat(v.gia_cong)) next.gia_cong = String(prices.gia_cong)
-            if (!parseFloat(v.duc))      next.duc      = String(prices.duc)
-            if (!parseFloat(v.thiet_ke)) next.thiet_ke = String(prices.thiet_ke)
-            if (!parseFloat(v.resin))    next.resin    = String(prices.resin)
+            if (!parseFloat(v.gia_cong))     next.gia_cong     = String(prices.gia_cong)
+            if (!parseFloat(v.duc))          next.duc          = String(prices.duc)
+            if (!parseFloat(v.thiet_ke))     next.thiet_ke     = String(prices.thiet_ke)
+            if (!parseFloat(v.resin))        next.resin        = String(prices.resin)
+            if (!parseFloat(v.phi_phu_kien)) next.phi_phu_kien = String(prices.phi_phu_kien)
           }
-          if (!parseFloat(v.phi_phu_kien)) next.phi_phu_kien = String(getPhiPhuKien(v.loai_vang))
           setAutoFees(true)
         }
       } else {
@@ -143,10 +143,11 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
       if (hasFees) {
         const prices = getAssemblyPrices(newSub, assemblyRules)
         if (prices) {
-          if (!parseFloat(v.gia_cong)) next.gia_cong = String(prices.gia_cong)
-          if (!parseFloat(v.duc))      next.duc      = String(prices.duc)
-          if (!parseFloat(v.thiet_ke)) next.thiet_ke = String(prices.thiet_ke)
-          if (!parseFloat(v.resin))    next.resin    = String(prices.resin)
+          if (!parseFloat(v.gia_cong))     next.gia_cong     = String(prices.gia_cong)
+          if (!parseFloat(v.duc))          next.duc          = String(prices.duc)
+          if (!parseFloat(v.thiet_ke))     next.thiet_ke     = String(prices.thiet_ke)
+          if (!parseFloat(v.resin))        next.resin        = String(prices.resin)
+          if (!parseFloat(v.phi_phu_kien)) next.phi_phu_kien = String(prices.phi_phu_kien)
           setAutoFees(true)
         }
       }
@@ -155,14 +156,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
   }
 
   function handleLoaiVangChange(v: string) {
-    setForm(prev => {
-      const next = { ...prev, loai_vang: v }
-      if (hasFees && !parseFloat(prev.phi_phu_kien)) {
-        next.phi_phu_kien = String(getPhiPhuKien(v))
-        setAutoFees(true)
-      }
-      return next
-    })
+    setForm(prev => ({ ...prev, loai_vang: v }))
   }
 
   useEffect(() => {

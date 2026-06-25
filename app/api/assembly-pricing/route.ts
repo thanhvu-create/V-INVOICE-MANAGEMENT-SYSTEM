@@ -9,7 +9,7 @@ export async function GET() {
     const db = createServiceClient()
     const { data, error } = await db
       .from('assembly_pricing_rules')
-      .select('sub_class, gia_cong, duc, thiet_ke, resin')
+      .select('sub_class, gia_cong, duc, thiet_ke, resin, phi_phu_kien')
       .order('sub_class')
     if (error) throw error
     return NextResponse.json({ success: true, data })

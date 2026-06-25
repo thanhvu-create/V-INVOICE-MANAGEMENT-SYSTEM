@@ -5,21 +5,23 @@ import { useUser } from '@/contexts/UserContext'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
 interface Rule {
-  id:        string
-  sub_class: string
-  gia_cong:  number
-  duc:       number
-  thiet_ke:  number
-  resin:     number
+  id:           string
+  sub_class:    string
+  gia_cong:     number
+  duc:          number
+  thiet_ke:     number
+  resin:        number
+  phi_phu_kien: number
 }
 
-const EMPTY_FORM = { sub_class: '', gia_cong: '', duc: '', thiet_ke: '', resin: '' }
+const EMPTY_FORM = { sub_class: '', gia_cong: '', duc: '', thiet_ke: '', resin: '', phi_phu_kien: '' }
 
 const FEE_COLS: { key: keyof Rule; label: string }[] = [
-  { key: 'gia_cong',  label: 'Gia công' },
-  { key: 'duc',       label: 'Đúc' },
-  { key: 'thiet_ke',  label: 'Thiết kế' },
-  { key: 'resin',     label: 'Resin' },
+  { key: 'gia_cong',     label: 'Gia công' },
+  { key: 'duc',          label: 'Đúc' },
+  { key: 'thiet_ke',     label: 'Thiết kế' },
+  { key: 'resin',        label: 'Resin' },
+  { key: 'phi_phu_kien', label: 'Phụ kiện' },
 ]
 
 export default function AssemblyPricingPage() {
@@ -52,11 +54,12 @@ export default function AssemblyPricingPage() {
 
   function openEdit(rule: Rule) {
     setForm({
-      sub_class: rule.sub_class,
-      gia_cong:  String(rule.gia_cong),
-      duc:       String(rule.duc),
-      thiet_ke:  String(rule.thiet_ke),
-      resin:     String(rule.resin),
+      sub_class:    rule.sub_class,
+      gia_cong:     String(rule.gia_cong),
+      duc:          String(rule.duc),
+      thiet_ke:     String(rule.thiet_ke),
+      resin:        String(rule.resin),
+      phi_phu_kien: String(rule.phi_phu_kien ?? 0),
     })
     setError('')
     setModal({ mode: 'edit', rule })
@@ -67,12 +70,13 @@ export default function AssemblyPricingPage() {
     setSaving(true)
     setError('')
     const body = {
-      id:        modal?.rule?.id,
-      sub_class: form.sub_class.trim().toUpperCase(),
-      gia_cong:  parseFloat(form.gia_cong)  || 0,
-      duc:       parseFloat(form.duc)        || 0,
-      thiet_ke:  parseFloat(form.thiet_ke)   || 0,
-      resin:     parseFloat(form.resin)      || 0,
+      id:           modal?.rule?.id,
+      sub_class:    form.sub_class.trim().toUpperCase(),
+      gia_cong:     parseFloat(form.gia_cong)     || 0,
+      duc:          parseFloat(form.duc)           || 0,
+      thiet_ke:     parseFloat(form.thiet_ke)      || 0,
+      resin:        parseFloat(form.resin)         || 0,
+      phi_phu_kien: parseFloat(form.phi_phu_kien)  || 0,
     }
     const res = await fetch('/api/admin/assembly-pricing', {
       method:  modal?.mode === 'add' ? 'POST' : 'PATCH',
@@ -155,13 +159,14 @@ export default function AssemblyPricingPage() {
                 <th style={{ ...th, textAlign: 'right' }}>Đúc</th>
                 <th style={{ ...th, textAlign: 'right' }}>Thiết kế</th>
                 <th style={{ ...th, textAlign: 'right' }}>Resin</th>
+                <th style={{ ...th, textAlign: 'right' }}>Phụ kiện</th>
                 <th style={{ ...th, textAlign: 'right' }}>Tổng</th>
                 {canEdit && <th style={{ ...th, width: 80 }} />}
               </tr>
             </thead>
             <tbody>
               {rules.map(rule => {
-                const total = rule.gia_cong + rule.duc + rule.thiet_ke + rule.resin
+                const total = rule.gia_cong + rule.duc + rule.thiet_ke + rule.resin + (rule.phi_phu_kien ?? 0)
                 return (
                   <tr
                     key={rule.id}
@@ -181,6 +186,7 @@ export default function AssemblyPricingPage() {
                     <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>${rule.duc}</td>
                     <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>${rule.thiet_ke}</td>
                     <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>${rule.resin}</td>
+                    <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--font-mono)' }}>${rule.phi_phu_kien ?? 0}</td>
                     <td style={{ ...td, textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--color-info)' }}>
                       ${total}
                     </td>
@@ -207,7 +213,7 @@ export default function AssemblyPricingPage() {
               })}
               {rules.length === 0 && (
                 <tr>
-                  <td colSpan={canEdit ? 7 : 6} style={{ ...td, textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
+                  <td colSpan={canEdit ? 8 : 7} style={{ ...td, textAlign: 'center', color: 'var(--text-muted)', padding: '2rem' }}>
                     Chưa có rule nào.
                   </td>
                 </tr>
@@ -219,8 +225,7 @@ export default function AssemblyPricingPage() {
 
       {/* Note */}
       <div style={{ marginTop: '1rem', padding: '0.75rem 1rem', background: 'var(--bg-base)', border: '1px solid var(--border-light)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
-        <strong>Phụ kiện (phi_phu_kien)</strong> tính theo loại vàng — không theo sub class:
-        {' '}14K/18K = $30 · PT = $50 · AG/Silver = $10
+        Tổng = Gia công + Đúc + Thiết kế + Resin + Phụ kiện. Khi chọn Sub Class trong AddItemModal, tất cả 5 giá trị tự điền theo rule này.
       </div>
 
       {/* Add/Edit Modal */}
@@ -271,10 +276,10 @@ export default function AssemblyPricingPage() {
               </div>
 
               {/* Total preview */}
-              {['gia_cong', 'duc', 'thiet_ke', 'resin'].some(k => parseFloat((form as any)[k]) > 0) && (
+              {(['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien'] as const).some(k => parseFloat(form[k]) > 0) && (
                 <div style={{ padding: '0.5rem 0.75rem', background: 'var(--bg-base)', borderLeft: '3px solid var(--color-info)', fontSize: 'var(--text-sm)' }}>
                   Tổng: <strong style={{ fontFamily: 'var(--font-mono)' }}>
-                    ${(['gia_cong', 'duc', 'thiet_ke', 'resin'] as const).reduce((s, k) => s + (parseFloat((form as any)[k]) || 0), 0)}
+                    ${(['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien'] as const).reduce((s, k) => s + (parseFloat(form[k]) || 0), 0)}
                   </strong>
                 </div>
               )}

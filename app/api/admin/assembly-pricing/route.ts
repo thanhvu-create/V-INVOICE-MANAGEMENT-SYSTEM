@@ -24,18 +24,19 @@ export async function POST(req: NextRequest) {
   try {
     await requireRole('manager')
     const body = await req.json()
-    const { sub_class, gia_cong, duc, thiet_ke, resin } = body
+    const { sub_class, gia_cong, duc, thiet_ke, resin, phi_phu_kien } = body
     if (!sub_class?.trim()) return NextResponse.json({ success: false, message: 'sub_class is required' }, { status: 400 })
     const db = createServiceClient()
     const { data, error } = await db
       .from('assembly_pricing_rules')
       .insert({
-        sub_class:  sub_class.trim().toUpperCase(),
-        gia_cong:   Number(gia_cong)  || 0,
-        duc:        Number(duc)        || 0,
-        thiet_ke:   Number(thiet_ke)   || 0,
-        resin:      Number(resin)      || 0,
-        updated_at: new Date().toISOString(),
+        sub_class:    sub_class.trim().toUpperCase(),
+        gia_cong:     Number(gia_cong)     || 0,
+        duc:          Number(duc)          || 0,
+        thiet_ke:     Number(thiet_ke)     || 0,
+        resin:        Number(resin)        || 0,
+        phi_phu_kien: Number(phi_phu_kien) || 0,
+        updated_at:   new Date().toISOString(),
       })
       .select()
       .single()
@@ -53,18 +54,19 @@ export async function PATCH(req: NextRequest) {
   try {
     await requireRole('manager')
     const body = await req.json()
-    const { id, sub_class, gia_cong, duc, thiet_ke, resin } = body
+    const { id, sub_class, gia_cong, duc, thiet_ke, resin, phi_phu_kien } = body
     if (!id) return NextResponse.json({ success: false, message: 'id is required' }, { status: 400 })
     const db = createServiceClient()
     const { data, error } = await db
       .from('assembly_pricing_rules')
       .update({
-        sub_class:  sub_class?.trim().toUpperCase(),
-        gia_cong:   Number(gia_cong)  || 0,
-        duc:        Number(duc)        || 0,
-        thiet_ke:   Number(thiet_ke)   || 0,
-        resin:      Number(resin)      || 0,
-        updated_at: new Date().toISOString(),
+        sub_class:    sub_class?.trim().toUpperCase(),
+        gia_cong:     Number(gia_cong)     || 0,
+        duc:          Number(duc)          || 0,
+        thiet_ke:     Number(thiet_ke)     || 0,
+        resin:        Number(resin)        || 0,
+        phi_phu_kien: Number(phi_phu_kien) || 0,
+        updated_at:   new Date().toISOString(),
       })
       .eq('id', id)
       .select()
