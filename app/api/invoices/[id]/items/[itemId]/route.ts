@@ -50,6 +50,27 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       updates.t_pham_co_nvl_da = updates.wt_gr
     }
 
+    // When sub_class changes and fee fields are not explicitly provided,
+    // auto-fill assembly fees from DB rules (CH1/CH2 only)
+    const hasFees = ['CH1', 'CH2'].includes((invoice as any).template_type ?? 'CH1')
+    const feeKeys = ['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien'] as const
+    const userSetFees = feeKeys.some(k => k in body)
+    if ('sub_class' in updates && hasFees && !userSetFees) {
+      const { data: asmRules } = await db
+        .from('assembly_pricing_rules')
+        .select('sub_class, gia_cong, duc, thiet_ke, resin, phi_phu_kien')
+      const rule = (asmRules ?? []).find(
+        r => r.sub_class.toUpperCase() === String(updates.sub_class ?? '').toUpperCase()
+      )
+      if (rule) {
+        updates.gia_cong     = rule.gia_cong
+        updates.duc          = rule.duc
+        updates.thiet_ke     = rule.thiet_ke
+        updates.resin        = rule.resin
+        updates.phi_phu_kien = rule.phi_phu_kien ?? 0
+      }
+    }
+
     const { data: item, error } = await db
       .from('invoice_products')
       .update(updates)
