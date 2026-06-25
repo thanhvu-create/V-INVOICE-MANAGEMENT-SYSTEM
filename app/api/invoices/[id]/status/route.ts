@@ -60,7 +60,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     return NextResponse.json({ success: true })
   } catch (err: any) {
-    if (err?.status) return NextResponse.json({ success: false, message: err.message }, { status: err.status })
-    return NextResponse.json({ success: false, message: String(err) }, { status: 500 })
+    const msg = err?.message || String(err)
+    const status = err?.status || 500
+    return NextResponse.json({ success: false, message: msg }, { status })
   }
 }
