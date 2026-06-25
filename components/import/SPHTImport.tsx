@@ -14,7 +14,7 @@ const SPHT_URL_KEY = 'spht_sheet_url'
 
 // Column indices (0-based)
 // A[0]=CH  D[3]=SKU  E[4]=SO  F[5]=MO  G[6]=CHI TIẾT SP  H[7]=LOẠI VÀNG
-// I[8]=SỐ LƯỢNG  J[9]=TỔNG TL(gr)  P[15]=TÊN KHÁCH  Q[16]=SỐ PO  R[17]=V-INV
+// I[8]=SỐ LƯỢNG  J[9]=TỔNG TL(gr)  P[15]=TÊN KHÁCH  Q[16]=SỐ PO  R[17]=V-INV  Z[25]=HÌNH ẢNH
 
 export const TEMPLATE_CHANNELS: Record<string, string[]> = {
   CH1:      ['CH1-Khách', 'CH1-SR'],
@@ -119,6 +119,7 @@ function parseSingleSheet(buf: ArrayBuffer, sheetName: string, rule: ImportRule)
         class:       '',
         subClass:    '',
         niniAdm:     cell(row, 15),
+        imageUrl:    cell(row, 25),
       }
 
       if (!rowsByVinv[vinv]) rowsByVinv[vinv] = []

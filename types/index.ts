@@ -159,6 +159,7 @@ export interface ImportRow {
   class:       string
   subClass:    string
   niniAdm:     string
+  imageUrl:    string
 }
 
 export interface ValidationError {

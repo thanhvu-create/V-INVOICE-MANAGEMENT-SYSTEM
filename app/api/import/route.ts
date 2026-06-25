@@ -80,6 +80,7 @@ export async function POST(req: NextRequest) {
         wt_gr:             row.weightTotal,
         t_pham_co_nvl_da:  row.weightTotal,
         customer_name:     row.niniAdm           || null,
+        image_url:         row.imageUrl           || null,
       }
     })
 
