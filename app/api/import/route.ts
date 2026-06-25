@@ -55,6 +55,17 @@ export async function POST(req: NextRequest) {
       .select('description_prefix, class, sub_class')
     const classRules = classRulesData ?? []
 
+    // Load assembly pricing rules (for CH1/CH2 fee auto-fill)
+    const hasFees = template === 'CH1' || template === 'CH2'
+    type AssemblyRule = { sub_class: string; gia_cong: number; duc: number; thiet_ke: number; resin: number; phi_phu_kien: number }
+    let assemblyRules: AssemblyRule[] = []
+    if (hasFees) {
+      const { data: asmData } = await db
+        .from('assembly_pricing_rules')
+        .select('sub_class, gia_cong, duc, thiet_ke, resin, phi_phu_kien')
+      assemblyRules = asmData ?? []
+    }
+
     const detectClass = (description: string | null | undefined) => {
       if (!description?.trim() || !classRules.length) return null
       const upper = description.trim().toUpperCase()
@@ -62,9 +73,16 @@ export async function POST(req: NextRequest) {
       return sorted.find(r => upper.startsWith(r.description_prefix)) ?? null
     }
 
+    const getAssemblyFees = (subClass: string | null | undefined) => {
+      if (!subClass?.trim() || !assemblyRules.length) return null
+      return assemblyRules.find(r => r.sub_class.toUpperCase() === subClass.trim().toUpperCase()) ?? null
+    }
+
     const itemsToInsert = rows.map((row, idx) => {
       const detected      = (!row.class && !row.subClass) ? detectClass(row.description) : null
       const detectedModel = extractVendorModel(row.description)
+      const subClass      = row.subClass || detected?.sub_class || null
+      const fees          = hasFees ? getAssemblyFees(subClass) : null
       return {
         invoice_id:        invoiceId,
         seq:               startSeq + idx,
@@ -74,14 +92,19 @@ export async function POST(req: NextRequest) {
         so_mo:             row.soMo              || null,
         description:       row.description       || null,
         vendor_model:      detectedModel         || null,
-        class:             row.class             || detected?.class     || null,
-        sub_class:         row.subClass          || detected?.sub_class || null,
+        class:             row.class             || detected?.class || null,
+        sub_class:         subClass,
         loai_vang:         row.loaiVang          || null,
         qt_pcs:            row.qty,
         wt_gr:             row.weightTotal,
         t_pham_co_nvl_da:  row.weightTotal,
         customer_name:     row.niniAdm           || null,
         image_url:         row.imageUrl           || null,
+        gia_cong:          fees?.gia_cong     ?? 0,
+        duc:               fees?.duc          ?? 0,
+        thiet_ke:          fees?.thiet_ke     ?? 0,
+        resin:             fees?.resin        ?? 0,
+        phi_phu_kien:      fees?.phi_phu_kien ?? 0,
       }
     })
 
