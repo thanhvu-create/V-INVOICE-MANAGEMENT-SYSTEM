@@ -147,6 +147,8 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
 
   const visibleCols = JM_COLS.filter(c => {
     if (c.key === 'cif_price' && template === 'CH2') return false
+    // AG3: hide HP Tag and HP FB (replaced by Tag/1sp and Purchase/1sp per-unit columns)
+    if ((c.key === 'tag_price' || c.key === 'fb_price') && isAG3) return false
     if (!canSeePrice && c.price) return false
     if (c.ag3only    && !isAG3)               return false
     if (c.ch1ag3only && template !== 'CH1_AG3') return false
