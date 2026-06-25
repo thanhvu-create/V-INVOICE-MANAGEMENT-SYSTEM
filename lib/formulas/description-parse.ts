@@ -40,8 +40,9 @@ export function extractVendorModel(description: string | null | undefined): stri
   const weightStart = weightMatch.index
 
   // ── Check token AFTER weight ──────────────────────────────────────────────
+  // Also split on ':' so "SIZE:16" → "SIZE" (excluded), not "SIZE:16" (falsely passes isModelCode)
   const afterRaw   = upper.slice(weightEnd).replace(/^[\s,;]+/, '')
-  const afterToken = afterRaw.split(/[\s,;]+/)[0] ?? ''
+  const afterToken = afterRaw.split(/[\s,;:]+/)[0] ?? ''
   if (isModelCode(afterToken)) return afterToken.replace(/[,;:.]+$/, '')
 
   // ── Check token immediately BEFORE weight ────────────────────────────────
