@@ -207,11 +207,11 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               ...(!isAG3 && !isAdm && item.tracking_no ? [['Tracking#', item.tracking_no]]       : []),
               ...(!isAG3 && !isAdm && item.hoa_don     ? [['V-INV', item.hoa_don]]               : []),
               ...(!isAG3 && !isAdm && item.nini_adm    ? [['Notes', item.nini_adm]]               : []),
-              ...(isAG3 && item.chi_tiet_tap           ? [['Chi tiết/Tập', item.chi_tiet_tap]]    : []),
+              ...(isAG3 && item.chi_tiet_tap           ? [['Chi tiết/Cặp', item.chi_tiet_tap]]    : []),
             ].map(([label, val]) => (
               <div key={String(label)}>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
-                <div style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', color: isBaSao && (String(label) === 'Notes' || String(label) === 'Chi tiết/Tập') ? '#DC2626' : 'inherit', fontWeight: isBaSao && (String(label) === 'Notes' || String(label) === 'Chi tiết/Tập') ? 700 : 400 }}>{val ?? '—'}</div>
+                <div style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', color: isBaSao && (String(label) === 'Notes' || String(label) === 'Chi tiết/Cặp') ? '#DC2626' : 'inherit', fontWeight: isBaSao && (String(label) === 'Notes' || String(label) === 'Chi tiết/Cặp') ? 700 : 400 }}>{val ?? '—'}</div>
               </div>
             ))}
           </div>

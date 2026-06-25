@@ -66,3 +66,17 @@ export function extractKichThuoc(description: string | null | undefined): string
   const match = description.match(/size\s*[:\s]\s*(\d+(?:\.\d+)?(?:-\d+(?:\.\d+)?)?\s*(?:VN|US|CM|IN|MM|M|in)?)/i)
   return match ? match[1].trim() : null
 }
+
+// Build Chi tiết/Cặp for AG3 templates:
+// Take the description and replace the weight token (e.g. "39.25GR") with the per-unit weight.
+export function buildChiTietCap(
+  description: string | null | undefined,
+  wtPerUnit: number | null | undefined,
+): string | null {
+  if (!description?.trim()) return null
+  if (wtPerUnit == null || wtPerUnit <= 0) return description.trim()
+  const rounded = parseFloat(wtPerUnit.toFixed(2))
+  // Replace first occurrence of \d+.?\d*\s*GR (case-insensitive)
+  const replaced = description.replace(/\d+\.?\d*\s*GR\b/i, `${rounded}GR`)
+  return replaced.trim()
+}

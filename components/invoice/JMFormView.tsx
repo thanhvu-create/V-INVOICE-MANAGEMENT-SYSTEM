@@ -33,6 +33,7 @@ interface Col {
   ch1only?:     boolean  // show only for CH1
   noAg3?:       boolean  // hide for CH1_AG3 / VNSI_AG3
   noAdm?:       boolean  // hide for ADM
+  autofill?:    boolean  // shows blue header + "auto" badge but cell is still editable
 }
 
 // JM Form sheet columns only — identity fields + output prices
@@ -70,8 +71,8 @@ const JM_COLS: Col[] = [
   { key: '_tag_unit',        label: 'Tag/1sp',           mono: true, computed: true, price: true, ag3only: true, width: 100 },
   // Notes — CH1/CH2 only (Ghi chú column in JM Form tab)
   { key: 'nini_adm',         label: 'Ghi chú',           notes: true, noAg3: true, noAdm: true, width: 140 },
-  // Chi tiết/Tập — AG3 only (col U21 in JM Form AG3 tab)
-  { key: 'chi_tiet_tap',     label: 'Chi tiết/Tập',      notes: true, ag3only: true,            width: 140 },
+  // Chi tiết/Cặp — AG3 only (col U21 in JM Form AG3 tab)
+  { key: 'chi_tiet_tap',     label: 'Chi tiết/Cặp',      notes: true, autofill: true, ag3only: true, width: 160 },
 ]
 
 const EDITABLE_FIELDS = new Set([
@@ -256,7 +257,7 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                 <th key={c.key} style={{
                   ...th,
                   width: c.width, minWidth: c.width,
-                  color: c.price ? '#1E40AF' : c.computed ? 'var(--color-info)' : 'var(--text-secondary)',
+                  color: (c.price || c.autofill) ? '#1E40AF' : c.computed ? 'var(--color-info)' : 'var(--text-secondary)',
                   textAlign: c.price || c.mono ? 'right' : 'left',
                   position: (i === 0 || c.image || c.sku) ? 'sticky' : 'sticky',
                   left:     i === 0 ? 0 : c.image ? 44 : c.sku ? 102 : undefined,
@@ -264,7 +265,7 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                   background: c.sku ? 'var(--sku-highlight-bg)' : c.price ? PRICE_HEAD : 'var(--bg-base)',
                 }}>
                   {c.label}
-                  {c.computed && <span style={{ display: 'block', fontSize: 9, fontWeight: 400, letterSpacing: 0, color: c.price ? '#1E40AF' : 'var(--color-info)', textTransform: 'none' }}>auto</span>}
+                  {(c.computed || c.autofill) && <span style={{ display: 'block', fontSize: 9, fontWeight: 400, letterSpacing: 0, color: (c.price || c.autofill) ? '#1E40AF' : 'var(--color-info)', textTransform: 'none' }}>auto</span>}
                 </th>
               ))}
               {canEdit && !isLocked && <th style={{ ...th, width: 40, zIndex: 10 }} />}

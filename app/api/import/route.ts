@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { recalcItem, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
-import { extractVendorModel, extractKichThuoc } from '@/lib/formulas/description-parse'
+import { extractVendorModel, extractKichThuoc, buildChiTietCap } from '@/lib/formulas/description-parse'
 import { resolvePhiPhuKien } from '@/lib/formulas/assembly-pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 import type { ImportRow } from '@/types'
@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
 
     const nvl      = nvlFromInvoice(invoice)
     const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
+    const isAG3    = template === 'CH1_AG3' || template === 'VNSI_AG3'
 
     // Load class/sub_class rules for auto-detection from description prefix
     const { data: classRulesData } = await db
@@ -86,13 +87,16 @@ export async function POST(req: NextRequest) {
       const detectedModel = extractVendorModel(row.description)
       const subClass      = row.subClass || detected?.sub_class || null
       const fees          = hasFees ? getAssemblyFees(subClass, row.loaiVang) : null
+      const qty           = Math.max(1, row.qty ?? 1)
+      const wtPerUnit     = isAG3 && row.weightTotal ? row.weightTotal / qty : null
       return {
         invoice_id:        invoiceId,
         seq:               startSeq + idx,
         sku:               row.sku               || null,
         store:             row.store             || null,
         location:          row.location          || null,
-        so_mo:             row.soMo              || null,
+        so_mo:             isAG3 ? null : (row.soMo || null),
+        po_number:         isAG3 ? (row.soMo ? row.soMo.split('-MO')[0] : null) : null,
         description:       row.description       || null,
         vendor_model:      detectedModel         || null,
         class:             row.class             || detected?.class || null,
@@ -104,6 +108,7 @@ export async function POST(req: NextRequest) {
         customer_name:     row.niniAdm              || null,
         image_url:         row.imageUrl             || null,
         kich_thuoc:        extractKichThuoc(row.description) || null,
+        chi_tiet_tap:      isAG3 ? buildChiTietCap(row.description, wtPerUnit) : null,
         gia_cong:          fees?.gia_cong     ?? 0,
         duc:               fees?.duc          ?? 0,
         thiet_ke:          fees?.thiet_ke     ?? 0,

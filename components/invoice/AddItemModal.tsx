@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 import { ComboInput } from '@/components/ui/ComboInput'
-import { extractVendorModel, extractKichThuoc } from '@/lib/formulas/description-parse'
+import { extractVendorModel, extractKichThuoc, buildChiTietCap } from '@/lib/formulas/description-parse'
 import { getAssemblyPrices, resolvePhiPhuKien, type AssemblyPricingRule } from '@/lib/formulas/assembly-pricing'
 
 
@@ -137,6 +137,14 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
         if (size) next.kich_thuoc = size
       }
 
+      // Auto-fill Chi tiết/Cặp for AG3 when description changes
+      if (isAG3) {
+        const wt  = parseFloat(v.wt_gr)  || 0
+        const qty = Math.max(1, parseInt(v.qt_pcs) || 1)
+        const cap = buildChiTietCap(desc, wt > 0 ? wt / qty : null)
+        if (cap) next.chi_tiet_tap = cap
+      }
+
       return next
     })
   }
@@ -184,6 +192,35 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
 
   const f = (key: keyof Form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(v => ({ ...v, [key]: e.target.value }))
+
+  // When wt_gr or qt_pcs changes on AG3 templates, re-compute chi_tiet_tap
+  function handleWtGrChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const newWt = e.target.value
+    setForm(v => {
+      const next: Form = { ...v, wt_gr: newWt }
+      if (isAG3 && v.description.trim()) {
+        const wt  = parseFloat(newWt) || 0
+        const qty = Math.max(1, parseInt(v.qt_pcs) || 1)
+        const cap = buildChiTietCap(v.description, wt > 0 ? wt / qty : null)
+        if (cap) next.chi_tiet_tap = cap
+      }
+      return next
+    })
+  }
+
+  function handleQtPcsChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const newQty = e.target.value
+    setForm(v => {
+      const next: Form = { ...v, qt_pcs: newQty }
+      if (isAG3 && v.description.trim()) {
+        const wt  = parseFloat(v.wt_gr) || 0
+        const qty = Math.max(1, parseInt(newQty) || 1)
+        const cap = buildChiTietCap(v.description, wt > 0 ? wt / qty : null)
+        if (cap) next.chi_tiet_tap = cap
+      }
+      return next
+    })
+  }
 
   async function handleSave() {
     if (!form.sku.trim()) { setError('SKU is required'); return }
@@ -368,12 +405,12 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
             </div>
             <div>
               <label style={labelStyle}>Qty (pcs)</label>
-              <input type="number" min="1" step="1" style={inputStyle} value={form.qt_pcs} onChange={f('qt_pcs')} />
+              <input type="number" min="1" step="1" style={inputStyle} value={form.qt_pcs} onChange={handleQtPcsChange} />
             </div>
 
             <div>
               <label style={labelStyle}>T.Phẩm có NVL đá (g)</label>
-              <input type="number" min="0" step="0.0001" style={inputStyle} placeholder="0.0000" value={form.wt_gr} onChange={f('wt_gr')} />
+              <input type="number" min="0" step="0.0001" style={inputStyle} placeholder="0.0000" value={form.wt_gr} onChange={handleWtGrChange} />
             </div>
             <div>
               <label style={labelStyle}>Kích Thước</label>
