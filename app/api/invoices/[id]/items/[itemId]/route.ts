@@ -51,7 +51,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     // When sub_class changes and fee fields are not explicitly provided,
-    // auto-fill assembly fees from DB rules (CH1/CH2 only)
+    // auto-fill assembly fees from DB rules (CH1/CH2 only).
+    // phi_phu_kien also depends on loai_vang: PT=$50, AG/SV=$10, others=table value.
     const hasFees = ['CH1', 'CH2'].includes((invoice as any).template_type ?? 'CH1')
     const feeKeys = ['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien'] as const
     const userSetFees = feeKeys.some(k => k in body)
@@ -63,11 +64,32 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         r => r.sub_class.toUpperCase() === String(updates.sub_class ?? '').toUpperCase()
       )
       if (rule) {
+        // Resolve loai_vang: use value from this request if being patched, else fetch existing
+        let loaiVang: string | null = (updates.loai_vang as string) ?? null
+        if (!loaiVang) {
+          const { data: existing } = await db.from('invoice_products').select('loai_vang').eq('id', params.itemId).single()
+          loaiVang = existing?.loai_vang ?? null
+        }
+        const v = loaiVang?.trim().toUpperCase() ?? ''
+        const phi = v.startsWith('PT') ? 50 : (v.includes('AG') || v.includes('SV') || v.includes('925')) ? 10 : (rule.phi_phu_kien ?? 30)
         updates.gia_cong     = rule.gia_cong
         updates.duc          = rule.duc
         updates.thiet_ke     = rule.thiet_ke
         updates.resin        = rule.resin
-        updates.phi_phu_kien = rule.phi_phu_kien ?? 0
+        updates.phi_phu_kien = phi
+      }
+    }
+
+    // When loai_vang changes (without sub_class) and phi_phu_kien not explicitly set,
+    // re-resolve phi_phu_kien based on existing sub_class + new metal type.
+    if ('loai_vang' in updates && !('sub_class' in updates) && !('phi_phu_kien' in updates) && hasFees) {
+      const { data: existing } = await db.from('invoice_products').select('sub_class, phi_phu_kien').eq('id', params.itemId).single()
+      const subClass = existing?.sub_class ?? null
+      if (subClass) {
+        const { data: asmRules } = await db.from('assembly_pricing_rules').select('sub_class, phi_phu_kien').eq('sub_class', subClass).single()
+        const base = asmRules?.phi_phu_kien ?? existing?.phi_phu_kien ?? 30
+        const v = String(updates.loai_vang ?? '').trim().toUpperCase()
+        updates.phi_phu_kien = v.startsWith('PT') ? 50 : (v.includes('AG') || v.includes('SV') || v.includes('925')) ? 10 : base
       }
     }
 

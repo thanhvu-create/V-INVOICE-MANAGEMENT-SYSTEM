@@ -73,16 +73,20 @@ export async function POST(req: NextRequest) {
       return sorted.find(r => upper.startsWith(r.description_prefix)) ?? null
     }
 
-    const getAssemblyFees = (subClass: string | null | undefined) => {
+    const getAssemblyFees = (subClass: string | null | undefined, loaiVang: string | null | undefined) => {
       if (!subClass?.trim() || !assemblyRules.length) return null
-      return assemblyRules.find(r => r.sub_class.toUpperCase() === subClass.trim().toUpperCase()) ?? null
+      const rule = assemblyRules.find(r => r.sub_class.toUpperCase() === subClass.trim().toUpperCase())
+      if (!rule) return null
+      const v = loaiVang?.trim().toUpperCase() ?? ''
+      const phi = v.startsWith('PT') ? 50 : (v.includes('AG') || v.includes('SV') || v.includes('925')) ? 10 : (rule.phi_phu_kien ?? 30)
+      return { ...rule, phi_phu_kien: phi }
     }
 
     const itemsToInsert = rows.map((row, idx) => {
       const detected      = (!row.class && !row.subClass) ? detectClass(row.description) : null
       const detectedModel = extractVendorModel(row.description)
       const subClass      = row.subClass || detected?.sub_class || null
-      const fees          = hasFees ? getAssemblyFees(subClass) : null
+      const fees          = hasFees ? getAssemblyFees(subClass, row.loaiVang) : null
       return {
         invoice_id:        invoiceId,
         seq:               startSeq + idx,
