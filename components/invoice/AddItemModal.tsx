@@ -5,7 +5,7 @@ import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 import { ComboInput } from '@/components/ui/ComboInput'
 import { extractVendorModel } from '@/lib/formulas/description-parse'
-import { getAssemblyPrices, getPhiPhuKien } from '@/lib/formulas/assembly-pricing'
+import { getAssemblyPrices, getPhiPhuKien, type AssemblyPricingRule } from '@/lib/formulas/assembly-pricing'
 
 
 interface Form {
@@ -70,7 +70,8 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
   const [saving,      setSaving]      = useState(false)
   const [error,       setError]       = useState('')
   const [metalTypes,  setMetalTypes]  = useState<string[]>(BASE_LOAI_VANG)
-  const [classRules,  setClassRules]  = useState<ClassRule[]>([])
+  const [classRules,    setClassRules]    = useState<ClassRule[]>([])
+  const [assemblyRules, setAssemblyRules] = useState<AssemblyPricingRule[]>([])
   const [autoFilled,  setAutoFilled]  = useState(false)
   const [autoFees,    setAutoFees]    = useState(false)
   const skuRef = useRef<HTMLInputElement>(null)
@@ -83,6 +84,10 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
     fetch('/api/class-subclass')
       .then(r => r.json())
       .then(j => { if (j.success) setClassRules(j.data) })
+      .catch(() => {})
+    fetch('/api/assembly-pricing')
+      .then(r => r.json())
+      .then(j => { if (j.success) setAssemblyRules(j.data) })
       .catch(() => {})
   }, [])
 
@@ -106,7 +111,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
         next.sub_class = detected.sub_class
         // Auto-fill fees when sub_class is detected and template has fee fields
         if (hasFees) {
-          const prices = getAssemblyPrices(detected.sub_class)
+          const prices = getAssemblyPrices(detected.sub_class, assemblyRules)
           if (prices) {
             if (!parseFloat(v.gia_cong)) next.gia_cong = String(prices.gia_cong)
             if (!parseFloat(v.duc))      next.duc      = String(prices.duc)
@@ -136,7 +141,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
     setForm(v => {
       const next: Form = { ...v, sub_class: newSub }
       if (hasFees) {
-        const prices = getAssemblyPrices(newSub)
+        const prices = getAssemblyPrices(newSub, assemblyRules)
         if (prices) {
           if (!parseFloat(v.gia_cong)) next.gia_cong = String(prices.gia_cong)
           if (!parseFloat(v.duc))      next.duc      = String(prices.duc)

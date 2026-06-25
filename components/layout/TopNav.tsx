@@ -20,8 +20,9 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/import',              label: 'Import',     roles: ['admin', 'manager', 'user'] },
   { href: '/admin/products',      label: 'NVL Prices',  roles: ['admin', 'manager'] },
   { href: '/admin/gem-catalog',   label: 'Gem Catalog',    roles: ['admin', 'manager'] },
-  { href: '/admin/class-subclass', label: 'Class/SubClass', roles: ['admin', 'manager'] },
-  { href: '/admin/users',         label: 'Users',           roles: ['admin'] },
+  { href: '/admin/class-subclass',    label: 'Class/SubClass',  roles: ['admin', 'manager'] },
+  { href: '/admin/assembly-pricing', label: 'Assembly Price', roles: ['admin', 'manager'] },
+  { href: '/admin/users',            label: 'Users',           roles: ['admin'] },
 ]
 
 const ROLE_LABEL: Record<Role, string> = {
