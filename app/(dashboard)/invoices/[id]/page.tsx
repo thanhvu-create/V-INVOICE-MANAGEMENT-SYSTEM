@@ -40,11 +40,13 @@ export default function InvoiceDetailPage() {
   const [dateVal,     setDateVal]     = useState('')
   const [savingField, setSavingField] = useState<string | null>(null)
 
-  const canSeePrice = canDo('see_prices')
-  const isLocked    = data?.header?.status === 'finalized'
-  const status      = data?.header?.status ?? ''
-  const canEdit     = canDo('edit') && !isLocked
-  const availTrans  = ALLOWED_TRANSITIONS[user.role]?.[status] ?? []
+  const canSeePrice   = canDo('see_prices')
+  const isLocked      = data?.header?.status === 'finalized'
+  const status        = data?.header?.status ?? ''
+  const isManagerPlus = user.role === 'manager' || user.role === 'admin'
+  // manager/admin can edit even when finalized; regular user/viewer cannot
+  const canEdit       = canDo('edit') && (!isLocked || isManagerPlus)
+  const availTrans    = ALLOWED_TRANSITIONS[user.role]?.[status] ?? []
 
   async function patchHeader(fields: Record<string, unknown>) {
     setSavingField(Object.keys(fields)[0])

@@ -22,11 +22,13 @@ export interface EditGuardContext {
  *   })
  */
 export function checkEditPermission(ctx: EditGuardContext): string | null {
-  if (ctx.isLocked) {
-    return 'Invoice is finalized and cannot be modified.'
-  }
   if (ctx.role === 'viewer') {
     return 'Viewers cannot make changes.'
+  }
+  if (ctx.isLocked) {
+    // manager and admin can edit finalized invoices directly
+    if (ctx.role === 'manager' || ctx.role === 'admin') return null
+    return 'Invoice is finalized. Only managers and admins can modify it.'
   }
   // draft: user role can only edit their own invoices
   if (
