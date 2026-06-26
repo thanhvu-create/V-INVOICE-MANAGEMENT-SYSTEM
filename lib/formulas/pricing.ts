@@ -174,8 +174,8 @@ export function recalcItem(
     cif_price:           cif,
     tag_price:           tag,
     fb_price:            fb,
-    // AG3 templates have no gems and no fabrication fees
-    ...(isAG3 ? { gia_cong: 0, duc: 0, thiet_ke: 0, resin: 0, phi_phu_kien: 0 } : {}),
+    // AG3 always has no fees; other templates zero fees when no gems are present
+    ...(isAG3 || diamonds.length === 0 ? { gia_cong: 0, duc: 0, thiet_ke: 0, resin: 0, phi_phu_kien: 0 } : {}),
   }
 }
 
