@@ -766,32 +766,33 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     // ── SUMMARY number formats (data rows start at row 3) ────────────────────
     const summaryNumFmt: any[] = []
-    const sfmt = (s: number, e: number, pattern: string, type = 'CURRENCY') => summaryNumFmt.push({
+    const $ = '"$"#,##0.000'           // explicit dollar — not locale-dependent
+    const sfmt = (s: number, e: number, pattern: string) => summaryNumFmt.push({
       repeatCell: {
         range: { sheetId: 1, startRowIndex: 3, startColumnIndex: s, endColumnIndex: e },
-        cell: { userEnteredFormat: { numberFormat: { type, pattern }, horizontalAlignment: 'RIGHT' } },
+        cell: { userEnteredFormat: { numberFormat: { type: 'NUMBER', pattern }, horizontalAlignment: 'RIGHT' } },
         fields: 'userEnteredFormat(numberFormat,horizontalAlignment)',
       },
     })
     if (isAG3f) {
-      sfmt(7, 8,  '#,##0')              // Tiền vàng — rounded
-      sfmt(8, 9,  '0.00', 'NUMBER')     // TL T.Phẩm (gr) — 2 decimals
-      sfmt(9, 10, '#,##0')              // Trị giá — rounded
+      sfmt(7, 8,  $)                    // Tiền vàng
+      sfmt(8, 9,  '0.00')              // TL T.Phẩm (gr)
+      sfmt(9, 10, $)                    // Trị giá
     } else if (isADMf) {
-      sfmt(8, 9,  '#,##0')              // Tiền vàng — rounded
-      sfmt(9, 12, '0.00', 'NUMBER')     // T.Phẩm weights (gr) — 2 decimals
-      sfmt(16,18, '0.000', 'NUMBER')    // TL trước/sau (ct) — 3 decimals
-      sfmt(18,19, '0.0000', 'NUMBER')   // TL Xoàn (gr) — 4 decimals
-      sfmt(19,21, '#,##0')              // GIÁ XOÀN — rounded
-      sfmt(21,23, '#,##0')              // Phí nhận hột — rounded
-      sfmt(23,25, '#,##0')              // HPUSA, CIF — rounded
+      sfmt(8, 9,  $)                    // Tiền vàng
+      sfmt(9, 12, '0.00')              // T.Phẩm weights (gr)
+      sfmt(16,18, '0.000')             // TL trước/sau (ct)
+      sfmt(18,19, '0.0000')            // TL Xoàn (gr)
+      sfmt(19,21, $)                    // GIÁ XOÀN
+      sfmt(21,23, $)                    // Phí nhận hột
+      sfmt(23,25, $)                    // HPUSA, CIF
     } else {
-      sfmt(8, 9,  '#,##0')              // Tiền vàng — rounded
-      sfmt(9, 12, '0.00', 'NUMBER')     // T.Phẩm weights (gr) — 2 decimals
-      sfmt(16,18, '0.000', 'NUMBER')    // TL trước/sau (ct) — 3 decimals
-      sfmt(18,19, '0.0000', 'NUMBER')   // TL Xoàn (gr) — 4 decimals
-      sfmt(19,23, '#,##0')              // Đơn giá, T.GIÁ, Phí nhận hột cols — rounded
-      sfmt(23,29, '#,##0')              // Gia công–HPUSA — rounded
+      sfmt(8, 9,  $)                    // Tiền vàng
+      sfmt(9, 12, '0.00')              // T.Phẩm weights (gr)
+      sfmt(16,18, '0.000')             // TL trước/sau (ct)
+      sfmt(18,19, '0.0000')            // TL Xoàn (gr)
+      sfmt(19,23, $)                    // Đơn giá, T.GIÁ, Phí nhận hột
+      sfmt(23,29, $)                    // Gia công–HPUSA
     }
 
     // ── JM FORM column widths ────────────────────────────────────────────────
