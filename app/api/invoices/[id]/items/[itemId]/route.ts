@@ -91,6 +91,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       }
     }
 
+    // AG3 templates have no gems and no fabrication fees — always zero them out
+    if (['CH1_AG3', 'VNSI_AG3'].includes((invoice as any).template_type ?? '')) {
+      updates.gia_cong = 0; updates.duc = 0; updates.thiet_ke = 0
+      updates.resin    = 0; updates.phi_phu_kien = 0
+    }
+
     const { data: item, error } = await db
       .from('invoice_products')
       .update(updates)
