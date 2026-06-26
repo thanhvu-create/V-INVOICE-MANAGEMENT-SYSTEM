@@ -145,9 +145,9 @@ function nvlGoldRef(loaiVang: string | null | undefined): string {
   if (lv.includes('15')) return 'NVL!$B$19'
   if (lv.includes('14')) return 'NVL!$B$20'
   if (lv.includes('10')) return 'NVL!$B$21'
-  if (lv === 'PT')       return 'NVL!$B$22'
-  if (lv === 'AG')       return 'NVL!$B$23'
-  if (lv === 'PD')       return 'NVL!$B$24'
+  if (lv.startsWith('PT')) return 'NVL!$B$22'  // PT950, PT850, PT, ...
+  if (lv === 'AG')         return 'NVL!$B$23'
+  if (lv === 'PD')         return 'NVL!$B$24'
   return 'NVL!$B$16'
 }
 
@@ -769,8 +769,15 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       if (_isAG3gt) {
         summaryGrandTotalRowIdx = 3 + processedItems.length * 4
         const gt = Array(_gtNCols).fill('')
-        gt[0] = 'TỔNG'; gt[4] = sumF('qt_pcs'); gt[7] = sumF('tien_vang')
-        gt[8] = sumF('t_pham_co_nvl_da'); gt[9] = sumF('von_san_xuat')
+        // AG3: each item = 4 rows; main data row for item i is at row (4 + i*4).
+        // Cannot use =SUM(H4:HN) because totals sub-rows duplicate H/I/J values → double-count.
+        const mainRowNums = processedItems.map((_: any, i: number) => 4 + i * 4)
+        const joinRefs = (col: string) => `=${mainRowNums.map((r: number) => `${col}${r}`).join('+')}`
+        gt[0] = 'TỔNG'
+        gt[4] = joinRefs('E')   // Qt. pcs
+        gt[7] = joinRefs('H')   // Tiền vàng
+        gt[8] = joinRefs('I')   // T.Phẩm có NVL đá
+        gt[9] = joinRefs('J')   // Vốn sản xuất
         summaryRows.push(gt)
       } else {
         let dataRowCount = 0
