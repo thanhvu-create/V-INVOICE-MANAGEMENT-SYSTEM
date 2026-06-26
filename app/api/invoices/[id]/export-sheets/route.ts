@@ -766,7 +766,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     // ── SUMMARY number formats (data rows start at row 3) ────────────────────
     const summaryNumFmt: any[] = []
-    const $ = '"$"#,##0.000'           // explicit dollar — not locale-dependent
+    const $ = '"$"#,##0.###'           // explicit dollar — not locale-dependent
     const sfmt = (s: number, e: number, pattern: string) => summaryNumFmt.push({
       repeatCell: {
         range: { sheetId: 1, startRowIndex: 3, startColumnIndex: s, endColumnIndex: e },
@@ -831,7 +831,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       jmNumFmt.push({
         repeatCell: {
           range: { sheetId: 0, startRowIndex: 2, startColumnIndex: priceStart, endColumnIndex: jmColCount - 1 },
-          cell: { userEnteredFormat: { numberFormat: { type: 'NUMBER', pattern: '"$"#,##0.000' }, horizontalAlignment: 'RIGHT' } },
+          cell: { userEnteredFormat: { numberFormat: { type: 'NUMBER', pattern: '"$"#,##0.###' }, horizontalAlignment: 'RIGHT' } },
           fields: 'userEnteredFormat(numberFormat,horizontalAlignment)',
         },
       })
