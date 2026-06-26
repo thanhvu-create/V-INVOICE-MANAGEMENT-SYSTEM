@@ -23,15 +23,15 @@ export async function GET(req: NextRequest) {
     let query = db
       .from('invoices')
       .select(`
-        id, invoice_code, template_type, status, created_by, created_at, finalized_at,
+        id, invoice_code, template_type, status, created_by, created_at, finalized_at, invoice_date,
         invoice_products ( id, seq )
       `, { count: 'exact' })
-      .order('created_at', { ascending: false })
+      .order('invoice_date', { ascending: false })
       .range(offset, offset + pageSize - 1)
 
     if (status)   query = query.eq('status', status)
-    if (dateFrom) query = query.gte('created_at', dateFrom)
-    if (dateTo)   query = query.lte('created_at', dateTo + 'T23:59:59')
+    if (dateFrom) query = query.gte('invoice_date', dateFrom)
+    if (dateTo)   query = query.lte('invoice_date', dateTo)
     if (search) {
       query = query.ilike('invoice_code', `%${search}%`)
     }
@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
   try {
     const ctx = await requireRole('user')
     const body = await req.json()
-    const { invoice_code, template_type } = body
+    const { invoice_code, template_type, invoice_date } = body
 
     if (!invoice_code?.trim()) {
       return NextResponse.json({ success: false, message: 'Invoice code is required' }, { status: 400 })
@@ -111,6 +111,7 @@ export async function POST(req: NextRequest) {
         template_type,
         status:        'draft',
         created_by:    ctx.userId,
+        invoice_date:  invoice_date || new Date().toISOString().slice(0, 10),
         ...nvlSnapshot,
       })
       .select()

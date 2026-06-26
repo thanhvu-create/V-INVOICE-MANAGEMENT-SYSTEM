@@ -11,6 +11,7 @@ interface InvoiceRow {
   invoice_code:  string
   template_type: string | null
   status:        string
+  invoice_date:  string | null
   created_at:    string
   finalized_at:  string | null
   invoice_products?: { image_url?: string | null; seq?: number }[] | null
@@ -177,7 +178,7 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
                     ) : '—'}
                   </td>
                   <td style={{ ...td, fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
-                    {row.created_at.slice(0, 10)}
+                    {(row.invoice_date ?? row.created_at).slice(0, 10)}
                   </td>
                   <td style={{ ...td, whiteSpace: 'nowrap', textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
@@ -213,7 +214,7 @@ export function InvoiceTable({ rows, loading, role, onDelete }: Props) {
               </div>
               <div className="invoice-card-row2">
                 {row.template_type && <span>{templateLabel(row.template_type)}</span>}
-                <span>{row.created_at.slice(0, 10)}</span>
+                <span>{(row.invoice_date ?? row.created_at).slice(0, 10)}</span>
               </div>
             </Link>
           )

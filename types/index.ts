@@ -19,6 +19,7 @@ export interface Invoice {
   nvl_cif_rate:       number | null
   nvl_tag_multiplier: number | null  // Tag price = CIF × this
   nvl_fr_multiplier:  number | null  // FB/FR price = CIF × this
+  invoice_date:  string          // DATE "YYYY-MM-DD" — business date, user-selectable
   created_at:    string
   finalized_at:  string | null
   created_by:    string | null   // UUID → app_users.id

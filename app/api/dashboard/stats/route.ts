@@ -14,38 +14,42 @@ export async function GET(req: NextRequest) {
     const monthParam = req.nextUrl.searchParams.get('month')
     const { start, end } = parseMonthRange(monthParam)
 
+    // Convert ISO start/end to DATE strings (YYYY-MM-DD) for invoice_date column
+    const dateStart = start.slice(0, 10)
+    const dateEnd   = end.slice(0, 10)   // exclusive upper bound
+
     const [statusRes, itemsRes, monthInvRes, monthCifRes, templateRes] = await Promise.all([
-      // Invoices created in selected month — count by status
+      // Invoices whose invoice_date falls in selected month — count by status
       db.from('invoices')
         .select('status')
-        .gte('created_at', start)
-        .lt('created_at', end),
+        .gte('invoice_date', dateStart)
+        .lt('invoice_date', dateEnd),
 
       // Items belonging to invoices in selected month
       db.from('invoice_products')
         .select('id', { count: 'exact', head: true })
-        .gte('invoices.created_at', start)
-        .lt('invoices.created_at', end),
+        .gte('invoices.invoice_date', dateStart)
+        .lt('invoices.invoice_date', dateEnd),
 
       // Invoice count for selected month
       db.from('invoices')
         .select('id', { count: 'exact', head: true })
-        .gte('created_at', start)
-        .lt('created_at', end),
+        .gte('invoice_date', dateStart)
+        .lt('invoice_date', dateEnd),
 
       // CIF sum for selected month
       canSeePrice
         ? db.from('invoice_products')
-            .select('cif_price, invoices!inner(created_at)')
-            .gte('invoices.created_at', start)
-            .lt('invoices.created_at', end)
+            .select('cif_price, invoices!inner(invoice_date)')
+            .gte('invoices.invoice_date', dateStart)
+            .lt('invoices.invoice_date', dateEnd)
         : Promise.resolve({ data: null, error: null }),
 
       // Template breakdown for selected month
       db.from('invoices')
         .select('template_type')
-        .gte('created_at', start)
-        .lt('created_at', end),
+        .gte('invoice_date', dateStart)
+        .lt('invoice_date', dateEnd),
     ])
 
     // by_status

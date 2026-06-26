@@ -33,9 +33,11 @@ export default function NewInvoicePage() {
   const { canDo, loaded } = useUser()
 
   const [nvlDefaults, setNvlDefaults] = useState<NVLDefaults | null>(null)
+  const todayISO = new Date().toISOString().slice(0, 10)
   const [form, setForm] = useState({
     invoice_code:  '',
     template_type: 'CH1',
+    invoice_date:  todayISO,
   })
   const [error,   setError]   = useState('')
   const [loading, setLoading] = useState(false)
@@ -58,6 +60,7 @@ export default function NewInvoicePage() {
         body: JSON.stringify({
           invoice_code:  form.invoice_code.trim().toUpperCase(),
           template_type: form.template_type,
+          invoice_date:  form.invoice_date || todayISO,
         }),
       })
       const json = await res.json()
@@ -98,6 +101,18 @@ export default function NewInvoicePage() {
               placeholder="e.g. P60501" />
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 4 }}>
               Mã invoice duy nhất — ví dụ: P60501, CH2-001
+            </div>
+          </div>
+
+          {/* Invoice Date */}
+          <div style={field}>
+            <label style={label}>Ngày Invoice *</label>
+            <input style={input} type="date" required
+              value={form.invoice_date}
+              max={new Date().toISOString().slice(0, 10)}
+              onChange={e => setForm(f => ({ ...f, invoice_date: e.target.value }))} />
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 4 }}>
+              Ngày nghiệp vụ — mặc định hôm nay, có thể chọn ngày trong quá khứ
             </div>
           </div>
 
