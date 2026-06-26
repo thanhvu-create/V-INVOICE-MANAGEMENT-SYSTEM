@@ -33,11 +33,36 @@ export default function InvoiceDetailPage() {
   const [exportingSheets, setExportingSheets] = useState(false)
   const [syncingNVL,      setSyncingNVL]      = useState(false)
 
+  // Inline-edit state for invoice_code and invoice_date
+  const [editingCode, setEditingCode] = useState(false)
+  const [codeVal,     setCodeVal]     = useState('')
+  const [editingDate, setEditingDate] = useState(false)
+  const [dateVal,     setDateVal]     = useState('')
+  const [savingField, setSavingField] = useState<string | null>(null)
+
   const canSeePrice = canDo('see_prices')
   const isLocked    = data?.header?.status === 'finalized'
   const status      = data?.header?.status ?? ''
   const canEdit     = canDo('edit') && !isLocked
   const availTrans  = ALLOWED_TRANSITIONS[user.role]?.[status] ?? []
+
+  async function patchHeader(fields: Record<string, unknown>) {
+    setSavingField(Object.keys(fields)[0])
+    try {
+      const res  = await fetch(`/api/invoices/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fields),
+      })
+      const json = await res.json()
+      if (json.success) {
+        setData(prev => prev ? { ...prev, header: { ...prev.header, ...fields } } : prev)
+      } else {
+        alert(json.message ?? 'Lỗi khi lưu')
+      }
+    } catch { alert('Lỗi kết nối') }
+    finally { setSavingField(null) }
+  }
 
   async function handleSyncNVL() {
     if (!confirm('Cập nhật giá NVL mới nhất cho invoice này và tính lại toàn bộ sản phẩm?')) return
@@ -125,12 +150,103 @@ export default function InvoiceDetailPage() {
           <div style={{ marginBottom: '0.25rem' }}>
             <a href="/invoices" style={{ color: 'var(--text-muted)', textDecoration: 'none', fontSize: 'var(--text-sm)' }}>← Invoices</a>
           </div>
-          <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', fontWeight: 400, margin: '0 0 0.5rem' }}>
-            {header.invoice_code}
-          </h1>
+
+          {/* Invoice Code — inline edit */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.4rem' }}>
+            {editingCode ? (
+              <form
+                onSubmit={async e => {
+                  e.preventDefault()
+                  const v = codeVal.trim().toUpperCase()
+                  if (v && v !== header.invoice_code) await patchHeader({ invoice_code: v })
+                  setEditingCode(false)
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <input
+                  autoFocus
+                  value={codeVal}
+                  onChange={e => setCodeVal(e.target.value)}
+                  onBlur={() => setEditingCode(false)}
+                  style={{
+                    fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', fontWeight: 400,
+                    border: 'none', borderBottom: '2px solid var(--text-primary)',
+                    background: 'transparent', outline: 'none', padding: '0 2px', width: 260,
+                    color: 'var(--text-primary)', textTransform: 'uppercase',
+                  }}
+                />
+                <button type="submit" disabled={!!savingField} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, padding: 4 }}>
+                  {savingField === 'invoice_code' ? '...' : '✓'}
+                </button>
+              </form>
+            ) : (
+              <>
+                <h1 style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', fontWeight: 400, margin: 0 }}>
+                  {header.invoice_code}
+                </h1>
+                {canEdit && (
+                  <button
+                    onClick={() => { setCodeVal(header.invoice_code ?? ''); setEditingCode(true) }}
+                    title="Đổi Invoice Code"
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, padding: '2px 4px', opacity: 0.6 }}
+                  >
+                    <i className="fa-regular fa-pen-to-square" />
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Status + Template + Invoice Date */}
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <StatusBadge status={header.status} />
-            {header.template_type && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)', padding: '2px 8px' }}>{templateLabel(header.template_type)}</span>}
+            {header.template_type && (
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)', padding: '2px 8px' }}>
+                {templateLabel(header.template_type)}
+              </span>
+            )}
+
+            {/* Invoice Date — inline edit */}
+            {editingDate ? (
+              <form
+                onSubmit={async e => {
+                  e.preventDefault()
+                  if (dateVal) await patchHeader({ invoice_date: dateVal })
+                  setEditingDate(false)
+                }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              >
+                <input
+                  autoFocus type="date"
+                  value={dateVal}
+                  max={new Date().toISOString().slice(0, 10)}
+                  onChange={e => setDateVal(e.target.value)}
+                  onBlur={() => setEditingDate(false)}
+                  style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
+                    border: 'none', borderBottom: '1px solid var(--border-base)',
+                    background: 'transparent', outline: 'none', padding: '1px 2px',
+                    color: 'var(--text-secondary)',
+                  }}
+                />
+                <button type="submit" disabled={!!savingField} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 10, padding: 2 }}>
+                  {savingField === 'invoice_date' ? '...' : '✓'}
+                </button>
+              </form>
+            ) : (
+              <span
+                onClick={canEdit ? () => { setDateVal(header.invoice_date ?? ''); setEditingDate(true) } : undefined}
+                title={canEdit ? 'Đổi ngày invoice' : undefined}
+                style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
+                  cursor: canEdit ? 'pointer' : 'default',
+                  borderBottom: canEdit ? '1px dashed var(--border-base)' : 'none',
+                }}
+              >
+                {(header.invoice_date ?? header.created_at)?.slice(0, 10)}
+                {canEdit && <i className="fa-regular fa-pen-to-square" style={{ marginLeft: 5, opacity: 0.5, fontSize: 10 }} />}
+              </span>
+            )}
           </div>
         </div>
 
