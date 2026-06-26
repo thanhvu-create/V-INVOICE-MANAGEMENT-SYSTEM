@@ -222,6 +222,100 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
   return rows
 }
 
+function buildFormulaRows(invoice: any): (string | number)[][] {
+  const template  = invoice.template_type ?? 'CH1'
+  const isAG3     = template === 'CH1_AG3' || template === 'VNSI_AG3'
+  const isADM     = template === 'ADM'
+  const lossGold  = ((invoice.nvl_loss_gold ?? 0.06) * 100).toFixed(0) + '%'
+  const lossPt    = ((invoice.nvl_loss_pt  ?? 0.17) * 100).toFixed(0) + '%'
+  const cifRate   = ((invoice.nvl_cif_rate ?? 0.05) * 100).toFixed(0) + '%'
+  const spotAu    = invoice.nvl_gold_24k  ?? '—'
+  const spotPt    = invoice.nvl_pt_price  ?? '—'
+  const spotAg    = invoice.nvl_ag_price  ?? '—'
+  const spotPd    = invoice.nvl_pd_price  ?? '—'
+
+  const rows: (string | number)[][] = []
+
+  const h  = (t: string)   => [t, '', '']
+  const sub= (t: string)   => ['', t, '']
+  const row= (a: string, b: string, c = '') => [a, b, c]
+  const hr = ()             => ['', '', '']
+
+  // ── TITLE ────────────────────────────────────────────────────────────────
+  rows.push(['CÔNG THỨC TÍNH TOÁN — V-Invoice', '', ''])
+  rows.push([`Template: ${template}  |  Invoice: ${invoice.invoice_code ?? ''}`, '', ''])
+  rows.push(hr())
+
+  // ── 1. GIÁ VÀNG/GRAM ────────────────────────────────────────────────────
+  rows.push(h('1. GIÁ KIM LOẠI / GRAM'))
+  rows.push(['Loại', 'Công thức', 'Giá trị snapshot ($)'])
+  rows.push(row('24K',  `Spot_Au / 31.103`,                                           String(typeof spotAu === 'number' ? (spotAu / 31.103).toFixed(4) : '—')))
+  rows.push(row('22K',  `Spot_Au × (22/24) / 31.103`))
+  rows.push(row('18K',  `Spot_Au × (1 + ${lossGold}) × (18/24) / 31.103`))
+  rows.push(row('14K',  `Spot_Au × (1 + ${lossGold}) × (14/24) / 31.103`))
+  rows.push(row('10K',  `Spot_Au × (1 + ${lossGold}) × (10/24) / 31.103`))
+  rows.push(row('PT',   `Spot_PT × (1 + ${lossPt}) / 31.103`,                        String(typeof spotPt === 'number' ? (spotPt * (1 + (invoice.nvl_loss_pt ?? 0.17)) / 31.103).toFixed(4) : '—')))
+  rows.push(row('AG',   `Spot_AG × (1 + ${lossGold}) × (1 + ${lossPt}) / 31.103`,   String(typeof spotAg === 'number' ? (spotAg * (1 + (invoice.nvl_loss_gold ?? 0.06)) * (1 + (invoice.nvl_loss_pt ?? 0.17)) / 31.103).toFixed(4) : '—')))
+  rows.push(row('PD',   `Spot_PD × (1 + ${lossPt}) / 31.103`,                        String(typeof spotPd === 'number' ? (spotPd * (1 + (invoice.nvl_loss_pt ?? 0.17)) / 31.103).toFixed(4) : '—')))
+  rows.push(hr())
+
+  // ── 2. TIỀN VÀNG ────────────────────────────────────────────────────────
+  rows.push(h('2. TIỀN VÀNG'))
+  rows.push(sub('T.Phẩm vàng thực tế (gr) = T.Phẩm có NVL đá − Σ TL Xoàn (gr)'))
+  rows.push(sub('Tiền vàng ($) = Giá kim loại/gram × T.Phẩm vàng thực tế'))
+  rows.push(hr())
+
+  // ── 3. TÍNH TOÁN XOÀN ───────────────────────────────────────────────────
+  if (!isAG3) {
+    rows.push(h('3. TÍNH TOÁN XOÀN (mỗi dòng gem)'))
+    rows.push(row('TL Xoàn (gr)',      'TL trước xử lý (ct) ÷ 5'))
+    rows.push(row('Đơn giá ($/ct)',    'Lookup từ bảng NVL-Hột theo Size Range'))
+    rows.push(row('T.GIÁ XOÀN ($)',   'TL trước xử lý (ct) × Đơn giá ($/ct)'))
+    rows.push(row('Đơn giá phí',       '$1 (cố định / viên)'))
+    rows.push(row('T.Phí ($)',         'SL hột (viên) × $1'))
+    rows.push(hr())
+  }
+
+  // ── 4. VỐN SẢN XUẤT / HPUSA ─────────────────────────────────────────────
+  rows.push(h('4. VỐN SẢN XUẤT / HPUSA'))
+  if (isAG3) {
+    rows.push(sub('Vốn SX = Tiền vàng'))
+    rows.push(sub('(AG3 không có xoàn và gia công)'))
+  } else if (isADM) {
+    rows.push(sub('Vốn SX = Σ T.GIÁ XOÀN + Σ T.Phí + Tiền vàng'))
+    rows.push(sub('(ADM không tính gia công riêng lẻ)'))
+  } else {
+    rows.push(sub('Vốn SX = Σ T.GIÁ XOÀN + Σ T.Phí + Tiền vàng'))
+    rows.push(sub('       + Gia công + Đúc + Thiết Kế + Resin + Phí phụ kiện'))
+  }
+  rows.push(hr())
+
+  // ── 5. CIF PRICE ────────────────────────────────────────────────────────
+  rows.push(h('5. CIF PRICE'))
+  if (template === 'CH2') {
+    rows.push(sub('CH2: Không có CIF price'))
+  } else {
+    rows.push(row('CIF ($)', `Vốn SX × (1 + ${cifRate})  =  Vốn SX × ${(1 + (invoice.nvl_cif_rate ?? 0.05)).toFixed(2)}`))
+  }
+  rows.push(hr())
+
+  // ── 6. NVL SNAPSHOT ─────────────────────────────────────────────────────
+  rows.push(h('6. NVL SNAPSHOT (freeze tại thời điểm tạo invoice)'))
+  rows.push(['Tham số', 'Giá trị', ''])
+  rows.push(row('Spot Vàng 24K ($/oz)', String(spotAu)))
+  rows.push(row('Spot Platinum ($/oz)', String(spotPt)))
+  rows.push(row('Spot Silver ($/oz)',   String(spotAg)))
+  rows.push(row('Spot Palladium ($/oz)',String(spotPd)))
+  rows.push(row('Loss vàng',            lossGold))
+  rows.push(row('Loss Pt/AG/PD',        lossPt))
+  rows.push(row('CIF rate',             cifRate))
+  rows.push(hr())
+  rows.push(['⚠ Giá NVL trên đây đã được snapshot khi tạo invoice.', '', ''])
+  rows.push(['  Thay đổi giá sau này không ảnh hưởng đến invoice này.', '', ''])
+
+  return rows
+}
+
 function buildNVLRows(invoice: any) {
   const rows: (string | number)[][] = []
   rows.push(['NVL - Giá Vàng (Snapshot tại thời điểm tạo invoice)'])
@@ -523,13 +617,14 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     const title = `V-Invoice ${invoice.invoice_code ?? params.id} (${templateLabel(invoice.template_type)})`
 
-    // 1. Create spreadsheet with three sheets
+    // 1. Create spreadsheet with four sheets
     const created = await sheetsPost(accessToken, '', {
       properties: { title },
       sheets: [
-        { properties: { title: 'JM FORM',  sheetId: 0, index: 0 } },
-        { properties: { title: 'SUMMARY',  sheetId: 1, index: 1 } },
-        { properties: { title: 'NVL',      sheetId: 2, index: 2 } },
+        { properties: { title: 'JM FORM',    sheetId: 0, index: 0 } },
+        { properties: { title: 'SUMMARY',    sheetId: 1, index: 1 } },
+        { properties: { title: 'NVL',        sheetId: 2, index: 2 } },
+        { properties: { title: 'CÔNG THỨC', sheetId: 3, index: 3 } },
       ],
     })
 
@@ -591,6 +686,14 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       accessToken,
       `${spreadsheetId}/values/${encodeURIComponent('NVL!A1')}?valueInputOption=USER_ENTERED`,
       { values: nvlRows },
+    )
+
+    // 3c. Write CÔNG THỨC data (4th sheet)
+    const formulaRows = buildFormulaRows(invoice)
+    await sheetsPut(
+      accessToken,
+      `${spreadsheetId}/values/${encodeURIComponent('CÔNG THỨC!A1')}?valueInputOption=USER_ENTERED`,
+      { values: formulaRows },
     )
 
     // 4. Move to configured Drive folder (if set)
@@ -970,6 +1073,29 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         ...summaryNumFmt,
         // Totals row formatting (AG3 per-item totals + grand total)
         ...summaryExtraFmt,
+
+        // ═══════════════════════ CÔNG THỨC (sheetId 3) ════════════════════
+        // Title row
+        { mergeCells: { range: { sheetId: 3, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 3 }, mergeType: 'MERGE_ALL' } },
+        { repeatCell: { range: { sheetId: 3, startRowIndex: 0, endRowIndex: 1 }, cell: { userEnteredFormat: { textFormat: { bold: true, fontSize: 13, foregroundColor: { red: 1, green: 1, blue: 1 } }, backgroundColor: { red: 0.17, green: 0.36, blue: 0.60 }, horizontalAlignment: 'CENTER', verticalAlignment: 'MIDDLE' } }, fields: 'userEnteredFormat(textFormat,backgroundColor,horizontalAlignment,verticalAlignment)' } },
+        // Subtitle row
+        { mergeCells: { range: { sheetId: 3, startRowIndex: 1, endRowIndex: 2, startColumnIndex: 0, endColumnIndex: 3 }, mergeType: 'MERGE_ALL' } },
+        { repeatCell: { range: { sheetId: 3, startRowIndex: 1, endRowIndex: 2 }, cell: { userEnteredFormat: { textFormat: { italic: true, fontSize: 9, foregroundColor: { red: 0.4, green: 0.4, blue: 0.4 } }, backgroundColor: { red: 0.94, green: 0.96, blue: 0.99 } } }, fields: 'userEnteredFormat(textFormat,backgroundColor)' } },
+        // Section headers (col A contains section titles starting with number)
+        { repeatCell: { range: { sheetId: 3, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: 3 }, cell: { userEnteredFormat: { wrapStrategy: 'WRAP', verticalAlignment: 'MIDDLE' } }, fields: 'userEnteredFormat(wrapStrategy,verticalAlignment)' } },
+        // Section header rows — highlight rows where col A starts with a digit (1., 2., ...)
+        { addConditionalFormatRule: { rule: { ranges: [{ sheetId: 3, startRowIndex: 2, startColumnIndex: 0, endColumnIndex: 3 }], booleanRule: { condition: { type: 'TEXT_STARTS_WITH', values: [{ userEnteredValue: '1' }] }, format: { textFormat: { bold: true }, backgroundColor: { red: 0.98, green: 0.95, blue: 0.80 } } } }, index: 0 } },
+        { addConditionalFormatRule: { rule: { ranges: [{ sheetId: 3, startRowIndex: 2, startColumnIndex: 0, endColumnIndex: 3 }], booleanRule: { condition: { type: 'TEXT_STARTS_WITH', values: [{ userEnteredValue: '2' }] }, format: { textFormat: { bold: true }, backgroundColor: { red: 0.98, green: 0.95, blue: 0.80 } } } }, index: 1 } },
+        { addConditionalFormatRule: { rule: { ranges: [{ sheetId: 3, startRowIndex: 2, startColumnIndex: 0, endColumnIndex: 3 }], booleanRule: { condition: { type: 'TEXT_STARTS_WITH', values: [{ userEnteredValue: '3' }] }, format: { textFormat: { bold: true }, backgroundColor: { red: 0.98, green: 0.95, blue: 0.80 } } } }, index: 2 } },
+        { addConditionalFormatRule: { rule: { ranges: [{ sheetId: 3, startRowIndex: 2, startColumnIndex: 0, endColumnIndex: 3 }], booleanRule: { condition: { type: 'TEXT_STARTS_WITH', values: [{ userEnteredValue: '4' }] }, format: { textFormat: { bold: true }, backgroundColor: { red: 0.98, green: 0.95, blue: 0.80 } } } }, index: 3 } },
+        { addConditionalFormatRule: { rule: { ranges: [{ sheetId: 3, startRowIndex: 2, startColumnIndex: 0, endColumnIndex: 3 }], booleanRule: { condition: { type: 'TEXT_STARTS_WITH', values: [{ userEnteredValue: '5' }] }, format: { textFormat: { bold: true }, backgroundColor: { red: 0.98, green: 0.95, blue: 0.80 } } } }, index: 4 } },
+        { addConditionalFormatRule: { rule: { ranges: [{ sheetId: 3, startRowIndex: 2, startColumnIndex: 0, endColumnIndex: 3 }], booleanRule: { condition: { type: 'TEXT_STARTS_WITH', values: [{ userEnteredValue: '6' }] }, format: { textFormat: { bold: true }, backgroundColor: { red: 0.98, green: 0.95, blue: 0.80 } } } }, index: 5 } },
+        // Col widths: label | formula | value
+        { updateDimensionProperties: { range: { sheetId: 3, dimension: 'COLUMNS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 200 }, fields: 'pixelSize' } },
+        { updateDimensionProperties: { range: { sheetId: 3, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 }, properties: { pixelSize: 420 }, fields: 'pixelSize' } },
+        { updateDimensionProperties: { range: { sheetId: 3, dimension: 'COLUMNS', startIndex: 2, endIndex: 3 }, properties: { pixelSize: 140 }, fields: 'pixelSize' } },
+        // Title row height
+        { updateDimensionProperties: { range: { sheetId: 3, dimension: 'ROWS', startIndex: 0, endIndex: 1 }, properties: { pixelSize: 36 }, fields: 'pixelSize' } },
 
         // ═══════════════════════ NVL (sheetId 2) ══════════════════════════
         {
