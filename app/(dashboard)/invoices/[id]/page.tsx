@@ -173,7 +173,8 @@ export default function InvoiceDetailPage() {
                   style={{
                     fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', fontWeight: 400,
                     border: 'none', borderBottom: '2px solid var(--text-primary)',
-                    background: 'transparent', outline: 'none', padding: '0 2px', width: 260,
+                    background: 'transparent', outline: 'none', padding: '0 2px',
+                    width: `${Math.max(8, codeVal.length + 2)}ch`,
                     color: 'var(--text-primary)', textTransform: 'uppercase',
                   }}
                 />
