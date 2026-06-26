@@ -251,7 +251,7 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean, summa
         const purchaseCol = colLetter(priceStart)    // L for CH1
         const erpCol      = colLetter(priceStart + 2) // N for CH1 (Purchase, CIF, ERP)
         row.push(typeof erp === 'number' ? erp : '')  // ERP — manual input, keep static
-        row.push(`=(${purchaseCol}${jmDataRow}-${erpCol}${jmDataRow})/${purchaseCol}${jmDataRow}`)
+        row.push(`=IFERROR((${purchaseCol}${jmDataRow}-${erpCol}${jmDataRow})/${purchaseCol}${jmDataRow},"")`)
       }
       if (hasTagFB) row.push(n(item.tag_price), n(item.fb_price))
       if (isADM) row.push(item.ngay_gui ?? '', item.hoa_don ?? '')
@@ -744,7 +744,15 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       { values: jmRows },
     )
 
-    // 3. Write SUMMARY data
+    // 3. Write NVL first — SUMMARY cross-sheet refs (=NVL!$B$18*...) must resolve correctly
+    const nvlRows = buildNVLRows(invoice)
+    await sheetsPut(
+      accessToken,
+      `${spreadsheetId}/values/${encodeURIComponent('NVL!A1')}?valueInputOption=USER_ENTERED`,
+      { values: nvlRows },
+    )
+
+    // 3b. Write SUMMARY data (references NVL sheet)
     const summaryRows = buildSummaryRows(invoice, processedItems)
 
     // ── Grand total row (TỔNG CỘNG) ─────────────────────────────────────────
@@ -791,14 +799,6 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       accessToken,
       `${spreadsheetId}/values/${encodeURIComponent('SUMMARY!A1')}?valueInputOption=USER_ENTERED`,
       { values: summaryRows },
-    )
-
-    // 3b. Write NVL data (3rd sheet)
-    const nvlRows = buildNVLRows(invoice)
-    await sheetsPut(
-      accessToken,
-      `${spreadsheetId}/values/${encodeURIComponent('NVL!A1')}?valueInputOption=USER_ENTERED`,
-      { values: nvlRows },
     )
 
     // 3c. Write CÔNG THỨC data (4th sheet)
