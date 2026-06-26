@@ -51,7 +51,16 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
       'T.Phẩm NVL đá (g)', // J
       'T.Phẩm vàng TT (g)', // K
       ...(canSeePrice
-        ? ['Tiền vàng', 'Gia công', 'Vốn SX', 'CIF/SP'] // L-O
+        ? [
+            'Tiền vàng ($)',        // L
+            'Gia công / 1 SP ($)',  // M
+            'Đúc / 1sp ($)',        // N
+            'Thiết Kế / 1sp ($)',   // O
+            'Resin / 1sp ($)',      // P
+            'Phí phụ kiện ($)',     // Q
+            'Vốn SX / HPUSA ($)',   // R
+            'CIF / SP ($)',         // S
+          ]
         : []),
       'Notes',       // last
     ]
@@ -101,6 +110,10 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           ...(canSeePrice ? [
             fmt2(item.tien_vang),
             fmt2(item.gia_cong),
+            fmt2(item.duc),
+            fmt2(item.thiet_ke),
+            fmt2(item.resin),
+            fmt2(item.phi_phu_kien),
             fmt2(item.von_san_xuat),
             fmt2(item.cif_price),
           ] : []),
@@ -138,7 +151,16 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     ws['!cols']     = [
       { wch: 5 }, { wch: 14 }, { wch: 20 }, { wch: 28 }, { wch: 10 }, { wch: 10 },
       { wch: 10 }, { wch: 10 }, { wch: 7  }, { wch: 14 }, { wch: 14 },
-      ...(canSeePrice ? [{ wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 12 }] : []),
+      ...(canSeePrice ? [
+        { wch: 13 }, // Tiền vàng
+        { wch: 15 }, // Gia công
+        { wch: 12 }, // Đúc
+        { wch: 14 }, // Thiết Kế
+        { wch: 12 }, // Resin
+        { wch: 14 }, // Phí phụ kiện
+        { wch: 14 }, // Vốn SX
+        { wch: 12 }, // CIF
+      ] : []),
       { wch: 16 },
       // gem cols
       { wch: 2 }, { wch: 12 }, { wch: 8 }, { wch: 18 }, { wch: 8 },
