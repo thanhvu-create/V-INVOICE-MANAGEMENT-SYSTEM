@@ -101,62 +101,91 @@ export function DashboardClient() {
       </div>
 
       {/* Month selector */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
-        {/* Prev month */}
-        <button
-          onClick={() => setSelected(m => shiftMonth(m, -1))}
-          disabled={selectedMonth === monthOptions[monthOptions.length - 1].key}
-          style={{
-            padding: '0.3rem 0.65rem', background: 'var(--bg-surface)',
-            border: '1px solid var(--border-base)', borderRadius: 4,
-            cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1,
-            opacity: selectedMonth === monthOptions[monthOptions.length - 1].key ? 0.35 : 1,
-          }}
-        >◀</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.75rem' }}>
 
-        {/* Dropdown */}
-        <select
-          value={selectedMonth}
-          onChange={e => setSelected(e.target.value)}
-          style={{
-            padding: '0.3rem 0.6rem', background: 'var(--bg-surface)',
-            border: '1px solid var(--border-base)', borderRadius: 4,
-            fontSize: 'var(--text-sm)', color: 'var(--text-primary)',
-            fontFamily: 'var(--font-body)', cursor: 'pointer', outline: 'none',
-            minWidth: 160,
-          }}
-        >
-          {monthOptions.map(o => (
-            <option key={o.key} value={o.key}>
-              {o.label}{o.key === currentMonthKey() ? ' (Tháng này)' : ''}
-            </option>
-          ))}
-        </select>
+        {/* Unified nav strip: ◀ [select] ▶ */}
+        <div style={{
+          display: 'inline-flex', alignItems: 'stretch',
+          border: '1px solid var(--border-base)', background: 'var(--bg-surface)',
+          overflow: 'hidden',
+        }}>
+          {/* Prev */}
+          <button
+            onClick={() => setSelected(m => shiftMonth(m, -1))}
+            disabled={selectedMonth === monthOptions[monthOptions.length - 1].key}
+            title="Tháng trước"
+            style={{
+              padding: '0.4rem 0.7rem',
+              background: 'none', border: 'none', borderRight: '1px solid var(--border-base)',
+              cursor: selectedMonth === monthOptions[monthOptions.length - 1].key ? 'not-allowed' : 'pointer',
+              color: 'var(--text-secondary)', fontSize: 11, lineHeight: 1,
+              opacity: selectedMonth === monthOptions[monthOptions.length - 1].key ? 0.3 : 1,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--bg-muted)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+          >&#9664;</button>
 
-        {/* Next month */}
-        <button
-          onClick={() => setSelected(m => shiftMonth(m, +1))}
-          disabled={isCurrentMonth}
-          style={{
-            padding: '0.3rem 0.65rem', background: 'var(--bg-surface)',
-            border: '1px solid var(--border-base)', borderRadius: 4,
-            cursor: 'pointer', color: 'var(--text-secondary)', fontSize: 13, lineHeight: 1,
-            opacity: isCurrentMonth ? 0.35 : 1,
-          }}
-        >▶</button>
+          {/* Select */}
+          <select
+            value={selectedMonth}
+            onChange={e => setSelected(e.target.value)}
+            style={{
+              padding: '0.4rem 0.5rem 0.4rem 0.75rem',
+              background: 'transparent', border: 'none', outline: 'none',
+              fontSize: 'var(--text-sm)', color: 'var(--text-primary)',
+              fontFamily: 'var(--font-body)', cursor: 'pointer',
+              minWidth: 190, appearance: 'none',
+            }}
+          >
+            {monthOptions.map(o => (
+              <option key={o.key} value={o.key}>
+                {o.label}{o.key === currentMonthKey() ? ' — Tháng này' : ''}
+              </option>
+            ))}
+          </select>
 
-        {/* Back to current month shortcut */}
+          {/* Chevron icon for custom select */}
+          <span style={{
+            display: 'flex', alignItems: 'center', paddingRight: '0.5rem',
+            color: 'var(--text-muted)', fontSize: 9, pointerEvents: 'none',
+          }}>&#9660;</span>
+
+          {/* Divider */}
+          <span style={{ width: 1, background: 'var(--border-base)', flexShrink: 0 }} />
+
+          {/* Next */}
+          <button
+            onClick={() => setSelected(m => shiftMonth(m, +1))}
+            disabled={isCurrentMonth}
+            title="Tháng sau"
+            style={{
+              padding: '0.4rem 0.7rem',
+              background: 'none', border: 'none', borderLeft: 'none',
+              cursor: isCurrentMonth ? 'not-allowed' : 'pointer',
+              color: 'var(--text-secondary)', fontSize: 11, lineHeight: 1,
+              opacity: isCurrentMonth ? 0.3 : 1,
+              transition: 'background 0.15s',
+            }}
+            onMouseEnter={e => { if (!e.currentTarget.disabled) e.currentTarget.style.background = 'var(--bg-muted)' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'none' }}
+          >&#9654;</button>
+        </div>
+
+        {/* Back to current month — subtle text link */}
         {!isCurrentMonth && (
           <button
             onClick={() => setSelected(currentMonthKey())}
             style={{
-              padding: '0.3rem 0.75rem', background: 'none',
-              border: '1px solid var(--border-base)', borderRadius: 4,
+              padding: 0, background: 'none', border: 'none',
               cursor: 'pointer', color: 'var(--text-muted)',
               fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)',
+              letterSpacing: '0.06em', textDecoration: 'underline',
+              textDecorationColor: 'var(--border-base)',
+              textUnderlineOffset: 3,
             }}
           >
-            Về tháng này
+            Tháng này →
           </button>
         )}
       </div>
