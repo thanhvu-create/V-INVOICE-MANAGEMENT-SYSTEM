@@ -31,21 +31,29 @@ const TEMPLATE_COLORS: Record<string, string> = {
   VNSI_AG3: '#9F1239',
 }
 
-export function SummaryCards({ stats, loading }: { stats: Stats | null; loading: boolean }) {
+function monthShortLabel(selectedMonth: string): string {
+  const now = new Date()
+  const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  if (selectedMonth === cur) return 'Tháng này'
+  const [y, m] = selectedMonth.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })
+}
+
+export function SummaryCards({ stats, loading, selectedMonth }: { stats: Stats | null; loading: boolean; selectedMonth: string }) {
   const byTemplate  = stats?.by_template ?? {}
   const totalInvAll = Object.values(stats?.by_status ?? {}).reduce((a, b) => a + b, 0)
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
 
-      {/* CIF This Month */}
+      {/* CIF selected month */}
       <div style={cardStyle}>
-        <div style={labelStyle}>CIF — This Month</div>
+        <div style={labelStyle}>CIF — {monthShortLabel(selectedMonth)}</div>
         <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-2xl)', fontWeight: 500, color: 'var(--text-primary)' }}>
           {loading ? '—' : formatUSD(stats?.month_cif ?? 0)}
         </div>
         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 4 }}>
-          {loading ? '' : `${(stats?.month_invoice_count ?? 0).toLocaleString()} invoices this month`}
+          {loading ? '' : `${(stats?.month_invoice_count ?? 0).toLocaleString()} invoices`}
         </div>
       </div>
 

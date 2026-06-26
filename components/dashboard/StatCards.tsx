@@ -66,12 +66,12 @@ function StatCard({ label, color, target, loading, href, delay }: {
   )
 }
 
-function MonthCard({ target, loading, delay }: { target: number; loading: boolean; delay: number }) {
+function MonthCard({ target, loading, delay, label }: { target: number; loading: boolean; delay: number; label: string }) {
   const count = useCountUp(target, !loading)
   return (
     <div style={{ padding: '1.5rem 1.5rem 1.25rem', background: 'var(--bg-surface)', animation: `fadeIn 0.35s ease-out ${delay}ms both` }}>
       <div style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--color-info)', marginBottom: '0.75rem' }}>
-        This Month
+        {label}
       </div>
       <div style={{ fontFamily: 'var(--font-heading)', fontSize: 'var(--text-3xl)', fontWeight: 400, color: 'var(--text-primary)', lineHeight: 1 }}>
         {loading
@@ -84,7 +84,15 @@ function MonthCard({ target, loading, delay }: { target: number; loading: boolea
   )
 }
 
-export function StatCards({ stats, loading }: { stats: Stats | null; loading: boolean }) {
+function monthDisplayLabel(selectedMonth: string): string {
+  const now = new Date()
+  const cur = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  if (selectedMonth === cur) return 'Tháng này'
+  const [y, m] = selectedMonth.split('-').map(Number)
+  return new Date(y, m - 1, 1).toLocaleDateString('vi-VN', { month: 'long', year: 'numeric' })
+}
+
+export function StatCards({ stats, loading, selectedMonth }: { stats: Stats | null; loading: boolean; selectedMonth: string }) {
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '1px', background: 'var(--border-light)', border: '1px solid var(--border-light)', marginBottom: '2rem' }}>
       {STATUS_CARDS.map(({ key, label, color, href }, i) => (
@@ -94,7 +102,11 @@ export function StatCards({ stats, loading }: { stats: Stats | null; loading: bo
           loading={loading} href={href} delay={i * 60}
         />
       ))}
-      <MonthCard target={stats?.month_invoice_count ?? 0} loading={loading} delay={120} />
+      <MonthCard
+        target={stats?.month_invoice_count ?? 0}
+        loading={loading} delay={120}
+        label={monthDisplayLabel(selectedMonth)}
+      />
     </div>
   )
 }
