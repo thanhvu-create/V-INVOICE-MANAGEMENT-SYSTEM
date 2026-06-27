@@ -80,6 +80,28 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       }
     }
 
+    // Backfill: if sub_class wasn't changed but all fees are 0 (stale import), auto-fill them
+    if (!('sub_class' in updates) && hasFees) {
+      const feeKeys = ['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien']
+      const { data: cur } = await db.from('invoice_products').select('sub_class, loai_vang, gia_cong, duc, thiet_ke, resin, phi_phu_kien').eq('id', params.itemId).single()
+      if (cur) {
+        const allZero = feeKeys.every(k => !(k in updates) && ((cur as any)[k] ?? 0) === 0)
+        const subClass = String(cur.sub_class ?? '').trim()
+        if (allZero && subClass) {
+          const { data: asmRules } = await db.from('assembly_pricing_rules').select('sub_class, gia_cong, duc, thiet_ke, resin, phi_phu_kien')
+          const rule = (asmRules ?? []).find(r => r.sub_class.toUpperCase() === subClass.toUpperCase())
+          if (rule) {
+            const loaiVang = (updates.loai_vang as string) ?? cur.loai_vang ?? null
+            updates.gia_cong     = rule.gia_cong
+            updates.duc          = rule.duc
+            updates.thiet_ke     = rule.thiet_ke
+            updates.resin        = rule.resin
+            updates.phi_phu_kien = resolvePhiPhuKien(rule.phi_phu_kien, loaiVang, subClass)
+          }
+        }
+      }
+    }
+
     // When loai_vang changes (without sub_class) and phi_phu_kien not explicitly set,
     // re-resolve phi_phu_kien based on existing sub_class + new metal type.
     if ('loai_vang' in updates && !('sub_class' in updates) && !('phi_phu_kien' in updates) && hasFees) {

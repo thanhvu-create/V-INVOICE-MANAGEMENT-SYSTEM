@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     const classRules = classRulesData ?? []
 
     // Load assembly pricing rules (for CH1/CH2 fee auto-fill)
-    const hasFees = template === 'CH1' || template === 'CH2'
+    const hasFees = template === 'CH1' || template === 'CH2' || template === 'ADM'
     type AssemblyRule = { sub_class: string; gia_cong: number; duc: number; thiet_ke: number; resin: number; phi_phu_kien: number }
     let assemblyRules: AssemblyRule[] = []
     if (hasFees) {
