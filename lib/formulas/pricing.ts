@@ -103,9 +103,7 @@ export function calcVonSanXuat(
   const sumPhi     = diamonds.reduce((s, g) => s + (g.t_phi      ?? 0), 0)
 
   if (template === 'CH1' || template === 'CH2' || template === 'ADM') {
-    const base = sumGiaXoan + sumPhi + tienVang
-    if (diamonds.length === 0) return base
-    return base
+    return sumGiaXoan + sumPhi + tienVang
       + (item.gia_cong     ?? 0)
       + (item.duc          ?? 0)
       + (item.thiet_ke     ?? 0)
