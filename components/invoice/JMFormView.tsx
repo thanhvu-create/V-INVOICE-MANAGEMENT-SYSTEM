@@ -66,9 +66,9 @@ const JM_COLS: Col[] = [
   { key: 'tag_price',        label: 'HP Tag',            mono: true, price: true, noAg3: true, width: 100 },
   { key: 'fb_price',         label: 'HP FB',             mono: true, price: true, noAg3: true, width: 100 },
   // AG3-only: per-piece pricing display
-  { key: '_pu_wt',           label: 'Wt./1sp (gr)',      mono: true, computed: true, price: true, ag3only: true, width: 100 },
-  { key: '_purchase_unit',   label: 'Purchase/1sp',      mono: true, computed: true, price: true, ag3only: true, width: 110 },
-  { key: '_tag_unit',        label: 'Tag/1sp',           mono: true, computed: true, price: true, ag3only: true, width: 100 },
+  { key: '_pu_wt',           label: 'Wt./1sp (gr)',      mono: true, computed: true, price: true, autofill: true, ag3only: true, width: 100 },
+  { key: '_purchase_unit',   label: 'Purchase/1sp',      mono: true, computed: true, price: true, autofill: true, ag3only: true, width: 110 },
+  { key: '_tag_unit',        label: 'Tag/1sp',           mono: true, computed: true, price: true, autofill: true, ag3only: true, width: 100 },
   // Notes — CH1/CH2 only (Ghi chú column in JM Form tab)
   { key: 'nini_adm',         label: 'Ghi chú',           notes: true, noAg3: true, noAdm: true, width: 140 },
   // Chi tiết/Cặp — AG3 only (col U21 in JM Form AG3 tab)
@@ -345,7 +345,7 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                       }
 
                       if (col.computed) {
-                        return <td key={col.key} style={{ ...td, fontFamily: 'var(--font-mono)', color: col.price ? '#1E40AF' : 'var(--text-muted)', fontWeight: col.price ? 600 : 400, textAlign: 'right' }}>{displayVal}</td>
+                        return <td key={col.key} style={{ ...td, fontFamily: 'var(--font-mono)', color: col.price ? '#1E40AF' : 'var(--text-muted)', fontWeight: col.price ? 600 : 400, textAlign: 'right', background: col.autofill ? PRICE_BG : undefined }}>{displayVal}</td>
                       }
 
                       // tag/fb: computed (read-only) for AG3, manually editable for CH1/CH2/ADM
