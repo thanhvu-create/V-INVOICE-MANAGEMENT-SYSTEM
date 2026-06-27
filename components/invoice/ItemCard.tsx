@@ -10,6 +10,7 @@ import { DriveImageInput } from '@/components/ui/DriveImageInput'
 import { ComboInput } from '@/components/ui/ComboInput'
 
 import type { InvoiceTemplate } from '@/lib/formulas/pricing'
+import { getAssemblyPrices, type AssemblyPricingRule } from '@/lib/formulas/assembly-pricing'
 
 const BASE_METAL_TYPES = ['18KY', '18KW', '18KR', '18KG', '22KY', '22KW', '24K', '14KY', '14KW', '14KR', '10KY', '10KW', 'PT950', 'PT850', 'AG', 'PD']
 
@@ -52,11 +53,17 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   const [metalTypes,    setMetalTypes]    = useState<string[]>(BASE_METAL_TYPES)
   const [classOptions,  setClassOptions]  = useState<string[]>([])
   const [subClassOptions, setSubClassOptions] = useState<string[]>([])
+  const [assemblyRules, setAssemblyRules] = useState<AssemblyPricingRule[]>([])
 
   useEffect(() => {
     fetch('/api/metal-types').then(r => r.json()).then(j => { if (j.success) setMetalTypes(j.data) }).catch(() => {})
     fetch('/api/class-subclass').then(r => r.json()).then(j => { if (j.success) setClassOptions(Array.from(new Set((j.data as any[]).map(r => r.class))).sort()) }).catch(() => {})
-    fetch('/api/assembly-pricing').then(r => r.json()).then(j => { if (j.success) setSubClassOptions(Array.from(new Set((j.data as any[]).map(r => r.sub_class))).sort()) }).catch(() => {})
+    fetch('/api/assembly-pricing').then(r => r.json()).then(j => {
+      if (j.success) {
+        setAssemblyRules(j.data)
+        setSubClassOptions(Array.from(new Set((j.data as any[]).map((r: any) => r.sub_class))).sort())
+      }
+    }).catch(() => {})
   }, [])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -70,6 +77,13 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   const isBaSao  = notesVal?.toLowerCase().includes('ba sao') ?? false
 
   function openEdit() {
+    const hasFees = !isAG3
+    const subClass = item.sub_class?.trim() ?? ''
+    const allZero = [item.gia_cong, item.duc, item.thiet_ke, item.resin, item.phi_phu_kien].every(v => (v ?? 0) === 0)
+    const fill = (hasFees && subClass && allZero)
+      ? getAssemblyPrices(subClass, assemblyRules, item.loai_vang)
+      : null
+
     setForm({
       vendor_model:      item.vendor_model             ?? '',
       po_number:         item.po_number                ?? '',
@@ -82,11 +96,11 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
       sub_class:         item.sub_class                ?? '',
       loai_vang:         item.loai_vang                ?? '',
       t_pham_co_nvl_da:  String(item.t_pham_co_nvl_da  ?? ''),
-      gia_cong:          String(item.gia_cong           ?? 0),
-      duc:               String(item.duc                ?? 0),
-      thiet_ke:          String(item.thiet_ke           ?? 0),
-      resin:             String(item.resin              ?? 0),
-      phi_phu_kien:      String(item.phi_phu_kien       ?? 0),
+      gia_cong:          String(fill?.gia_cong     ?? item.gia_cong     ?? 0),
+      duc:               String(fill?.duc          ?? item.duc          ?? 0),
+      thiet_ke:          String(fill?.thiet_ke     ?? item.thiet_ke     ?? 0),
+      resin:             String(fill?.resin        ?? item.resin        ?? 0),
+      phi_phu_kien:      String(fill?.phi_phu_kien ?? item.phi_phu_kien ?? 0),
       bao_hiem:          String(item.bao_hiem           ?? 0),
       so_mo:             item.so_mo                    ?? '',
       ngay_gui:          item.ngay_gui                 ?? '',
