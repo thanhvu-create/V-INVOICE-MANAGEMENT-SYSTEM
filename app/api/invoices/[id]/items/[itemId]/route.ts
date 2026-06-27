@@ -57,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     // When sub_class changes, auto-fill assembly fees from DB rules (CH1/CH2/ADM).
-    // phi_phu_kien also depends on loai_vang: PT=$50, AG/SV=$10, others=table value.
+    // Only fill fee fields that the user did NOT explicitly send in this request.
     const hasFees = ['CH1', 'CH2', 'ADM'].includes((invoice as any).template_type ?? 'CH1')
     if ('sub_class' in updates && hasFees) {
       const { data: asmRules } = await db
@@ -67,17 +67,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         r => r.sub_class.toUpperCase() === String(updates.sub_class ?? '').toUpperCase()
       )
       if (rule) {
-        // Resolve loai_vang: use value from this request if being patched, else fetch existing
         let loaiVang: string | null = (updates.loai_vang as string) ?? null
         if (!loaiVang) {
           const { data: existing } = await db.from('invoice_products').select('loai_vang').eq('id', params.itemId).single()
           loaiVang = existing?.loai_vang ?? null
         }
-        updates.gia_cong     = rule.gia_cong
-        updates.duc          = rule.duc
-        updates.thiet_ke     = rule.thiet_ke
-        updates.resin        = rule.resin
-        updates.phi_phu_kien = resolvePhiPhuKien(rule.phi_phu_kien, loaiVang, String(updates.sub_class ?? ''))
+        if (!('gia_cong' in body))     updates.gia_cong     = rule.gia_cong
+        if (!('duc' in body))          updates.duc          = rule.duc
+        if (!('thiet_ke' in body))     updates.thiet_ke     = rule.thiet_ke
+        if (!('resin' in body))        updates.resin        = rule.resin
+        if (!('phi_phu_kien' in body)) updates.phi_phu_kien = resolvePhiPhuKien(rule.phi_phu_kien, loaiVang, String(updates.sub_class ?? ''))
       }
     }
 

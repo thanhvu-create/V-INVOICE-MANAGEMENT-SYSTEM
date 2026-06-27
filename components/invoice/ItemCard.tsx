@@ -105,8 +105,33 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   async function handleSave() {
     setSaving(true)
     const nums = ['qt_pcs', 't_pham_co_nvl_da', 'gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien', 'bao_hiem']
+    const original: Record<string, string> = {
+      vendor_model:      item.vendor_model             ?? '',
+      po_number:         item.po_number                ?? '',
+      sku_ag:            item.sku_ag                   ?? '',
+      qt_pcs:            String(item.qt_pcs            ?? ''),
+      kich_thuoc:        item.kich_thuoc               ?? '',
+      description:       item.description              ?? '',
+      customer_name:     item.customer_name            ?? '',
+      class:             item.class                    ?? '',
+      sub_class:         item.sub_class                ?? '',
+      loai_vang:         item.loai_vang                ?? '',
+      t_pham_co_nvl_da:  String(item.t_pham_co_nvl_da  ?? ''),
+      gia_cong:          String(item.gia_cong           ?? 0),
+      duc:               String(item.duc                ?? 0),
+      thiet_ke:          String(item.thiet_ke           ?? 0),
+      resin:             String(item.resin              ?? 0),
+      phi_phu_kien:      String(item.phi_phu_kien       ?? 0),
+      bao_hiem:          String(item.bao_hiem           ?? 0),
+      so_mo:             item.so_mo                    ?? '',
+      ngay_gui:          item.ngay_gui                 ?? '',
+      tracking_no:       item.tracking_no              ?? '',
+      hoa_don:           item.hoa_don                  ?? '',
+      image_url:         item.image_url                ?? '',
+    }
     const payload: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(form)) {
+      if (v === original[k]) continue
       if (nums.includes(k)) {
         const n = parseFloat(v)
         payload[k] = v === '' || isNaN(n) ? null : n
@@ -114,6 +139,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
         payload[k] = v.trim() || null
       }
     }
+    if (Object.keys(payload).length === 0) { setSaving(false); setEditMode(false); return }
     const data = await apiCall<any>(
       () => fetch(`/api/invoices/${invoiceId}/items/${item.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
