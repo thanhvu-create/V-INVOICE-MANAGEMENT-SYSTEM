@@ -11,7 +11,6 @@ import { DetailView } from '@/components/invoice/DetailView'
 import { templateLabel } from '@/lib/templates'
 import { AddItemModal } from '@/components/invoice/AddItemModal'
 import { XoanUrlConfig } from '@/components/invoice/XoanUrlConfig'
-import { ExportFolderConfig } from '@/components/invoice/ExportFolderConfig'
 
 type InvoiceView = 'jm-form' | 'detail'
 
@@ -30,7 +29,6 @@ export default function InvoiceDetailPage() {
   const [loading,         setLoading]      = useState(true)
   const [view,            setView]         = useState<InvoiceView>('detail')
   const [addItemOpen,     setAddItemOpen]  = useState(false)
-  const [exportingSheets, setExportingSheets] = useState(false)
   const [syncingNVL,      setSyncingNVL]      = useState(false)
 
   // Inline-edit state for invoice_code and invoice_date
@@ -82,24 +80,6 @@ export default function InvoiceDetailPage() {
       alert('Lỗi kết nối.')
     } finally {
       setSyncingNVL(false)
-    }
-  }
-
-  async function handleExportSheets() {
-    setExportingSheets(true)
-    try {
-      const res  = await fetch(`/api/invoices/${id}/export-sheets`, { method: 'POST' })
-      const json = await res.json()
-      if (json.success && json.spreadsheetUrl) {
-        if (json.warning) alert(json.warning)
-        window.open(json.spreadsheetUrl, '_blank')
-      } else {
-        alert(json.message ?? 'Không thể export lên Google Sheets.')
-      }
-    } catch {
-      alert('Lỗi kết nối.')
-    } finally {
-      setExportingSheets(false)
     }
   }
 
@@ -279,17 +259,6 @@ export default function InvoiceDetailPage() {
               <i className={`fa-solid ${syncingNVL ? 'fa-circle-notch fa-spin' : 'fa-rotate'}`} style={{ fontSize: 12 }} />
             </button>
           )}
-          <div style={{ display: 'inline-flex', alignItems: 'stretch' }}>
-            <button
-              onClick={handleExportSheets}
-              disabled={exportingSheets}
-              title="Export lên Google Sheets"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.75rem', border: '1px solid var(--border-base)', borderRight: 'none', background: 'transparent', color: exportingSheets ? 'var(--text-muted)' : 'var(--text-secondary)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)', cursor: exportingSheets ? 'not-allowed' : 'pointer', opacity: exportingSheets ? 0.6 : 1 }}
-            >
-              <i className={`${exportingSheets ? 'fa-solid fa-circle-notch fa-spin' : 'fa-brands fa-google-drive'}`} style={{ fontSize: 12, color: exportingSheets ? undefined : '#34A853' }} />
-            </button>
-            <ExportFolderConfig />
-          </div>
           <XoanUrlConfig template={header.template_type ?? 'CH1'} />
         </div>
       </div>
