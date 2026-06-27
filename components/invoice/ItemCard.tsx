@@ -232,10 +232,10 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                   <span style={{ color: 'var(--text-muted)' }}>+</span>
                   <span style={{ background: 'rgba(30,64,175,0.06)', padding: '2px 6px' }}>Phí gắn {fmt2(gems.reduce((s: number, g: any) => s + (g.t_phi ?? 0), 0))}</span>
                 </>}
-                {hasFees && (item.gia_cong || item.duc || item.thiet_ke || item.resin || item.phi_phu_kien) ? <>
+                {hasFees && <>
                   <span style={{ color: 'var(--text-muted)' }}>+</span>
                   <span style={{ background: 'rgba(30,64,175,0.06)', padding: '2px 6px' }}>Gia công {fmt2((item.gia_cong ?? 0) + (item.duc ?? 0) + (item.thiet_ke ?? 0) + (item.resin ?? 0) + (item.phi_phu_kien ?? 0))}</span>
-                </> : null}
+                </>}
                 <span style={{ color: '#1E40AF', fontWeight: 700 }}>=</span>
                 <span style={{ background: '#1E40AF', color: '#fff', padding: '2px 8px', fontWeight: 700 }}>Purchase {fmt2(item.von_san_xuat)}</span>
                 {hasCIF && <>
@@ -257,7 +257,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                     ['ERP BOM ($)', fmt2(item.erp_bom_cost)],
                     ['Chênh lệch', item.von_san_xuat ? (((item.von_san_xuat - item.erp_bom_cost) / item.von_san_xuat) * 100).toFixed(1) + '%' : '—'],
                   ] : []),
-                  ...(hasFees && (item.gia_cong || item.duc || item.thiet_ke || item.resin || item.phi_phu_kien) ? [
+                  ...(hasFees ? [
                     ['Gia công', fmt2(item.gia_cong)],
                     ['Đúc', fmt2(item.duc)],
                     ['Thiết kế', fmt2(item.thiet_ke)],

@@ -153,11 +153,18 @@ export function recalcItem(
   const gpg       = goldPricePerGram(item.loai_vang ?? '', nvl)
   const goldValue = gpg !== null ? weightNoGem * gpg : 0
 
-  const withGold = { ...item, tien_vang: goldValue }
+  const isAG3    = template === 'CH1_AG3' || template === 'VNSI_AG3'
+  const zeroFees = isAG3 || diamonds.length === 0
+
+  // Zero fees BEFORE Von SX so the formula is consistent: fees only count when gems are present
+  const itemForCalc: Partial<InvoiceProduct> = zeroFees
+    ? { ...item, gia_cong: 0, duc: 0, thiet_ke: 0, resin: 0, phi_phu_kien: 0 }
+    : item
+
+  const withGold = { ...itemForCalc, tien_vang: goldValue }
   const vonSX    = calcVonSanXuat(withGold, diamonds, template)
   const cif      = calcCIFPrice(vonSX, template, nvl.cif_rate)
 
-  const isAG3 = template === 'CH1_AG3' || template === 'VNSI_AG3'
   const tag = isAG3
     ? (cif != null && nvl.tag_multiplier > 0 ? cif * nvl.tag_multiplier : null)
     : (item.tag_price ?? null)
@@ -174,8 +181,7 @@ export function recalcItem(
     cif_price:           cif,
     tag_price:           tag,
     fb_price:            fb,
-    // AG3 always has no fees; other templates zero fees when no gems are present
-    ...(isAG3 || diamonds.length === 0 ? { gia_cong: 0, duc: 0, thiet_ke: 0, resin: 0, phi_phu_kien: 0 } : {}),
+    ...(zeroFees ? { gia_cong: 0, duc: 0, thiet_ke: 0, resin: 0, phi_phu_kien: 0 } : {}),
   }
 }
 
