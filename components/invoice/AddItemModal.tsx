@@ -112,21 +112,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
         setClassWarn('')
         next.class     = detected.class
         next.sub_class = detected.sub_class
-        if (hasFees) {
-          const prices = getAssemblyPrices(detected.sub_class, assemblyRules, v.loai_vang)
-          if (prices) {
-            next.gia_cong     = String(prices.gia_cong)
-            next.duc          = String(prices.duc)
-            next.thiet_ke     = String(prices.thiet_ke)
-            next.resin        = String(prices.resin)
-            next.phi_phu_kien = String(prices.phi_phu_kien)
-            setFeeWarn('')
-            setAutoFees(true)
-          } else {
-            setFeeWarn(`Chưa có giá gia công cho Sub Class "${detected.sub_class}". Vào Admin → Assembly Price để thêm, hoặc nhập tay.`)
-            setAutoFees(false)
-          }
-        }
+        applyAssemblyFees(next, detected.sub_class)
       } else {
         setAutoFilled(false)
         if (desc.trim().length >= 3) {
@@ -160,26 +146,29 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
     })
   }
 
+  function applyAssemblyFees(next: Form, subClass: string) {
+    if (!hasFees || !subClass.trim()) return
+    const prices = getAssemblyPrices(subClass, assemblyRules, next.loai_vang)
+    if (prices) {
+      next.gia_cong     = String(prices.gia_cong)
+      next.duc          = String(prices.duc)
+      next.thiet_ke     = String(prices.thiet_ke)
+      next.resin        = String(prices.resin)
+      next.phi_phu_kien = String(prices.phi_phu_kien)
+      setFeeWarn('')
+      setAutoFees(true)
+    } else {
+      setFeeWarn(`Chưa có giá gia công cho Sub Class "${subClass.toUpperCase()}". Vào Admin → Assembly Price để thêm, hoặc nhập tay.`)
+      setAutoFees(false)
+    }
+  }
+
   function handleSubClassChange(e: React.ChangeEvent<HTMLInputElement>) {
     const newSub = e.target.value
     setAutoFilled(false)
     setForm(v => {
       const next: Form = { ...v, sub_class: newSub }
-      if (hasFees && newSub.trim()) {
-        const prices = getAssemblyPrices(newSub, assemblyRules, v.loai_vang)
-        if (prices) {
-          next.gia_cong     = String(prices.gia_cong)
-          next.duc          = String(prices.duc)
-          next.thiet_ke     = String(prices.thiet_ke)
-          next.resin        = String(prices.resin)
-          next.phi_phu_kien = String(prices.phi_phu_kien)
-          setFeeWarn('')
-          setAutoFees(true)
-        } else {
-          setFeeWarn(`Chưa có giá gia công cho Sub Class "${newSub.toUpperCase()}". Vào Admin → Assembly Price để thêm, hoặc nhập tay.`)
-          setAutoFees(false)
-        }
-      }
+      applyAssemblyFees(next, newSub)
       return next
     })
   }
@@ -187,13 +176,8 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
   function handleLoaiVangChange(newMetal: string) {
     setForm(prev => {
       const next = { ...prev, loai_vang: newMetal }
-      // Re-resolve phi_phu_kien when metal changes (PT/AG override table value)
       if (hasFees && prev.sub_class.trim()) {
-        const prices = getAssemblyPrices(prev.sub_class, assemblyRules, newMetal)
-        if (prices) {
-          next.phi_phu_kien = String(prices.phi_phu_kien)
-          setAutoFees(true)
-        }
+        applyAssemblyFees(next, prev.sub_class)
       }
       return next
     })
