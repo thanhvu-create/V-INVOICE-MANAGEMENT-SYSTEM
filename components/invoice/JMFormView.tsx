@@ -259,15 +259,15 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                 <th key={c.key} style={{
                   ...th,
                   width: c.width, minWidth: c.width,
-                  color: (c.price || c.autofill) ? '#1E40AF' : c.computed ? 'var(--color-info)' : 'var(--text-secondary)',
+                  color: (c.price && !c.computed) || c.autofill ? '#1E40AF' : c.computed ? 'var(--color-info)' : 'var(--text-secondary)',
                   textAlign: c.price || c.mono ? 'right' : 'left',
                   position: (i === 0 || c.image || c.sku) ? 'sticky' : 'sticky',
                   left:     i === 0 ? 0 : c.image ? 44 : c.sku ? 102 : undefined,
                   zIndex:   i === 0 || c.image || c.sku ? 20 : 10,
-                  background: c.sku ? 'var(--sku-highlight-bg)' : (c.price || c.autofill) ? PRICE_HEAD : 'var(--bg-base)',
+                  background: c.sku ? 'var(--sku-highlight-bg)' : ((c.price && !c.computed) || c.autofill) ? PRICE_HEAD : 'var(--bg-base)',
                 }}>
                   {c.label}
-                  {(c.computed || c.autofill) && <span style={{ display: 'block', fontSize: 9, fontWeight: 400, letterSpacing: 0, color: (c.price || c.autofill) ? '#1E40AF' : 'var(--color-info)', textTransform: 'none' }}>auto</span>}
+                  {(c.computed || c.autofill) && <span style={{ display: 'block', fontSize: 9, fontWeight: 400, letterSpacing: 0, color: ((c.price && !c.computed) || c.autofill) ? '#1E40AF' : 'var(--color-info)', textTransform: 'none' }}>auto</span>}
                 </th>
               ))}
               {canEdit && !isLocked && <th style={{ ...th, width: 40, zIndex: 10 }} />}
@@ -345,12 +345,12 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
                       }
 
                       if (col.computed) {
-                        return <td key={col.key} style={{ ...td, fontFamily: 'var(--font-mono)', color: col.price ? '#1E40AF' : 'var(--text-muted)', fontWeight: col.price ? 600 : 400, textAlign: 'right', background: col.price ? PRICE_BG : 'var(--bg-base)' }}>{displayVal}</td>
+                        return <td key={col.key} style={{ ...td, fontFamily: 'var(--font-mono)', color: col.price ? '#1E40AF' : 'var(--text-muted)', fontWeight: col.price ? 600 : 400, textAlign: 'right' }}>{displayVal}</td>
                       }
 
                       // tag/fb: computed (read-only) for AG3, manually editable for CH1/CH2/ADM
                       if ((col.key === 'tag_price' || col.key === 'fb_price') && isAG3) {
-                        return <td key={col.key} style={{ ...td, fontFamily: 'var(--font-mono)', color: '#1E40AF', fontWeight: 600, textAlign: 'right', background: PRICE_BG }}>{displayVal}</td>
+                        return <td key={col.key} style={{ ...td, fontFamily: 'var(--font-mono)', color: '#1E40AF', fontWeight: 600, textAlign: 'right' }}>{displayVal}</td>
                       }
 
                       return (
