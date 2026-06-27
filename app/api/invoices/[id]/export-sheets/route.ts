@@ -126,47 +126,11 @@ async function fetchImageToSupabase(
   }
 }
 
-// ── Formula helpers ──────────────────────────────────────────────────────────
+// ── Row builders ─────────────────────────────────────────────────────────────
+// All computed values (tien_vang, von_san_xuat, cif_price, etc.) come from DB.
+// No Sheets formulas are emitted — only =IMAGE() for inline images remains.
 
-// 0-indexed column to A1 letter (0→A, 7→H, 26→AA)
-function colLetter(idx: number): string {
-  let r = '', num = idx + 1
-  while (num > 0) { const m = (num - 1) % 26; r = String.fromCharCode(65 + m) + r; num = Math.floor((num - 1) / 26) }
-  return r
-}
-
-// Map loai_vang to NVL sheet price-per-gram cell reference.
-// NVL!$B$16=24K … $B$23=AG … $B$24=PD (added by buildNVLRows)
-function nvlGoldRef(loaiVang: string | null | undefined): string {
-  const lv = (loaiVang ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
-  if (lv.includes('24')) return 'NVL!$B$16'
-  if (lv.includes('22')) return 'NVL!$B$17'
-  if (lv.includes('18')) return 'NVL!$B$18'
-  if (lv.includes('15')) return 'NVL!$B$19'
-  if (lv.includes('14')) return 'NVL!$B$20'
-  if (lv.includes('10')) return 'NVL!$B$21'
-  if (lv.startsWith('PT')) return 'NVL!$B$22'  // PT950, PT850, PT, ...
-  if (lv === 'AG')         return 'NVL!$B$23'
-  if (lv === 'PD')         return 'NVL!$B$24'
-  return 'NVL!$B$16'
-}
-
-// Pre-compute 1-indexed Sheets row for each item's main row in SUMMARY.
-// SUMMARY data starts at row 4 (3 header rows, then data).
-function summaryItemMainRows(items: any[], template: string): number[] {
-  const isAG3 = template === 'CH1_AG3' || template === 'VNSI_AG3'
-  const result: number[] = []
-  let cursor = 4
-  for (const item of items ?? []) {
-    result.push(cursor)
-    cursor += isAG3 ? 4 : Math.max((item.invoice_diamonds?.length ?? 0), 1)
-  }
-  return result
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean, summaryMainRows: number[] = []) {
+function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean) {
   const template   = (invoice.template_type ?? 'CH1') as string
   const isCH2      = template === 'CH2'
   const isADM      = template === 'ADM'
@@ -214,12 +178,9 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean, summa
   let itemIdx = 0
   for (const item of items ?? []) {
     const erp          = n(item.erp_bom_cost)
-    const jmDataRow    = itemIdx + 3  // 1-indexed Sheets row (title=1, header=2, first data=3)
-    const summaryMainR = summaryMainRows[itemIdx] ?? (itemIdx + 4)
 
-    // Purchase price — reference SUMMARY Vốn SX / Trị giá
-    const summaryVonSXCol = isADM ? 'X' : isAG3 ? 'J' : 'AC'
-    const purchaseFormula = `='SUMMARY'!${summaryVonSXCol}${summaryMainR}`
+    // Purchase price — pre-computed from DB (= von_san_xuat)
+    const purchaseValue = n(item.von_san_xuat)
 
     const row: (string | number)[] = [
       n(item.seq),
@@ -238,20 +199,18 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean, summa
       n(item.wt_gr ?? item.t_pham_co_nvl_da),
     )
     if (canSeePrice) {
-      row.push(purchaseFormula)
+      row.push(purchaseValue)
       if (hasCIF) {
-        // ADM CIF is pre-computed in SUMMARY!Y; others = VonSX × (1 + NVL!$B$11)
-        const cifFormula = isADM
-          ? `='SUMMARY'!Y${summaryMainR}`
-          : `='SUMMARY'!${isAG3 ? 'J' : 'AC'}${summaryMainR}*(1+NVL!$B$11)`
-        row.push(cifFormula)
+        // CIF price — pre-computed from DB
+        row.push(n(item.cif_price))
       }
       if (hasERP) {
-        const priceStart = isCH1_AG3 ? 12 : 11   // 0-indexed col of Purchase in this row
-        const purchaseCol = colLetter(priceStart)    // L for CH1
-        const erpCol      = colLetter(priceStart + 2) // N for CH1 (Purchase, CIF, ERP)
         row.push(typeof erp === 'number' ? erp : '')  // ERP — manual input, keep static
-        row.push(`=IFERROR((${purchaseCol}${jmDataRow}-${erpCol}${jmDataRow})/${purchaseCol}${jmDataRow},"")`)
+        // Chênh lệch — computed inline
+        const purchaseNum = typeof purchaseValue === 'number' ? purchaseValue : 0
+        const erpNum      = typeof erp === 'number' ? erp : 0
+        const chenhLech   = purchaseNum > 0 ? (purchaseNum - erpNum) / purchaseNum : ''
+        row.push(chenhLech)
       }
       if (hasTagFB) row.push(n(item.tag_price), n(item.fb_price))
       if (isADM) row.push(item.ngay_gui ?? '', item.hoa_don ?? '')
@@ -261,7 +220,10 @@ function buildJMFormRows(invoice: any, items: any[], canSeePrice: boolean, summa
           ? (n(item.qt_pcs) as number) : 1
         const wtPerUnit = typeof n(item.wt_gr ?? item.t_pham_co_nvl_da) === 'number'
           ? (n(item.wt_gr ?? item.t_pham_co_nvl_da) as number) / qty : ''
-        row.push(1, wtPerUnit, `=${purchaseFormula.slice(1)}/${qty}`, n(item.tag_price) !== '' ? `=${n(item.tag_price)}/${qty}` : '')
+        const purchasePerUnit = typeof purchaseValue === 'number' ? purchaseValue / qty : ''
+        const tagVal = n(item.tag_price)
+        const tagPerUnit = typeof tagVal === 'number' ? tagVal / qty : ''
+        row.push(1, wtPerUnit, purchasePerUnit, tagPerUnit)
       }
     }
     row.push(item.customer_name ?? '')
@@ -384,20 +346,27 @@ function buildNVLRows(invoice: any) {
   rows.push(['CIF rate',          n(invoice.nvl_cif_rate ?? 0.05)])
   rows.push(['Tag multiplier',    n(invoice.nvl_tag_multiplier ?? '')])
   rows.push(['FB multiplier',     n(invoice.nvl_fr_multiplier ?? '')])
-  // ── Giá kim loại / gram — computed formulas used by SUMMARY ──────────────
+  // ── Giá kim loại / gram — pre-computed from NVL snapshot ──────────────
   // Row index (0-based): 13=blank, 14=section header, 15..23 = price/gram rows
   // Sheets rows (1-based):         B15 is header,     B16..B24 = price/gram values
+  const spot  = invoice.nvl_gold_24k ?? 0
+  const sPt   = invoice.nvl_pt_price ?? 0
+  const sAg   = invoice.nvl_ag_price ?? 0
+  const sPd   = invoice.nvl_pd_price ?? 0
+  const lGold = invoice.nvl_loss_gold ?? 0.06
+  const lPt   = invoice.nvl_loss_pt   ?? 0.17
+  const OZ    = 31.103
   rows.push([''])
   rows.push(['--- Giá kim loại / gram ---', ''])   // Sheets B15 — section label
-  rows.push(['24K / gram',  '=B4/31.103'])          // B16
-  rows.push(['22K / gram',  '=B4*(22/24)/31.103'])  // B17
-  rows.push(['18K / gram',  '=B4*(1+B9)*(18/24)/31.103'])  // B18
-  rows.push(['15K / gram',  '=B4*(1+B9)*(15/24)/31.103'])  // B19
-  rows.push(['14K / gram',  '=B4*(1+B9)*(14/24)/31.103'])  // B20
-  rows.push(['10K / gram',  '=B4*(1+B9)*(10/24)/31.103'])  // B21
-  rows.push(['PT / gram',   '=B5*(1+B10)/31.103'])          // B22
-  rows.push(['AG / gram',   '=B6*(1+B9)*(1+B10)/31.103'])   // B23
-  rows.push(['PD / gram',   '=B7*(1+B10)/31.103'])           // B24
+  rows.push(['24K / gram',  spot / OZ])                                // B16
+  rows.push(['22K / gram',  spot * (22 / 24) / OZ])                    // B17
+  rows.push(['18K / gram',  spot * (1 + lGold) * (18 / 24) / OZ])     // B18
+  rows.push(['15K / gram',  spot * (1 + lGold) * (15 / 24) / OZ])     // B19
+  rows.push(['14K / gram',  spot * (1 + lGold) * (14 / 24) / OZ])     // B20
+  rows.push(['10K / gram',  spot * (1 + lGold) * (10 / 24) / OZ])     // B21
+  rows.push(['PT / gram',   sPt * (1 + lPt) / OZ])                    // B22
+  rows.push(['AG / gram',   sAg * (1 + lGold) * (1 + lPt) / OZ])     // B23
+  rows.push(['PD / gram',   sPd * (1 + lPt) / OZ])                    // B24
   return rows
 }
 
@@ -430,12 +399,7 @@ function buildSummaryRowsAG3(items: any[]) {
   rows.push(r3)
 
   // Data rows — 4 rows per product (data + channel-sub-row + spacer + totals)
-  // Track Sheets row (1-indexed) for formula references. Data starts at row 4.
-  let rowCursor = 3  // 0-indexed position in rows array before push
-
   for (const item of items ?? []) {
-    const mainR = rowCursor + 1  // 1-indexed Sheets row for this item's main data row
-
     const row = Array(C).fill('')
     row[0] = n(item.seq)
     row[1] = driveImageFormula(item.image_url)
@@ -444,27 +408,23 @@ function buildSummaryRowsAG3(items: any[]) {
     row[4] = n(item.qt_pcs)
     row[5] = item.vendor_model ?? ''
     row[6] = item.loai_vang    ?? ''
-    // H = Tiền vàng: nvl price/gram × I (T.Phẩm)
-    row[7] = `=${nvlGoldRef(item.loai_vang)}*I${mainR}`
+    // H = Tiền vàng (pre-computed from DB)
+    row[7] = n(item.tien_vang)
     row[8] = n(item.t_pham_co_nvl_da)   // I = TL T.Phẩm — INPUT
-    row[9] = `=H${mainR}`               // J = Trị giá = Tiền vàng for AG3
+    row[9] = n(item.von_san_xuat)       // J = Trị giá = Tiền vàng for AG3 (pre-computed)
     rows.push(row)
-    rowCursor++
 
     rows.push(Array(C).fill(''))                                    // channel sub-row
-    rowCursor++
 
     rows.push(Array(C).fill('').map((v, i) => i === 7 ? ' ' : v))  // spacer
-    rowCursor++
 
-    // Totals row — references main row via formulas so it stays in sync
+    // Totals row — static values matching the main row
     const totals = Array(C).fill('')
     totals[4] = n(item.qt_pcs)
-    totals[7] = `=H${mainR}`   // Tiền vàng
-    totals[8] = `=I${mainR}`   // TL T.Phẩm
-    totals[9] = `=J${mainR}`   // Trị giá
+    totals[7] = n(item.tien_vang)           // Tiền vàng
+    totals[8] = n(item.t_pham_co_nvl_da)    // TL T.Phẩm
+    totals[9] = n(item.von_san_xuat)        // Trị giá
     rows.push(totals)
-    rowCursor++
   }
 
   return rows
@@ -503,20 +463,13 @@ function buildSummaryRowsADM(items: any[]) {
   r3[23]='总计'; r3[24]='到岸价'
   rows.push(r3)
 
-  // Track Sheets row (1-indexed). Data starts at row 4 (3 header rows).
-  let rowCursor = 3
-
   for (const item of items ?? []) {
     const gems     = (item.invoice_diamonds ?? []) as any[]
     const custName = item.customer_name ?? item.nini_adm
-    const numGems  = gems.length
-    const numRows  = Math.max(numGems, 1)
-    const mainR    = rowCursor + 1          // 1-indexed Sheets row for main product row
-    const lastGemR = mainR + numGems - 1    // last gem row (= mainR when no gems)
+    const numRows  = Math.max(gems.length, 1)
 
     for (let g = 0; g < numRows; g++) {
       const gem = gems[g] as any | undefined
-      const r   = mainR + g                 // 1-indexed Sheets row for this gem row
       const row = Array(C).fill('')
 
       if (g === 0) {
@@ -529,14 +482,12 @@ function buildSummaryRowsADM(items: any[]) {
         row[6]  = item.vendor_model ?? ''
         row[7]  = item.loai_vang    ?? ''
         row[9]  = n(item.t_pham_co_nvl_da)   // J = T.Phẩm có NVL đá — INPUT
-        // Computed formulas
-        const gemRef = numGems > 1 ? `S${mainR}:S${lastGemR}` : `S${mainR}`
-        row[10] = `=J${mainR}-SUM(${gemRef})`              // K = T.Phẩm trừ NVL đá
-        row[11] = `=K${mainR}`                              // L = T.Phẩm vàng TT
-        row[8]  = `=${nvlGoldRef(item.loai_vang)}*L${mainR}` // I = Tiền vàng
-        const sumU = numGems > 1 ? `U${mainR}:U${lastGemR}` : `U${mainR}`
-        row[23] = `=SUM(${sumU})+I${mainR}`   // X = Vốn SX ADM (no fabrication fees)
-        row[24] = `=X${mainR}*1.1`            // Y = CIF 10%
+        // Pre-computed values from DB
+        row[10] = n(item.t_pham_tru_nvl_da)     // K = T.Phẩm trừ NVL đá
+        row[11] = n(item.t_pham_vang_thuc_te)   // L = T.Phẩm vàng TT
+        row[8]  = n(item.tien_vang)              // I = Tiền vàng
+        row[23] = n(item.von_san_xuat)           // X = Vốn SX ADM
+        row[24] = n(item.cif_price)              // Y = CIF
       }
 
       if (gem) {
@@ -546,15 +497,14 @@ function buildSummaryRowsADM(items: any[]) {
         row[15] = n(gem.sl_hot)                // P = SL hột — INPUT
         row[16] = n(gem.tl_truoc_xu_ly_ct)     // Q = TL trước — INPUT
         row[17] = n(gem.tl_sau_xu_ly_ct)       // R = TL sau — INPUT
-        row[18] = `=Q${r}/5`                    // S = TL Xoàn (gr)
+        row[18] = n(gem.tl_xoan_gr)              // S = TL Xoàn (gr) (pre-computed)
         row[19] = n(gem.don_gia)                // T = Đơn giá — from DB lookup
-        row[20] = `=Q${r}*T${r}`               // U = Tổng giá
+        row[20] = n(gem.t_gia_xoan)             // U = Tổng giá (pre-computed)
         row[21] = 0   // don_gia_phi = 0 for ADM
         row[22] = 0   // t_phi = 0 for ADM
       }
 
       rows.push(row)
-      rowCursor++
     }
   }
 
@@ -610,21 +560,13 @@ function buildSummaryRows(invoice: any, items: any[]) {
   rows.push(r3)
 
   // Data — dynamic rows: 1 main row + 1 row per gem (no fixed block limit)
-  // Track Sheets row (1-indexed) to build cell-reference formulas.
-  // Data starts at rows array index 3 → Sheets row 4 (1-indexed).
-  let rowCursor = 3
-
   for (const item of items ?? []) {
     const gems     = (item.invoice_diamonds ?? []) as any[]
     const custName = item.customer_name ?? item.nini_adm
-    const numGems  = gems.length
-    const numRows  = Math.max(numGems, 1)
-    const mainR    = rowCursor + 1          // 1-indexed Sheets row for this item's main row
-    const lastGemR = mainR + numGems - 1    // last gem row (= mainR when no gems)
+    const numRows  = Math.max(gems.length, 1)
 
     for (let g = 0; g < numRows; g++) {
       const gem = gems[g] as any | undefined
-      const r   = mainR + g                 // 1-indexed Sheets row for this gem row
       const row: (string | number)[] = Array(SUMMARY_COLS).fill('')
 
       if (g === 0) {
@@ -645,15 +587,11 @@ function buildSummaryRows(invoice: any, items: any[]) {
         row[30] = item.ngay_gui    ?? ''
         row[31] = item.tracking_no ?? ''
         row[32] = item.hoa_don     ?? ''
-        // Computed formulas
-        const gemRef = numGems > 1 ? `S${mainR}:S${lastGemR}` : `S${mainR}`
-        row[10] = `=J${mainR}-SUM(${gemRef})`                 // K = T.Phẩm trừ NVL đá
-        row[11] = `=K${mainR}`                                 // L = T.Phẩm vàng TT
-        row[8]  = `=${nvlGoldRef(item.loai_vang)}*L${mainR}`  // I = Tiền vàng
-        const sumU = numGems > 1 ? `U${mainR}:U${lastGemR}` : `U${mainR}`
-        const sumW = numGems > 1 ? `W${mainR}:W${lastGemR}` : `W${mainR}`
-        // AC = Vốn SX: Σ T.GIÁ XOÀN + Σ T.Phí + Tiền vàng + fabrication cols
-        row[28] = `=SUM(${sumU})+SUM(${sumW})+I${mainR}+X${mainR}+Y${mainR}+Z${mainR}+AA${mainR}+AB${mainR}`
+        // Pre-computed values from DB
+        row[10] = n(item.t_pham_tru_nvl_da)     // K = T.Phẩm trừ NVL đá
+        row[11] = n(item.t_pham_vang_thuc_te)   // L = T.Phẩm vàng TT
+        row[8]  = n(item.tien_vang)              // I = Tiền vàng
+        row[28] = n(item.von_san_xuat)           // AC = Vốn SX
       }
 
       // Gem columns (12-22)
@@ -664,15 +602,14 @@ function buildSummaryRows(invoice: any, items: any[]) {
         row[15] = n(gem.sl_hot)                // P = SL hột — INPUT
         row[16] = n(gem.tl_truoc_xu_ly_ct)     // Q = TL trước — INPUT
         row[17] = n(gem.tl_sau_xu_ly_ct)       // R = TL sau — INPUT
-        row[18] = `=Q${r}/5`                    // S = TL Xoàn (gr)
+        row[18] = n(gem.tl_xoan_gr)              // S = TL Xoàn (gr) (pre-computed)
         row[19] = n(gem.don_gia)                // T = Đơn giá — from DB lookup
-        row[20] = `=Q${r}*T${r}`               // U = T.GIÁ XOÀN
+        row[20] = n(gem.t_gia_xoan)             // U = T.GIÁ XOÀN (pre-computed)
         row[21] = 1                              // V = Đơn giá phí = $1/viên
-        row[22] = `=P${r}*1`                   // W = T.Phí
+        row[22] = n(gem.t_phi)                   // W = T.Phí (pre-computed)
       }
 
       rows.push(row)
-      rowCursor++
     }
   }
 
@@ -736,15 +673,14 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
 
     // 2. Write JM FORM data
-    const smRows = summaryItemMainRows(processedItems, invoice.template_type ?? 'CH1')
-    const jmRows = buildJMFormRows(invoice, processedItems, canSeePrice, smRows)
+    const jmRows = buildJMFormRows(invoice, processedItems, canSeePrice)
     await sheetsPut(
       accessToken,
       `${spreadsheetId}/values/${encodeURIComponent('JM FORM!A1')}?valueInputOption=USER_ENTERED`,
       { values: jmRows },
     )
 
-    // 3. Write NVL first — SUMMARY cross-sheet refs (=NVL!$B$18*...) must resolve correctly
+    // 3. Write NVL data (reference sheet with metal prices snapshot)
     const nvlRows = buildNVLRows(invoice)
     await sheetsPut(
       accessToken,
@@ -769,15 +705,11 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       if (_isAG3gt) {
         summaryGrandTotalRowIdx = 3 + processedItems.length * 4
         const gt = Array(_gtNCols).fill('')
-        // AG3: each item = 4 rows; main data row for item i is at row (4 + i*4).
-        // Cannot use =SUM(H4:HN) because totals sub-rows duplicate H/I/J values → double-count.
-        const mainRowNums = processedItems.map((_: any, i: number) => 4 + i * 4)
-        const joinRefs = (col: string) => `=${mainRowNums.map((r: number) => `${col}${r}`).join('+')}`
         gt[0] = 'TỔNG'
-        gt[4] = joinRefs('E')   // Qt. pcs
-        gt[7] = joinRefs('H')   // Tiền vàng
-        gt[8] = joinRefs('I')   // T.Phẩm có NVL đá
-        gt[9] = joinRefs('J')   // Vốn sản xuất
+        gt[4] = sumF('qt_pcs')                // Qt. pcs
+        gt[7] = sumF('tien_vang')             // Tiền vàng
+        gt[8] = sumF('t_pham_co_nvl_da')      // T.Phẩm có NVL đá
+        gt[9] = sumF('von_san_xuat')          // Vốn sản xuất
         summaryRows.push(gt)
       } else {
         let dataRowCount = 0
@@ -787,16 +719,15 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         }
         summaryGrandTotalRowIdx = 3 + dataRowCount
         const gt = Array(_gtNCols).fill('')
-        const firstData = 4, lastData = 3 + dataRowCount
         gt[0] = 'TỔNG'
-        gt[5] = `=SUM(F${firstData}:F${lastData})`   // Qty
-        gt[8] = `=SUM(I${firstData}:I${lastData})`   // Tiền vàng
+        gt[5] = sumF('qt_pcs')                // Qty
+        gt[8] = sumF('tien_vang')             // Tiền vàng
         if (_isADMgt) {
-          gt[23] = `=SUM(X${firstData}:X${lastData})` // Vốn SX ADM
-          gt[24] = `=SUM(Y${firstData}:Y${lastData})` // CIF ADM
+          gt[23] = sumF('von_san_xuat')       // Vốn SX ADM
+          gt[24] = sumF('cif_price')          // CIF ADM
         } else {
-          gt[9]  = `=SUM(J${firstData}:J${lastData})` // T.Phẩm có NVL đá
-          gt[28] = `=SUM(AC${firstData}:AC${lastData})` // Vốn SX CH1/CH2
+          gt[9]  = sumF('t_pham_co_nvl_da')   // T.Phẩm có NVL đá
+          gt[28] = sumF('von_san_xuat')       // Vốn SX CH1/CH2
         }
         summaryRows.push(gt)
       }
