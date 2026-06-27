@@ -89,8 +89,8 @@ export function recalcDiamond(
 /**
  * Vốn sản xuất — template-aware per JM-FORM SUMMARY
  *
- * CH1, CH2:  Σt_gia_xoan + Σt_phi + tien_vang + gia_cong + duc + thiet_ke + resin + phi_phu_kien
- * ADM:       Σt_gia_xoan + Σt_phi + tien_vang  (no individual fabrication fees)
+ * CH1, CH2, ADM (có hột): Σt_gia_xoan + Σt_phi + tien_vang + gia_cong + duc + thiet_ke + resin + phi_phu_kien
+ * CH1, CH2, ADM (không hột): tien_vang only
  * CH1_AG3, VNSI_AG3: tien_vang only (no diamonds, no fees)
  */
 export function calcVonSanXuat(

@@ -93,10 +93,12 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
 
   const isAG3    = template === 'CH1_AG3' || template === 'VNSI_AG3'
   const isAdm    = template === 'ADM'
-  const hasFees  = template === 'CH1' || template === 'CH2'
+  const hasFees  = !isAG3
+  const [classWarn, setClassWarn] = useState('')
+  const [feeWarn,   setFeeWarn]   = useState('')
 
   useEffect(() => {
-    if (open) { setForm(EMPTY); setError(''); setAutoFilled(false); setAutoFees(false) }
+    if (open) { setForm(EMPTY); setError(''); setAutoFilled(false); setAutoFees(false); setClassWarn(''); setFeeWarn('') }
   }, [open])
 
   function handleDescriptionChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -107,22 +109,31 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
       const detected = detectClassSubClass(desc, classRules)
       if (detected) {
         setAutoFilled(true)
+        setClassWarn('')
         next.class     = detected.class
         next.sub_class = detected.sub_class
-        // Auto-fill fees when sub_class is detected and template has fee fields
         if (hasFees) {
           const prices = getAssemblyPrices(detected.sub_class, assemblyRules, v.loai_vang)
           if (prices) {
-            if (!parseFloat(v.gia_cong))     next.gia_cong     = String(prices.gia_cong)
-            if (!parseFloat(v.duc))          next.duc          = String(prices.duc)
-            if (!parseFloat(v.thiet_ke))     next.thiet_ke     = String(prices.thiet_ke)
-            if (!parseFloat(v.resin))        next.resin        = String(prices.resin)
-            if (!parseFloat(v.phi_phu_kien)) next.phi_phu_kien = String(prices.phi_phu_kien)
+            next.gia_cong     = String(prices.gia_cong)
+            next.duc          = String(prices.duc)
+            next.thiet_ke     = String(prices.thiet_ke)
+            next.resin        = String(prices.resin)
+            next.phi_phu_kien = String(prices.phi_phu_kien)
+            setFeeWarn('')
+            setAutoFees(true)
+          } else {
+            setFeeWarn(`Chưa có giá gia công cho Sub Class "${detected.sub_class}". Vào Admin → Assembly Price để thêm, hoặc nhập tay.`)
+            setAutoFees(false)
           }
-          setAutoFees(true)
         }
       } else {
         setAutoFilled(false)
+        if (desc.trim().length >= 3) {
+          setClassWarn('Không tìm thấy Class/SubClass cho description này. Vào Admin → Class/SubClass để thêm prefix, hoặc nhập tay.')
+        } else {
+          setClassWarn('')
+        }
       }
 
       // Auto-fill Vendor Model# only when currently empty
@@ -154,15 +165,19 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
     setAutoFilled(false)
     setForm(v => {
       const next: Form = { ...v, sub_class: newSub }
-      if (hasFees) {
+      if (hasFees && newSub.trim()) {
         const prices = getAssemblyPrices(newSub, assemblyRules, v.loai_vang)
         if (prices) {
-          if (!parseFloat(v.gia_cong))     next.gia_cong     = String(prices.gia_cong)
-          if (!parseFloat(v.duc))          next.duc          = String(prices.duc)
-          if (!parseFloat(v.thiet_ke))     next.thiet_ke     = String(prices.thiet_ke)
-          if (!parseFloat(v.resin))        next.resin        = String(prices.resin)
-          if (!parseFloat(v.phi_phu_kien)) next.phi_phu_kien = String(prices.phi_phu_kien)
+          next.gia_cong     = String(prices.gia_cong)
+          next.duc          = String(prices.duc)
+          next.thiet_ke     = String(prices.thiet_ke)
+          next.resin        = String(prices.resin)
+          next.phi_phu_kien = String(prices.phi_phu_kien)
+          setFeeWarn('')
           setAutoFees(true)
+        } else {
+          setFeeWarn(`Chưa có giá gia công cho Sub Class "${newSub.toUpperCase()}". Vào Admin → Assembly Price để thêm, hoặc nhập tay.`)
+          setAutoFees(false)
         }
       }
       return next
@@ -392,6 +407,13 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
               />
             </div>
 
+            {classWarn && (
+              <div style={{ gridColumn: '1 / -1', fontSize: 'var(--text-xs)', color: '#B45309', background: '#FFFBEB', border: '1px solid #FDE68A', padding: '6px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: 10 }} />
+                {classWarn}
+              </div>
+            )}
+
             <div>
               <label style={labelStyle}>Loại Vàng</label>
               <ComboInput
@@ -418,7 +440,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
             </div>
           </div>
 
-          {/* Fees (CH1/CH2 only) */}
+          {/* Fees (CH1/CH2/ADM) */}
           {hasFees && (
             <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem', marginBottom: '0.75rem' }}>
               <div style={{ fontSize: 'var(--text-xs)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
@@ -429,6 +451,12 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
                   </span>
                 )}
               </div>
+              {feeWarn && (
+                <div style={{ fontSize: 'var(--text-xs)', color: '#B45309', background: '#FFFBEB', border: '1px solid #FDE68A', padding: '6px 10px', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <i className="fa-solid fa-triangle-exclamation" style={{ fontSize: 10 }} />
+                  {feeWarn}
+                </div>
+              )}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '0.5rem' }}>
                 {([
                   ['gia_cong',    'Gia công'],
