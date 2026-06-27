@@ -3,11 +3,6 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { recalcItem, recalcDiamond, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
-
-const PRICE_FIELDS = new Set([
-  'qt_pcs', 'wt_gr', 't_pham_co_nvl_da', 'loai_vang',
-  'gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien', 'sub_class',
-])
 import { resolvePhiPhuKien } from '@/lib/formulas/assembly-pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 
@@ -132,8 +127,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     writeAuditLog({ invoiceId: params.id, userId: ctx.userId, action: 'item_updated', metadata: { seq: item.seq, sku: item.sku } })
 
-    const needsRecalc = Object.keys(updates).some(k => PRICE_FIELDS.has(k))
-    if (needsRecalc) {
+    {
       const nvl      = nvlFromInvoice(invoice)
       const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
       const { data: diamonds } = await db.from('invoice_diamonds').select('*').eq('product_id', params.itemId)
