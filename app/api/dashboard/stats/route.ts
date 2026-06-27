@@ -18,72 +18,47 @@ export async function GET(req: NextRequest) {
     const dateStart = start.slice(0, 10)
     const dateEnd   = end.slice(0, 10)   // exclusive upper bound
 
-    const [statusRes, itemsRes, monthInvRes, monthCifRes, templateRes] = await Promise.all([
-      // Invoices whose invoice_date falls in selected month — count by status
+    const [invoiceRes, cifRes] = await Promise.all([
       db.from('invoices')
-        .select('status')
+        .select('id, status, template_type')
         .gte('invoice_date', dateStart)
         .lt('invoice_date', dateEnd),
 
-      // Items belonging to invoices in selected month
-      db.from('invoice_products')
-        .select('id', { count: 'exact', head: true })
-        .gte('invoices.invoice_date', dateStart)
-        .lt('invoices.invoice_date', dateEnd),
-
-      // Invoice count for selected month
-      db.from('invoices')
-        .select('id', { count: 'exact', head: true })
-        .gte('invoice_date', dateStart)
-        .lt('invoice_date', dateEnd),
-
-      // CIF sum for selected month
       canSeePrice
         ? db.from('invoice_products')
             .select('cif_price, invoices!inner(invoice_date)')
             .gte('invoices.invoice_date', dateStart)
             .lt('invoices.invoice_date', dateEnd)
         : Promise.resolve({ data: null, error: null }),
-
-      // Template breakdown for selected month
-      db.from('invoices')
-        .select('template_type')
-        .gte('invoice_date', dateStart)
-        .lt('invoice_date', dateEnd),
     ])
 
-    // by_status
-    const by_status: Record<string, number> = {}
-    for (const row of statusRes.data ?? []) {
-      by_status[row.status] = (by_status[row.status] ?? 0) + 1
-    }
+    const invoices = invoiceRes.data ?? []
+    const invoiceIds = invoices.map(r => r.id)
 
-    // by_template
+    const by_status: Record<string, number> = {}
     const by_template: Record<string, number> = {}
-    for (const row of templateRes.data ?? []) {
+    for (const row of invoices) {
+      by_status[row.status] = (by_status[row.status] ?? 0) + 1
       const t = row.template_type ?? 'MANUAL'
       by_template[t] = (by_template[t] ?? 0) + 1
     }
 
-    // CIF sum — items join invoices via Supabase embedded select
     let month_cif = 0
-    if (canSeePrice && monthCifRes.data) {
-      month_cif = (monthCifRes.data as any[]).reduce((s: number, r: any) => s + (r.cif_price ?? 0), 0)
+    if (canSeePrice && cifRes.data) {
+      for (const r of cifRes.data as any[]) month_cif += (r.cif_price ?? 0)
     }
 
-    // total_items for month: simpler fallback — count all products in month's invoices
-    const monthInvoiceCount = monthInvRes.count ?? 0
     let total_items = 0
-    if (monthInvoiceCount > 0) {
-      const { count } = await db
-        .from('invoice_products')
-        .select('id', { count: 'exact', head: true })
-        .in('invoice_id',
-          (statusRes.data ?? []).length > 0
-            ? (await db.from('invoices').select('id').gte('created_at', start).lt('created_at', end)).data?.map(r => r.id) ?? []
-            : []
+    if (invoiceIds.length > 0) {
+      const BATCH = 500
+      const counts = await Promise.all(
+        Array.from({ length: Math.ceil(invoiceIds.length / BATCH) }, (_, i) =>
+          db.from('invoice_products')
+            .select('id', { count: 'exact', head: true })
+            .in('invoice_id', invoiceIds.slice(i * BATCH, (i + 1) * BATCH))
         )
-      total_items = count ?? 0
+      )
+      total_items = counts.reduce((s, r) => s + (r.count ?? 0), 0)
     }
 
     return NextResponse.json({
@@ -92,7 +67,7 @@ export async function GET(req: NextRequest) {
         by_status,
         by_template,
         total_items,
-        month_invoice_count: monthInvoiceCount,
+        month_invoice_count: invoices.length,
         ...(canSeePrice ? { month_cif } : {}),
       },
     })

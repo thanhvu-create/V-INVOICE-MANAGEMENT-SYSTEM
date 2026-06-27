@@ -117,19 +117,16 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    const { data: inserted, error: insertErr } = await db
+    const itemsWithCalc = itemsToInsert.map(row => ({
+      ...row,
+      ...recalcItem(row, [], nvl, template),
+    }))
+
+    const { error: insertErr } = await db
       .from('invoice_products')
-      .insert(itemsToInsert)
-      .select()
+      .insert(itemsWithCalc)
 
     if (insertErr) throw insertErr
-
-    if (inserted) {
-      for (const item of inserted) {
-        const updates = recalcItem(item, [], nvl, template)
-        await db.from('invoice_products').update(updates).eq('id', item.id)
-      }
-    }
 
     writeAuditLog({
       invoiceId,

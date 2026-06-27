@@ -15,7 +15,9 @@ export async function GET(req: NextRequest) {
 
   const url = req.nextUrl.searchParams.get('url')
   if (!url) return NextResponse.json({ error: 'Missing url' }, { status: 400 })
-  if (!url.includes('docs.google.com/spreadsheets'))
+  let parsed: URL
+  try { parsed = new URL(url) } catch { return NextResponse.json({ error: 'URL không hợp lệ' }, { status: 400 }) }
+  if (parsed.hostname !== 'docs.google.com' || !parsed.pathname.startsWith('/spreadsheets/'))
     return NextResponse.json({ error: 'URL phải là Google Sheets' }, { status: 400 })
 
   let exportUrl: string

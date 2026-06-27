@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
-import { recalcItem, recalcDiamond, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
+import { bulkRecalcInvoice } from '@/lib/formulas/recalc-helpers'
+import type { InvoiceTemplate } from '@/lib/formulas/pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 
 type Params = { params: { id: string } }
@@ -67,30 +68,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
     if (invErr) throw invErr
 
-    const nvl = nvlFromInvoice(nvlSnapshot)
-
-    // Recalc toàn bộ items
-    const { data: items } = await db
-      .from('invoice_products')
-      .select('*, invoice_diamonds(*)')
-      .eq('invoice_id', params.id)
-
-    if (items && items.length > 0) {
-      await Promise.all(items.map(async (item: any) => {
-        const gems: any[] = item.invoice_diamonds ?? []
-
-        // Recalc từng gem trước
-        if (gems.length > 0) {
-          await Promise.all(gems.map((g: any) =>
-            db.from('invoice_diamonds').update(recalcDiamond(g, template)).eq('id', g.id)
-          ))
-        }
-
-        const updatedGems = gems.map((g: any) => ({ ...g, ...recalcDiamond(g, template) }))
-        const recalc = recalcItem(item, updatedGems, nvl, template)
-        await db.from('invoice_products').update(recalc).eq('id', item.id)
-      }))
-    }
+    await bulkRecalcInvoice(db, params.id, { ...nvlSnapshot, template_type: template })
 
     writeAuditLog({
       invoiceId: params.id,

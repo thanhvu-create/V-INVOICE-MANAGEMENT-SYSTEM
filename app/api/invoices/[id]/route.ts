@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getAuthContext, requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { checkEditPermission } from '@/lib/auth/editGuard'
-import { recalcItem, recalcDiamond, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
+import { bulkRecalcInvoice } from '@/lib/formulas/recalc-helpers'
 
 type Params = { params: { id: string } }
 
@@ -94,31 +94,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     ].some(k => k in updates)
 
     if (nvlChanged) {
-      const [{ data: newHeader }, { data: products }] = await Promise.all([
-        db.from('invoices').select('*').eq('id', params.id).single(),
-        db.from('invoice_products').select('id').eq('invoice_id', params.id),
-      ])
-      if (newHeader && products?.length) {
-        const nvl      = nvlFromInvoice(newHeader)
-        const template = ((newHeader as any).template_type ?? 'CH1') as InvoiceTemplate
-        await Promise.all(products.map(async (prod) => {
-          const [{ data: fullProd }, { data: diamonds }] = await Promise.all([
-            db.from('invoice_products').select('*').eq('id', prod.id).single(),
-            db.from('invoice_diamonds').select('*').eq('product_id', prod.id),
-          ])
-          if (fullProd) {
-            // Recalc each diamond's derived fields first
-            if (diamonds?.length) {
-              await Promise.all(diamonds.map(d =>
-                db.from('invoice_diamonds').update(recalcDiamond(d, template)).eq('id', d.id)
-              ))
-            }
-            const updatedDiamonds = diamonds ? diamonds.map(d => ({ ...d, ...recalcDiamond(d, template) })) : []
-            const recalc = recalcItem(fullProd, updatedDiamonds as any, nvl, template)
-            await db.from('invoice_products').update(recalc).eq('id', prod.id)
-          }
-        }))
-      }
+      const { data: newHeader } = await db.from('invoices').select('*').eq('id', params.id).single()
+      if (newHeader) await bulkRecalcInvoice(db, params.id, newHeader)
     }
 
     return NextResponse.json({ success: true, data })

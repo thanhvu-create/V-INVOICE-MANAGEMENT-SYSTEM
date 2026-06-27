@@ -1,31 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
-import { recalcItem, recalcDiamond, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
+import { recalcDiamond } from '@/lib/formulas/pricing'
+import type { InvoiceTemplate } from '@/lib/formulas/pricing'
+import { triggerItemRecalc } from '@/lib/formulas/recalc-helpers'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 
 type Params = { params: { id: string; itemId: string; gemId: string } }
-
-async function triggerRecalc(db: ReturnType<typeof createServiceClient>, itemId: string, invoiceId: string) {
-  const [{ data: item }, { data: diamonds }, { data: invoice }] = await Promise.all([
-    db.from('invoice_products').select('*').eq('id', itemId).single(),
-    db.from('invoice_diamonds').select('*').eq('product_id', itemId),
-    db.from('invoices').select('template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_cif_rate, nvl_tag_multiplier, nvl_fr_multiplier').eq('id', invoiceId).single(),
-  ])
-  if (item && invoice) {
-    const gemList = diamonds ?? []
-    const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
-    if (gemList.length) {
-      await Promise.all(gemList.map(d =>
-        db.from('invoice_diamonds').update(recalcDiamond(d, template)).eq('id', d.id)
-      ))
-    }
-    const updatedGems = gemList.map(d => ({ ...d, ...recalcDiamond(d, template) }))
-    const nvl     = nvlFromInvoice(invoice)
-    const updates = recalcItem(item, updatedGems as any, nvl, template)
-    await db.from('invoice_products').update(updates).eq('id', itemId)
-  }
-}
 
 // PATCH /api/invoices/[id]/items/[itemId]/gems/[gemId]
 export async function PATCH(req: NextRequest, { params }: Params) {
@@ -34,7 +15,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const body = await req.json()
     const db   = createServiceClient()
 
-    const { data: inv } = await db.from('invoices').select('status, created_by, template_type').eq('id', params.id).single()
+    const { data: inv } = await db.from('invoices')
+      .select('status, created_by, template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_cif_rate, nvl_tag_multiplier, nvl_fr_multiplier')
+      .eq('id', params.id).single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
     const editError = checkEditPermission({
       isLocked:  inv.status === 'finalized',
@@ -55,18 +38,16 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const updates: Record<string, unknown> = {}
     for (const k of EDITABLE) { if (k in body) updates[k] = body[k] }
 
-    // Immediately compute derived fields from the updated values
     const { data: existing } = await db.from('invoice_diamonds').select('*').eq('id', params.gemId).single()
     if (existing) {
       const merged = { ...existing, ...updates }
-      const derived = recalcDiamond(merged as any, template)
-      Object.assign(updates, derived)
+      Object.assign(updates, recalcDiamond(merged as any, template))
     }
 
     const { error } = await db.from('invoice_diamonds').update(updates).eq('id', params.gemId)
     if (error) throw error
 
-    await triggerRecalc(db, params.itemId, params.id)
+    await triggerItemRecalc(db, params.itemId, inv)
 
     const { data: updatedItem } = await db
       .from('invoice_products')
@@ -87,7 +68,9 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const ctx = await requireRole('user')
     const db  = createServiceClient()
 
-    const { data: inv } = await db.from('invoices').select('status, created_by').eq('id', params.id).single()
+    const { data: inv } = await db.from('invoices')
+      .select('status, created_by, template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_cif_rate, nvl_tag_multiplier, nvl_fr_multiplier')
+      .eq('id', params.id).single()
     if (!inv) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
     const editError = checkEditPermission({
       isLocked:  inv.status === 'finalized',
@@ -101,7 +84,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     const { error } = await db.from('invoice_diamonds').delete().eq('id', params.gemId)
     if (error) throw error
 
-    await triggerRecalc(db, params.itemId, params.id)
+    await triggerItemRecalc(db, params.itemId, inv)
 
     const { data: updatedItem } = await db
       .from('invoice_products')

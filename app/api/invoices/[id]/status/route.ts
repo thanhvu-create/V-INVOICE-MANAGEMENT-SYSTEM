@@ -42,12 +42,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (to_status === 'finalized') updateData.finalized_at = new Date().toISOString()
     if (to_status === 'draft')     updateData.finalized_at = null
 
-    const { error } = await db
+    const { data: updated, error } = await db
       .from('invoices')
       .update(updateData)
       .eq('id', params.id)
+      .eq('status', invoice.status)
+      .select('id')
 
     if (error) throw error
+    if (!updated?.length) {
+      return NextResponse.json(
+        { success: false, message: 'Invoice status đã bị thay đổi bởi người khác. Vui lòng reload.' },
+        { status: 409 }
+      )
+    }
 
     writeAuditLog({
       invoiceId:  params.id,

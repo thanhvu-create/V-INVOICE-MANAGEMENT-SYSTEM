@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole, AuthContext } from '@/lib/auth/getRole'
-import { recalcItem, recalcDiamond, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
+import { recalcDiamond } from '@/lib/formulas/pricing'
+import type { InvoiceTemplate } from '@/lib/formulas/pricing'
+import { triggerItemRecalc } from '@/lib/formulas/recalc-helpers'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 
 type Params = { params: { id: string; itemId: string } }
@@ -9,7 +11,7 @@ type Params = { params: { id: string; itemId: string } }
 async function guardAndCheck(db: ReturnType<typeof createServiceClient>, invoiceId: string, ctx: AuthContext) {
   const { data } = await db
     .from('invoices')
-    .select('status, created_by, template_type')
+    .select('status, created_by, template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_cif_rate, nvl_tag_multiplier, nvl_fr_multiplier')
     .eq('id', invoiceId)
     .single()
   if (!data) throw { status: 404, message: 'Not found' }
@@ -22,27 +24,6 @@ async function guardAndCheck(db: ReturnType<typeof createServiceClient>, invoice
   })
   if (editError) throw { status: 403, message: editError }
   return data
-}
-
-async function triggerRecalc(db: ReturnType<typeof createServiceClient>, itemId: string, invoiceId: string) {
-  const [{ data: item }, { data: diamonds }, { data: invoice }] = await Promise.all([
-    db.from('invoice_products').select('*').eq('id', itemId).single(),
-    db.from('invoice_diamonds').select('*').eq('product_id', itemId),
-    db.from('invoices').select('template_type, nvl_gold_24k, nvl_pt_price, nvl_ag_price, nvl_pd_price, nvl_loss_gold, nvl_loss_pt, nvl_cif_rate, nvl_tag_multiplier, nvl_fr_multiplier').eq('id', invoiceId).single(),
-  ])
-  if (item && invoice) {
-    const gemList = diamonds ?? []
-    const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
-    if (gemList.length) {
-      await Promise.all(gemList.map(d =>
-        db.from('invoice_diamonds').update(recalcDiamond(d, template)).eq('id', d.id)
-      ))
-    }
-    const updatedGems = gemList.map(d => ({ ...d, ...recalcDiamond(d, template) }))
-    const nvl      = nvlFromInvoice(invoice)
-    const updates  = recalcItem(item, updatedGems as any, nvl, template)
-    await db.from('invoice_products').update(updates).eq('id', itemId)
-  }
 }
 
 // GET /api/invoices/[id]/items/[itemId]/gems
@@ -97,7 +78,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       .insert({ ...gemBase, ...recalcDiamond(gemBase, template) })
 
     if (error) throw error
-    await triggerRecalc(db, params.itemId, params.id)
+    await triggerItemRecalc(db, params.itemId, inv)
 
     const { data: updatedItem } = await db
       .from('invoice_products')

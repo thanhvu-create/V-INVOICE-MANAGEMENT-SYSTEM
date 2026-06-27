@@ -3,6 +3,11 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { recalcItem, recalcDiamond, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
+
+const PRICE_FIELDS = new Set([
+  'qt_pcs', 'wt_gr', 't_pham_co_nvl_da', 'loai_vang',
+  'gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien', 'sub_class',
+])
 import { resolvePhiPhuKien } from '@/lib/formulas/assembly-pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 
@@ -104,22 +109,28 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     if (error) throw error
 
-    // Recalculate: first update diamond derived fields, then recalc item
-    const nvl      = nvlFromInvoice(invoice)
-    const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
-
-    const { data: diamonds } = await db.from('invoice_diamonds').select('*').eq('product_id', params.itemId)
-    const gemList = diamonds ?? []
-    if (gemList.length) {
-      await Promise.all(gemList.map(d =>
-        db.from('invoice_diamonds').update(recalcDiamond(d, template)).eq('id', d.id)
-      ))
-    }
-    const updatedGems = gemList.map(d => ({ ...d, ...recalcDiamond(d, template) }))
-    const recalc   = recalcItem(item, updatedGems as any, nvl, template)
-    await db.from('invoice_products').update(recalc).eq('id', params.itemId)
-
     writeAuditLog({ invoiceId: params.id, userId: ctx.userId, action: 'item_updated', metadata: { seq: item.seq, sku: item.sku } })
+
+    const needsRecalc = Object.keys(updates).some(k => PRICE_FIELDS.has(k))
+    if (needsRecalc) {
+      const nvl      = nvlFromInvoice(invoice)
+      const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
+      const { data: diamonds } = await db.from('invoice_diamonds').select('*').eq('product_id', params.itemId)
+      const gemList = diamonds ?? []
+
+      const recalcedGems = gemList.map(d => {
+        const derived = recalcDiamond(d, template)
+        return { ...d, ...derived, _update: derived }
+      })
+      if (recalcedGems.length) {
+        await Promise.all(recalcedGems.map(g =>
+          db.from('invoice_diamonds').update(g._update).eq('id', g.id)
+        ))
+      }
+      const cleanGems = recalcedGems.map(({ _update, ...rest }) => rest)
+      const recalc = recalcItem(item, cleanGems as any, nvl, template)
+      await db.from('invoice_products').update(recalc).eq('id', params.itemId)
+    }
 
     const { data: updatedItem } = await db
       .from('invoice_products')
