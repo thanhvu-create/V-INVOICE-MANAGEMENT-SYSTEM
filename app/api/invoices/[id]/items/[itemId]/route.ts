@@ -52,9 +52,9 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     // When sub_class changes and fee fields are not explicitly provided,
-    // auto-fill assembly fees from DB rules (CH1/CH2 only).
+    // auto-fill assembly fees from DB rules (CH1/CH2/ADM).
     // phi_phu_kien also depends on loai_vang: PT=$50, AG/SV=$10, others=table value.
-    const hasFees = ['CH1', 'CH2'].includes((invoice as any).template_type ?? 'CH1')
+    const hasFees = ['CH1', 'CH2', 'ADM'].includes((invoice as any).template_type ?? 'CH1')
     const feeKeys = ['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien'] as const
     const userSetFees = feeKeys.some(k => k in body)
     if ('sub_class' in updates && hasFees && !userSetFees) {

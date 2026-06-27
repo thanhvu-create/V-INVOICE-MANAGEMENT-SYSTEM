@@ -43,7 +43,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   const isAG3      = template === 'CH1_AG3' || template === 'VNSI_AG3'
   const isAdm      = template === 'ADM'
   const hasGems    = template === 'CH1' || template === 'CH2' || template === 'ADM'
-  const hasFees    = template === 'CH1' || template === 'CH2'
+  const hasFees    = template === 'CH1' || template === 'CH2' || template === 'ADM'
   const hasCIF     = template !== 'CH2'
   const hasTagFb   = hasCIF  // all templates with CIF also show Tag+FB
   const [editMode, setEditMode] = useState(false)

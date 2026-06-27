@@ -71,21 +71,18 @@ export function calcWeightNoGem(totalGr: number, diamonds: InvoiceDiamond[]): nu
  * Computed fields for a single diamond row.
  * Call this BEFORE recalcItem so that tl_xoan_gr / t_gia_xoan / t_phi are up to date.
  */
-// ADM has no setting fee per pcs (U col = empty in Excel) → don_gia_phi = 0, t_phi = 0
 export function recalcDiamond(
   d: Partial<InvoiceDiamond>,
-  template: InvoiceTemplate = 'CH1',
+  _template: InvoiceTemplate = 'CH1',
 ): Partial<InvoiceDiamond> {
-  // TL Sau (after processing) overrides TL Trước when entered; otherwise use TL Trước.
   const tl_base   = d.tl_sau_xu_ly_ct ?? d.tl_truoc_xu_ly_ct ?? 0
   const don_gia   = d.don_gia ?? 0
   const sl_hot    = d.sl_hot  ?? 0
-  const feePerPcs = template === 'ADM' ? 0 : 1
   return {
     tl_xoan_gr:  tl_base / 5,
     t_gia_xoan:  tl_base * don_gia,
-    don_gia_phi: feePerPcs,
-    t_phi:       sl_hot * feePerPcs,
+    don_gia_phi: 1,
+    t_phi:       sl_hot * 1,
   }
 }
 
@@ -105,7 +102,7 @@ export function calcVonSanXuat(
   const sumGiaXoan = diamonds.reduce((s, g) => s + (g.t_gia_xoan ?? 0), 0)
   const sumPhi     = diamonds.reduce((s, g) => s + (g.t_phi      ?? 0), 0)
 
-  if (template === 'CH1' || template === 'CH2') {
+  if (template === 'CH1' || template === 'CH2' || template === 'ADM') {
     const base = sumGiaXoan + sumPhi + tienVang
     if (diamonds.length === 0) return base
     return base
@@ -114,9 +111,6 @@ export function calcVonSanXuat(
       + (item.thiet_ke     ?? 0)
       + (item.resin        ?? 0)
       + (item.phi_phu_kien ?? 0)
-  }
-  if (template === 'ADM') {
-    return sumGiaXoan + sumPhi + tienVang
   }
   // CH1_AG3, VNSI_AG3, MANUAL
   return tienVang
