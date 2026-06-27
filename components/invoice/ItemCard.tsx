@@ -49,13 +49,14 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   const [editMode, setEditMode] = useState(false)
   const [form, setForm] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
-  const [metalTypes, setMetalTypes] = useState<string[]>(BASE_METAL_TYPES)
+  const [metalTypes,    setMetalTypes]    = useState<string[]>(BASE_METAL_TYPES)
+  const [classOptions,  setClassOptions]  = useState<string[]>([])
+  const [subClassOptions, setSubClassOptions] = useState<string[]>([])
 
   useEffect(() => {
-    fetch('/api/metal-types')
-      .then(r => r.json())
-      .then(j => { if (j.success) setMetalTypes(j.data) })
-      .catch(() => {})
+    fetch('/api/metal-types').then(r => r.json()).then(j => { if (j.success) setMetalTypes(j.data) }).catch(() => {})
+    fetch('/api/class-subclass').then(r => r.json()).then(j => { if (j.success) setClassOptions([...new Set((j.data as any[]).map(r => r.class))].sort()) }).catch(() => {})
+    fetch('/api/assembly-pricing').then(r => r.json()).then(j => { if (j.success) setSubClassOptions([...new Set((j.data as any[]).map(r => r.sub_class))].sort()) }).catch(() => {})
   }, [])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -304,9 +305,9 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
             <div><label style={labelStyle}>Tên khách</label>
               <input style={inputStyle} value={form.customer_name ?? ''} onChange={f('customer_name')} placeholder="e.g. ADM1, CH1-Khách" /></div>
             <div><label style={labelStyle}>Class</label>
-              <input style={inputStyle} value={form.class} onChange={f('class')} /></div>
+              <ComboInput value={form.class ?? ''} onChange={v => setForm(prev => ({ ...prev, class: v }))} options={classOptions} placeholder="18MTG, DIAJE…" uppercase style={inputStyle} /></div>
             <div><label style={labelStyle}>Sub Class</label>
-              <input style={inputStyle} value={form.sub_class} onChange={f('sub_class')} /></div>
+              <ComboInput value={form.sub_class ?? ''} onChange={v => setForm(prev => ({ ...prev, sub_class: v }))} options={subClassOptions} placeholder="BL, RI, ER, PD…" uppercase style={inputStyle} /></div>
             <div><label style={labelStyle}>Vendor Model# (Mã mẫu)</label>
               <input style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }} value={form.vendor_model ?? ''} onChange={f('vendor_model')} placeholder="e.g. L10437" /></div>
             {isAG3 ? (<>
