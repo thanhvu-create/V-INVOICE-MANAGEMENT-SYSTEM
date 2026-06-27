@@ -106,14 +106,14 @@ export function calcVonSanXuat(
   const sumPhi     = diamonds.reduce((s, g) => s + (g.t_phi      ?? 0), 0)
 
   if (template === 'CH1' || template === 'CH2') {
-    return (
-      sumGiaXoan + sumPhi + tienVang
+    const base = sumGiaXoan + sumPhi + tienVang
+    if (diamonds.length === 0) return base
+    return base
       + (item.gia_cong     ?? 0)
       + (item.duc          ?? 0)
       + (item.thiet_ke     ?? 0)
       + (item.resin        ?? 0)
       + (item.phi_phu_kien ?? 0)
-    )
   }
   if (template === 'ADM') {
     return sumGiaXoan + sumPhi + tienVang
@@ -153,15 +153,9 @@ export function recalcItem(
   const gpg       = goldPricePerGram(item.loai_vang ?? '', nvl)
   const goldValue = gpg !== null ? weightNoGem * gpg : 0
 
-  const isAG3    = template === 'CH1_AG3' || template === 'VNSI_AG3'
-  const zeroFees = isAG3 || diamonds.length === 0
+  const isAG3 = template === 'CH1_AG3' || template === 'VNSI_AG3'
 
-  // Zero fees BEFORE Von SX so the formula is consistent: fees only count when gems are present
-  const itemForCalc: Partial<InvoiceProduct> = zeroFees
-    ? { ...item, gia_cong: 0, duc: 0, thiet_ke: 0, resin: 0, phi_phu_kien: 0 }
-    : item
-
-  const withGold = { ...itemForCalc, tien_vang: goldValue }
+  const withGold = { ...item, tien_vang: goldValue }
   const vonSX    = calcVonSanXuat(withGold, diamonds, template)
   const cif      = calcCIFPrice(vonSX, template, nvl.cif_rate)
 
@@ -181,7 +175,7 @@ export function recalcItem(
     cif_price:           cif,
     tag_price:           tag,
     fb_price:            fb,
-    ...(zeroFees ? { gia_cong: 0, duc: 0, thiet_ke: 0, resin: 0, phi_phu_kien: 0 } : {}),
+    ...(isAG3 ? { gia_cong: 0, duc: 0, thiet_ke: 0, resin: 0, phi_phu_kien: 0 } : {}),
   }
 }
 
