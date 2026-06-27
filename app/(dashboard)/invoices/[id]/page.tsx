@@ -26,8 +26,11 @@ export default function InvoiceDetailPage() {
   const { user, canDo } = useUser()
   const router          = useRouter()
 
-  const [data,            setData]         = useState<{ header: any; items: any[] } | null>(null)
-  const [loading,         setLoading]      = useState(true)
+  const cacheKey = `inv_${id}`
+  const cached   = typeof window !== 'undefined' ? (() => { try { return JSON.parse(sessionStorage.getItem(cacheKey) ?? 'null') } catch { return null } })() : null
+
+  const [data,            setData]         = useState<{ header: any; items: any[] } | null>(cached)
+  const [loading,         setLoading]      = useState(!cached)
   const [view,            setView]         = useState<InvoiceView>('detail')
   const [addItemOpen,     setAddItemOpen]  = useState(false)
   const [exportingSheets, setExportingSheets] = useState(false)
@@ -58,7 +61,12 @@ export default function InvoiceDetailPage() {
       })
       const json = await res.json()
       if (json.success) {
-        setData(prev => prev ? { ...prev, header: { ...prev.header, ...fields } } : prev)
+        setData(prev => {
+          if (!prev) return prev
+          const next = { ...prev, header: { ...prev.header, ...fields } }
+          try { sessionStorage.setItem(cacheKey, JSON.stringify(next)) } catch {}
+          return next
+        })
       } else {
         alert(json.message ?? 'Lỗi khi lưu')
       }
@@ -103,27 +111,33 @@ export default function InvoiceDetailPage() {
     }
   }
 
+  const setDataAndCache = useCallback((d: { header: any; items: any[] } | null) => {
+    setData(d)
+    if (d) try { sessionStorage.setItem(cacheKey, JSON.stringify(d)) } catch {}
+  }, [cacheKey])
+
   const fetchData = useCallback(async () => {
-    setLoading(true)
     try {
       const res  = await fetch(`/api/invoices/${id}`)
       const json = await res.json()
-      if (json.success) setData(json.data)
+      if (json.success) setDataAndCache(json.data)
       else router.push('/invoices')
     } finally { setLoading(false) }
-  }, [id])
+  }, [id, setDataAndCache])
 
   const updateItemInState = useCallback((itemId: string, updatedItem: any) => {
     setData(prev => {
       if (!prev) return prev
-      return {
+      const next = {
         ...prev,
         items: prev.items.map(item =>
           item.id === itemId ? { ...item, ...updatedItem } : item
         ),
       }
+      try { sessionStorage.setItem(cacheKey, JSON.stringify(next)) } catch {}
+      return next
     })
-  }, [])
+  }, [cacheKey])
 
   useEffect(() => { fetchData() }, [fetchData])
 
