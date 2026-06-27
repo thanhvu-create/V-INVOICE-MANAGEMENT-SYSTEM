@@ -386,7 +386,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
               <ComboInput
                 value={form.class}
                 onChange={v => { setAutoFilled(false); setForm(prev => ({ ...prev, class: v })) }}
-                options={[...new Set(classRules.map(r => r.class))].sort()}
+                options={Array.from(new Set(classRules.map(r => r.class))).sort()}
                 placeholder="18MTG, DIAJE…"
                 uppercase
                 style={{ ...inputStyle, background: autoFilled ? '#F0FDF4' : 'var(--bg-surface)' }}
@@ -404,7 +404,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
               <ComboInput
                 value={form.sub_class}
                 onChange={v => handleSubClassChange({ target: { value: v } } as any)}
-                options={[...new Set(assemblyRules.map(r => r.sub_class))].sort()}
+                options={Array.from(new Set(assemblyRules.map(r => r.sub_class))).sort()}
                 placeholder="BL, RI, ER, PD…"
                 uppercase
                 style={{ ...inputStyle, background: autoFilled ? '#F0FDF4' : 'var(--bg-surface)' }}

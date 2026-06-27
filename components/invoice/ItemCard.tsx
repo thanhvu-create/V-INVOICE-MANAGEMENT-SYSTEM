@@ -55,8 +55,8 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
 
   useEffect(() => {
     fetch('/api/metal-types').then(r => r.json()).then(j => { if (j.success) setMetalTypes(j.data) }).catch(() => {})
-    fetch('/api/class-subclass').then(r => r.json()).then(j => { if (j.success) setClassOptions([...new Set((j.data as any[]).map(r => r.class))].sort()) }).catch(() => {})
-    fetch('/api/assembly-pricing').then(r => r.json()).then(j => { if (j.success) setSubClassOptions([...new Set((j.data as any[]).map(r => r.sub_class))].sort()) }).catch(() => {})
+    fetch('/api/class-subclass').then(r => r.json()).then(j => { if (j.success) setClassOptions(Array.from(new Set((j.data as any[]).map(r => r.class))).sort()) }).catch(() => {})
+    fetch('/api/assembly-pricing').then(r => r.json()).then(j => { if (j.success) setSubClassOptions(Array.from(new Set((j.data as any[]).map(r => r.sub_class))).sort()) }).catch(() => {})
   }, [])
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
