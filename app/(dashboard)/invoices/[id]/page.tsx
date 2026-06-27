@@ -26,6 +26,10 @@ export default function InvoiceDetailPage() {
   const { user, canDo } = useUser()
   const router          = useRouter()
 
+  useEffect(() => {
+    sessionStorage.setItem('lastInvoicePath', `/invoices/${id}`)
+  }, [id])
+
   const cacheKey = `inv_${id}`
   const cached   = typeof window !== 'undefined' ? (() => { try { return JSON.parse(sessionStorage.getItem(cacheKey) ?? 'null') } catch { return null } })() : null
 

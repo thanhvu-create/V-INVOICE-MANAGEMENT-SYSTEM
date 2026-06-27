@@ -15,6 +15,8 @@ function InvoiceListContent() {
   const router          = useRouter()
   const searchParams    = useSearchParams()
 
+  useEffect(() => { sessionStorage.removeItem('lastInvoicePath') }, [])
+
   const [rows,       setRows]       = useState<any[]>([])
   const [total,      setTotal]      = useState(0)
   const [totalPages, setTotalPages] = useState(1)

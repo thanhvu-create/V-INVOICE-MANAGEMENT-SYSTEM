@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useUser } from '@/contexts/UserContext'
@@ -44,6 +44,11 @@ export function TopNav() {
     router.push('/login')
     router.refresh()
   }
+
+  const [lastInvoicePath, setLastInvoicePath] = useState<string | null>(null)
+  useEffect(() => {
+    setLastInvoicePath(sessionStorage.getItem('lastInvoicePath'))
+  }, [pathname])
 
   const visibleNav = NAV_ITEMS.filter(item => item.roles.includes(user.role))
 
@@ -199,11 +204,14 @@ export function TopNav() {
         {visibleNav.map(item => {
           const isActive = pathname === item.href ||
             (item.href !== '/dashboard' && pathname.startsWith(item.href))
+          const resolvedHref = item.href === '/invoices' && lastInvoicePath
+            ? lastInvoicePath
+            : item.href
 
           return (
             <Link
               key={item.href}
-              href={item.href}
+              href={resolvedHref}
               onClick={() => setMenuOpen(false)}
               style={{
                 display:        'inline-block',
