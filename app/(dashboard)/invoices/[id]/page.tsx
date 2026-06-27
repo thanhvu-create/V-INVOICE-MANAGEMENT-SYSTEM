@@ -163,13 +163,13 @@ export default function InvoiceDetailPage() {
                   if (v && v !== header.invoice_code) await patchHeader({ invoice_code: v })
                   setEditingCode(false)
                 }}
+                onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setEditingCode(false) }}
                 style={{ display: 'flex', alignItems: 'center', gap: 6 }}
               >
                 <input
                   autoFocus
                   value={codeVal}
                   onChange={e => setCodeVal(e.target.value)}
-                  onBlur={() => setEditingCode(false)}
                   style={{
                     fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', fontWeight: 400,
                     border: 'none', borderBottom: '2px solid var(--text-primary)',
@@ -217,6 +217,7 @@ export default function InvoiceDetailPage() {
                   if (dateVal) await patchHeader({ invoice_date: dateVal })
                   setEditingDate(false)
                 }}
+                onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setEditingDate(false) }}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
               >
                 <input
@@ -224,7 +225,6 @@ export default function InvoiceDetailPage() {
                   value={dateVal}
                   max={new Date().toISOString().slice(0, 10)}
                   onChange={e => setDateVal(e.target.value)}
-                  onBlur={() => setEditingDate(false)}
                   style={{
                     fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
                     border: 'none', borderBottom: '1px solid var(--border-base)',
