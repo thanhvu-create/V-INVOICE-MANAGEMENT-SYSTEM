@@ -106,7 +106,12 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
     const nums = ['qt_pcs', 't_pham_co_nvl_da', 'gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien', 'bao_hiem']
     const payload: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(form)) {
-      payload[k] = nums.includes(k) ? (parseFloat(v) || null) : (v.trim() || null)
+      if (nums.includes(k)) {
+        const n = parseFloat(v)
+        payload[k] = v === '' || isNaN(n) ? null : n
+      } else {
+        payload[k] = v.trim() || null
+      }
     }
     const data = await apiCall<any>(
       () => fetch(`/api/invoices/${invoiceId}/items/${item.id}`, {
