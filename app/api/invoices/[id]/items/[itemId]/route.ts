@@ -115,17 +115,22 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       updates.resin    = 0; updates.phi_phu_kien = 0
     }
 
-    const { data: item, error } = await db
-      .from('invoice_products')
-      .update(updates)
-      .eq('id', params.itemId)
-      .eq('invoice_id', params.id)
-      .select()
-      .single()
-
-    if (error) throw error
-
-    writeAuditLog({ invoiceId: params.id, userId: ctx.userId, action: 'item_updated', metadata: { seq: item.seq, sku: item.sku } })
+    let item: any
+    if (Object.keys(updates).length > 0) {
+      const { data, error } = await db
+        .from('invoice_products')
+        .update(updates)
+        .eq('id', params.itemId)
+        .eq('invoice_id', params.id)
+        .select()
+        .single()
+      if (error) throw error
+      item = data
+      writeAuditLog({ invoiceId: params.id, userId: ctx.userId, action: 'item_updated', metadata: { seq: item.seq, sku: item.sku } })
+    } else {
+      const { data } = await db.from('invoice_products').select('*').eq('id', params.itemId).single()
+      item = data
+    }
 
     {
       const nvl      = nvlFromInvoice(invoice)

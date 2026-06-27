@@ -153,7 +153,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
         payload[k] = v.trim() || null
       }
     }
-    if (Object.keys(payload).length === 0) { setSaving(false); setEditMode(false); return }
+    if (Object.keys(payload).length === 0) payload._recalc = true
     const data = await apiCall<any>(
       () => fetch(`/api/invoices/${invoiceId}/items/${item.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
