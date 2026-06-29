@@ -44,6 +44,16 @@ interface NVLHotRow {
   mk_price: number
 }
 
+// Stone types that use ct/viên (TB viên = TL / SL) as the size axis for range lookup.
+// All others (RD, RD-LG, PR, LG-PR, RDCZ) use mm.
+const CT_BASED_TYPES = new Set([
+  'BG', 'LG-BG', 'MQ', 'LG-MQ', 'PS', 'LG-PS',
+  'OV', 'LG-OV', 'LG-HS', 'LG-TD', 'BQT', 'XC', 'RRB-N', 'PEARL',
+])
+function isCTBased(stoneType: string | null): boolean {
+  return !!stoneType && CT_BASED_TYPES.has(stoneType)
+}
+
 export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSaved }: Props) {
   const [form,       setForm]       = useState<GemForm>(EMPTY_FORM)
   const [saving,     setSaving]     = useState(false)
@@ -95,20 +105,32 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
     return /^\d/.test(dashLast) ? dashLast : ''
   }
 
-  // Auto-map to size_xoan_range + don_gia via DB range query.
-  // Detects stone_type from ma_xoan prefix, parses size, then calls /api/nvl-hot?type=X&size=Y
+  // Auto-map size_xoan_range + don_gia via DB range query.
+  //
+  // MM-based (RD, RD-LG, PR, ...): size extracted from ma_xoan code or size_raw field.
+  // CT-based (BG, MQ, PS, OV, ...): size = tl_truoc_xu_ly_ct / sl_hot (TB viên).
   useEffect(() => {
     if (!form.ma_xoan) return
-    if (form.size_xoan_range && !form.size_raw) return
-
-    const sizeToUse = form.size_raw || extractSizeFromCode(form.ma_xoan)
-    if (!sizeToUse) return
 
     const stoneType = detectStoneType(form.ma_xoan)
     if (!stoneType) return
 
-    const sizeNum = parseSizeValue(sizeToUse)
-    if (sizeNum <= 0) return
+    let sizeNum: number
+
+    if (isCTBased(stoneType)) {
+      // CT-based: compute TB viên = TL Trước / SL Hột
+      const tl = parseFloat(form.tl_truoc_xu_ly_ct)
+      const sl = parseInt(form.sl_hot)
+      if (isNaN(tl) || tl <= 0 || isNaN(sl) || sl <= 0) return
+      sizeNum = tl / sl
+    } else {
+      // MM-based: use size_raw override, or extract from ma_xoan code
+      if (form.size_xoan_range && !form.size_raw) return
+      const sizeToUse = form.size_raw || extractSizeFromCode(form.ma_xoan)
+      if (!sizeToUse) return
+      sizeNum = parseSizeValue(sizeToUse)
+      if (sizeNum <= 0) return
+    }
 
     let cancelled = false
     fetch(`/api/nvl-hot?type=${encodeURIComponent(stoneType)}&size=${sizeNum}`)
@@ -124,16 +146,26 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
       .catch(() => {})
     return () => { cancelled = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.ma_xoan, form.size_raw])
+  }, [form.ma_xoan, form.size_raw, form.tl_truoc_xu_ly_ct, form.sl_hot])
 
   if (!open) return null
 
   const f = (key: keyof GemForm) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(v => ({ ...v, [key]: e.target.value }))
 
-  // Live computed preview — matches recalcDiamond: TL Sau overrides TL Trước when entered; ADM has no setting fee
+  const detectedType = detectStoneType(form.ma_xoan)
+  const ctBased      = isCTBased(detectedType)
+  const tbVienAuto   = ctBased
+    ? (() => {
+        const tl = parseFloat(form.tl_truoc_xu_ly_ct)
+        const sl = parseInt(form.sl_hot)
+        return (!isNaN(tl) && !isNaN(sl) && sl > 0) ? (tl / sl) : null
+      })()
+    : null
+
+  // Live computed preview — matches server recalcDiamond: TL Trước ưu tiên, fallback TL Sau
   const isADM      = template === 'ADM'
-  const tlBase     = parseFloat(form.tl_sau_xu_ly_ct || form.tl_truoc_xu_ly_ct) || 0
+  const tlBase     = parseFloat(form.tl_truoc_xu_ly_ct || form.tl_sau_xu_ly_ct) || 0
   const slHot      = parseInt(form.sl_hot) || 0
   const donGia     = parseFloat(form.don_gia) || 0
   const tl_xoan_gr = tlBase > 0 ? tlBase / 5 : null
@@ -219,9 +251,24 @@ export function GemModal({ open, invoiceId, itemId, gem, template, onClose, onSa
               <input style={inputStyle} placeholder="RD-11119, BG-L14…" value={form.ma_xoan} onChange={f('ma_xoan')} />
             </div>
             <div>
-              <label style={labelStyle} title="mm cho RD/PR; ct TB viên cho BG/MQ/PS/OV">Size (mm / ct)</label>
-              <input style={{ ...inputStyle, background: form.size_raw ? 'var(--color-accent-light, #fffbeb)' : 'var(--bg-surface)' }}
-                placeholder="2.1 hoặc 0.05" value={form.size_raw} onChange={f('size_raw')} />
+              <label style={labelStyle}>
+                {ctBased ? (
+                  <>TB Viên (ct) <span style={{ fontWeight: 400, textTransform: 'none', letterSpacing: 0, color: 'var(--color-success)' }}>auto</span></>
+                ) : 'Size (mm)'}
+              </label>
+              {ctBased ? (
+                <div style={{
+                  ...inputStyle, background: tbVienAuto != null ? '#f0fdf4' : 'var(--bg-base)',
+                  color: tbVienAuto != null ? '#166534' : 'var(--text-muted)',
+                  fontFamily: 'var(--font-mono)', fontWeight: 600,
+                  display: 'flex', alignItems: 'center',
+                }}>
+                  {tbVienAuto != null ? tbVienAuto.toFixed(5) : '— nhập TL + SL'}
+                </div>
+              ) : (
+                <input style={{ ...inputStyle, background: form.size_raw ? 'var(--color-accent-light, #fffbeb)' : 'var(--bg-surface)' }}
+                  placeholder="2.1" value={form.size_raw} onChange={f('size_raw')} />
+              )}
             </div>
             <div>
               <label style={labelStyle}>P.Chất</label>
