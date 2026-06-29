@@ -982,22 +982,35 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     if (canSeePrice) {
       // Price cols start after the base cols
       const priceStart = template2 === 'CH1_AG3' ? 12 : 11
-      jmNumFmt.push({
+      const jmfmt = (s: number, e: number, pattern: string) => jmNumFmt.push({
         repeatCell: {
-          range: { sheetId: 0, startRowIndex: 2, startColumnIndex: priceStart, endColumnIndex: jmColCount - 1 },
-          cell: { userEnteredFormat: { numberFormat: { type: 'NUMBER', pattern: '"$"#,##0.###' }, horizontalAlignment: 'RIGHT' } },
+          range: { sheetId: 0, startRowIndex: 2, startColumnIndex: s, endColumnIndex: e },
+          cell: { userEnteredFormat: { numberFormat: { type: 'NUMBER', pattern }, horizontalAlignment: 'RIGHT' } },
           fields: 'userEnteredFormat(numberFormat,horizontalAlignment)',
         },
       })
-      // Chênh lệch col is percentage (CH1 only: priceStart+3)
-      if (isCH1f) {
-        jmNumFmt.push({
-          repeatCell: {
-            range: { sheetId: 0, startRowIndex: 2, startColumnIndex: priceStart + 3, endColumnIndex: priceStart + 4 },
-            cell: { userEnteredFormat: { numberFormat: { type: 'PERCENT', pattern: '0.00%' } } },
-            fields: 'userEnteredFormat.numberFormat',
-          },
-        })
+      if (isAG3f) {
+        // AG3 per-unit section layout (from priceStart):
+        //  +0 HP Purchase, +1 HP CIF, +2 HP Tag, +3 HP FB → $
+        //  +4 Qt/1sp → integer (no $)
+        //  +5 Wt/1sp (gr) → 0.00 decimal (no $)
+        //  +6 HP Purchase/1sp, +7 HP Tag/1sp → $
+        jmfmt(priceStart,     priceStart + 4, '"$"#,##0.###')
+        jmfmt(priceStart + 4, priceStart + 5, '0')
+        jmfmt(priceStart + 5, priceStart + 6, '0.00')
+        jmfmt(priceStart + 6, priceStart + 8, '"$"#,##0.###')
+      } else {
+        jmfmt(priceStart, jmColCount - 1, '"$"#,##0.###')
+        // Chênh lệch col is percentage (CH1 only: priceStart+3)
+        if (isCH1f) {
+          jmNumFmt.push({
+            repeatCell: {
+              range: { sheetId: 0, startRowIndex: 2, startColumnIndex: priceStart + 3, endColumnIndex: priceStart + 4 },
+              cell: { userEnteredFormat: { numberFormat: { type: 'PERCENT', pattern: '0.00%' } } },
+              fields: 'userEnteredFormat.numberFormat',
+            },
+          })
+        }
       }
     }
 
