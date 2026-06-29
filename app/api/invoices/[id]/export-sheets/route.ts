@@ -920,7 +920,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
     // ── SUMMARY number formats (data rows start at row 3) ────────────────────
     const summaryNumFmt: any[] = []
-    const $ = '"$"#,##0.###'           // explicit dollar — not locale-dependent
+    const $ = '"$"#,##0'               // dollar — integer, no decimals
     const sfmt = (s: number, e: number, pattern: string) => summaryNumFmt.push({
       repeatCell: {
         range: { sheetId: 1, startRowIndex: 3, startColumnIndex: s, endColumnIndex: e },
@@ -935,16 +935,16 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     } else if (isADMf) {
       sfmt(8, 9,  $)                    // Tiền vàng
       sfmt(9, 12, '0.00')              // T.Phẩm weights (gr)
-      sfmt(16,18, '0.000')             // TL trước/sau (ct)
-      sfmt(18,19, '0.0000')            // TL Xoàn (gr)
+      sfmt(16,18, '0.00')              // TL trước/sau (ct)
+      sfmt(18,19, '0.00')              // TL Xoàn (gr)
       sfmt(19,21, $)                    // GIÁ XOÀN
       sfmt(21,23, $)                    // Phí nhận hột
       sfmt(23,25, $)                    // HPUSA, CIF
     } else {
       sfmt(8, 9,  $)                    // Tiền vàng
       sfmt(9, 12, '0.00')              // T.Phẩm weights (gr)
-      sfmt(16,18, '0.000')             // TL trước/sau (ct)
-      sfmt(18,19, '0.0000')            // TL Xoàn (gr)
+      sfmt(16,18, '0.00')              // TL trước/sau (ct)
+      sfmt(18,19, '0.00')              // TL Xoàn (gr)
       sfmt(19,23, $)                    // Đơn giá, T.GIÁ, Phí nhận hột
       sfmt(23,29, $)                    // Gia công–HPUSA
     }
@@ -995,12 +995,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         //  +4 Qt/1sp → integer (no $)
         //  +5 Wt/1sp (gr) → 0.00 decimal (no $)
         //  +6 HP Purchase/1sp, +7 HP Tag/1sp → $
-        jmfmt(priceStart,     priceStart + 4, '"$"#,##0.###')
+        jmfmt(priceStart,     priceStart + 4, '"$"#,##0')
         jmfmt(priceStart + 4, priceStart + 5, '0')
         jmfmt(priceStart + 5, priceStart + 6, '0.00')
-        jmfmt(priceStart + 6, priceStart + 8, '"$"#,##0.###')
+        jmfmt(priceStart + 6, priceStart + 8, '"$"#,##0')
       } else {
-        jmfmt(priceStart, jmColCount - 1, '"$"#,##0.###')
+        jmfmt(priceStart, jmColCount - 1, '"$"#,##0')
         // Chênh lệch col is percentage (CH1 only: priceStart+3)
         if (isCH1f) {
           jmNumFmt.push({
