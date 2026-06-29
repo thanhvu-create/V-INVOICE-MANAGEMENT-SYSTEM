@@ -765,7 +765,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
                 .filter(idx => !excludedIndices.has(idx))
               const originalIdx = originalIndices[i]
               if (originalIdx !== undefined) {
-                setExcludedIndices(prev => new Set([...prev, originalIdx]))
+                setExcludedIndices(prev => new Set(Array.from(prev).concat(originalIdx)))
               }
             }}
           />
