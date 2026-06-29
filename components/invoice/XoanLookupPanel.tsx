@@ -27,6 +27,7 @@ interface NVLHotRow {
 interface EnrichedRow extends GemRow {
   mapped_range: string | null
   don_gia:      number
+  tb_vien:      number | null  // computed for CT-based types (tl / sl)
 }
 
 interface Props {
@@ -38,6 +39,14 @@ interface Props {
 }
 
 const SETTINGS_KEY = 'xoan_sheet_url'
+
+const CT_BASED_TYPES = new Set([
+  'BG', 'LG-BG', 'MQ', 'LG-MQ', 'PS', 'LG-PS',
+  'OV', 'LG-OV', 'LG-HS', 'LG-TD', 'BQT', 'XC', 'RRB-N', 'PEARL',
+])
+function isCTBased(stoneType: string | null): boolean {
+  return !!stoneType && CT_BASED_TYPES.has(stoneType)
+}
 
 function extractMO(soMo: string): string | null {
   const m = soMo.match(/MO([\d.]+)/i)
@@ -113,11 +122,19 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
     if (!rows) return null
     return rows.map(r => {
       const stoneType = detectStoneType(r.ma_xoan)
-      const sizeNum   = parseSizeValue(r.size_xoan) || r.tl_sau_xu_ly
-      const found     = stoneType && sizeNum > 0
+      let sizeNum: number
+      let tb_vien: number | null = null
+      if (isCTBased(stoneType)) {
+        // CT-based types (BG, MQ, PS, OV, ...): use TB viên = TL / SL for range lookup
+        tb_vien  = r.sl_hot > 0 ? r.tl_sau_xu_ly / r.sl_hot : 0
+        sizeNum  = tb_vien
+      } else {
+        sizeNum  = parseSizeValue(r.size_xoan) || r.tl_sau_xu_ly
+      }
+      const found = stoneType && sizeNum > 0
         ? nvlHotList.find(c => c.stone_type === stoneType && c.size_min != null && c.size_max != null && sizeNum >= c.size_min && sizeNum <= c.size_max)
         : null
-      return { ...r, mapped_range: found?.size_range ?? null, don_gia: found?.mk_price ?? 0 }
+      return { ...r, mapped_range: found?.size_range ?? null, don_gia: found?.mk_price ?? 0, tb_vien }
     })
   }, [rows, nvlHotList])
 
@@ -298,13 +315,23 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
                   </thead>
                   <tbody>
                     {enrichedRows.map((r, idx) => {
-                      const done = addedIds.has(idx)
+                      const done     = addedIds.has(idx)
+                      const ctBased  = r.tb_vien !== null
                       return (
                         <tr key={idx} style={{ opacity: done ? 0.4 : 1 }}
                           onMouseEnter={e => !done && (e.currentTarget.style.background = 'var(--bg-hover)')}
                           onMouseLeave={e => (e.currentTarget.style.background = '')}>
                           <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', fontWeight: 600 }}>{r.ma_xoan || '—'}</td>
-                          <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>{r.size_xoan || '—'}</td>
+                          <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>
+                            {ctBased ? (
+                              <span title={`Size gốc: ${r.size_xoan || '—'} · TB viên = TL/SL`}>
+                                {r.size_xoan || '—'}
+                                <span style={{ marginLeft: 4, color: 'var(--color-info)', fontSize: '0.9em' }}>
+                                  ({r.tb_vien!.toFixed(4)} ct)
+                                </span>
+                              </span>
+                            ) : (r.size_xoan || '—')}
+                          </td>
                           <td style={{ padding: '3px 8px', borderBottom: '1px solid var(--border-light)', color: r.mapped_range ? 'var(--color-success)' : 'var(--text-muted)' }}>
                             {r.mapped_range ?? '—'}
                           </td>
