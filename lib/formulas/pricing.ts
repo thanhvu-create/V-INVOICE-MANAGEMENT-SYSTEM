@@ -60,7 +60,7 @@ export function goldPricePerGram(loai_vang: string, nvl: NVLSnapshot): number | 
 
 /**
  * T.Phẩm vàng thực tế = T.Phẩm có NVL đá − Σ TL xoàn (gr)
- * tl_xoan_gr = (tl_sau_xu_ly_ct ?? tl_truoc_xu_ly_ct) / 5 (written by recalcDiamond)
+ * tl_xoan_gr = (tl_truoc_xu_ly_ct ?? tl_sau_xu_ly_ct) / 5 (written by recalcDiamond)
  */
 export function calcWeightNoGem(totalGr: number, diamonds: InvoiceDiamond[]): number {
   const gemGr = diamonds.reduce((s, g) => s + (g.tl_xoan_gr ?? 0), 0)
@@ -75,7 +75,7 @@ export function recalcDiamond(
   d: Partial<InvoiceDiamond>,
   _template: InvoiceTemplate = 'CH1',
 ): Partial<InvoiceDiamond> {
-  const tl_base   = d.tl_sau_xu_ly_ct ?? d.tl_truoc_xu_ly_ct ?? 0
+  const tl_base   = d.tl_truoc_xu_ly_ct ?? d.tl_sau_xu_ly_ct ?? 0
   const don_gia   = d.don_gia ?? 0
   const sl_hot    = d.sl_hot  ?? 0
   return {
@@ -89,8 +89,7 @@ export function recalcDiamond(
 /**
  * Vốn sản xuất — template-aware per JM-FORM SUMMARY
  *
- * CH1, CH2, ADM (có hột): Σt_gia_xoan + Σt_phi + tien_vang + gia_cong + duc + thiet_ke + resin + phi_phu_kien
- * CH1, CH2, ADM (không hột): tien_vang only
+ * CH1, CH2, ADM: Σt_gia_xoan + Σt_phi + tien_vang + gia_cong + duc + thiet_ke + resin + phi_phu_kien
  * CH1_AG3, VNSI_AG3: tien_vang only (no diamonds, no fees)
  */
 export function calcVonSanXuat(

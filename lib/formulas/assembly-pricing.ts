@@ -16,6 +16,10 @@ export interface AssemblyPricingRule extends AssemblyPrices {
   phi_phu_kien: number
 }
 
+export function hasGemsInDescription(description: string | null | undefined): boolean {
+  return /cts/i.test(description ?? '')
+}
+
 // Only these sub_classes get phi_phu_kien > 0
 const PHI_PHU_KIEN_CLASSES = new Set(['ER', 'BL', 'NL'])
 

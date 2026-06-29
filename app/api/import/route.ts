@@ -4,7 +4,7 @@ import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { recalcItem, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
 import { extractVendorModel, extractKichThuoc, buildChiTietCap } from '@/lib/formulas/description-parse'
-import { resolvePhiPhuKien } from '@/lib/formulas/assembly-pricing'
+import { resolvePhiPhuKien, hasGemsInDescription } from '@/lib/formulas/assembly-pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 import type { ImportRow } from '@/types'
 
@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
       const detected      = (!row.class && !row.subClass) ? detectClass(row.description) : null
       const detectedModel = extractVendorModel(row.description)
       const subClass      = row.subClass || detected?.sub_class || null
-      const fees          = hasFees ? getAssemblyFees(subClass, row.loaiVang) : null
+      const fees          = hasFees && hasGemsInDescription(row.description) ? getAssemblyFees(subClass, row.loaiVang) : null
       const qty           = Math.max(1, row.qty ?? 1)
       const wtPerUnit     = isAG3 && row.weightTotal ? row.weightTotal / qty : null
       return {

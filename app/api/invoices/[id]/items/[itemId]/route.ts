@@ -3,7 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { recalcItem, recalcDiamond, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
-import { resolvePhiPhuKien } from '@/lib/formulas/assembly-pricing'
+import { resolvePhiPhuKien, hasGemsInDescription } from '@/lib/formulas/assembly-pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 
 type Params = { params: { id: string; itemId: string } }
@@ -51,65 +51,80 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       updates.t_pham_co_nvl_da = updates.wt_gr
     }
 
-    // When sub_class changes, auto-fill assembly fees from DB rules (CH1/CH2/ADM).
-    // Only fill fee fields that the user did NOT explicitly send in this request.
+    // ── Assembly fee auto-fill (CH1/CH2 only) ──
+    // Logic: description contains "cts" → has gems → lookup assembly rules by sub_class
+    //        no "cts" → no gems → all fees = 0
     const hasFees = ['CH1', 'CH2', 'ADM'].includes((invoice as any).template_type ?? 'CH1')
-    if ('sub_class' in updates && hasFees) {
-      const { data: asmRules } = await db
-        .from('assembly_pricing_rules')
-        .select('sub_class, gia_cong, duc, thiet_ke, resin, phi_phu_kien')
-      const rule = (asmRules ?? []).find(
-        r => r.sub_class.toUpperCase() === String(updates.sub_class ?? '').toUpperCase()
-      )
-      if (rule) {
-        let loaiVang: string | null = (updates.loai_vang as string) ?? null
-        if (!loaiVang) {
-          const { data: existing } = await db.from('invoice_products').select('loai_vang').eq('id', params.itemId).single()
-          loaiVang = existing?.loai_vang ?? null
-        }
-        if (!('gia_cong' in body))     updates.gia_cong     = rule.gia_cong
-        if (!('duc' in body))          updates.duc          = rule.duc
-        if (!('thiet_ke' in body))     updates.thiet_ke     = rule.thiet_ke
-        if (!('resin' in body))        updates.resin        = rule.resin
-        if (!('phi_phu_kien' in body)) updates.phi_phu_kien = resolvePhiPhuKien(rule.phi_phu_kien, loaiVang, String(updates.sub_class ?? ''))
+    if (hasFees) {
+      let effectiveDesc = ('description' in updates) ? (updates.description as string) : null
+      if (effectiveDesc === null) {
+        const { data: cur } = await db.from('invoice_products').select('description').eq('id', params.itemId).single()
+        effectiveDesc = cur?.description ?? null
       }
-    }
+      const itemHasGems = hasGemsInDescription(effectiveDesc)
 
-    // Backfill: if sub_class wasn't changed but all fees are 0 (stale import), auto-fill them
-    if (!('sub_class' in updates) && hasFees) {
-      const feeKeys = ['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien']
-      const { data: cur } = await db.from('invoice_products').select('sub_class, loai_vang, gia_cong, duc, thiet_ke, resin, phi_phu_kien').eq('id', params.itemId).single()
-      if (cur) {
-        const allZero = feeKeys.every(k => !(k in updates) && ((cur as any)[k] ?? 0) === 0)
-        const subClass = String(cur.sub_class ?? '').trim()
-        if (allZero && subClass) {
-          const { data: asmRules } = await db.from('assembly_pricing_rules').select('sub_class, gia_cong, duc, thiet_ke, resin, phi_phu_kien')
-          const rule = (asmRules ?? []).find(r => r.sub_class.toUpperCase() === subClass.toUpperCase())
+      if (!itemHasGems) {
+        updates.gia_cong = 0; updates.duc = 0; updates.thiet_ke = 0
+        updates.resin    = 0; updates.phi_phu_kien = 0
+      } else {
+        // sub_class changes → lookup assembly rules, fill fees not explicitly sent
+        if ('sub_class' in updates) {
+          const { data: asmRules } = await db
+            .from('assembly_pricing_rules')
+            .select('sub_class, gia_cong, duc, thiet_ke, resin, phi_phu_kien')
+          const rule = (asmRules ?? []).find(
+            r => r.sub_class.toUpperCase() === String(updates.sub_class ?? '').toUpperCase()
+          )
           if (rule) {
-            const loaiVang = (updates.loai_vang as string) ?? cur.loai_vang ?? null
-            updates.gia_cong     = rule.gia_cong
-            updates.duc          = rule.duc
-            updates.thiet_ke     = rule.thiet_ke
-            updates.resin        = rule.resin
-            updates.phi_phu_kien = resolvePhiPhuKien(rule.phi_phu_kien, loaiVang, subClass)
+            let loaiVang: string | null = (updates.loai_vang as string) ?? null
+            if (!loaiVang) {
+              const { data: existing } = await db.from('invoice_products').select('loai_vang').eq('id', params.itemId).single()
+              loaiVang = existing?.loai_vang ?? null
+            }
+            if (!('gia_cong' in body))     updates.gia_cong     = rule.gia_cong
+            if (!('duc' in body))          updates.duc          = rule.duc
+            if (!('thiet_ke' in body))     updates.thiet_ke     = rule.thiet_ke
+            if (!('resin' in body))        updates.resin        = rule.resin
+            if (!('phi_phu_kien' in body)) updates.phi_phu_kien = resolvePhiPhuKien(rule.phi_phu_kien, loaiVang, String(updates.sub_class ?? ''))
+          }
+        }
+
+        // Backfill: sub_class not changed but all fees are 0 (stale import or description just gained "cts")
+        if (!('sub_class' in updates)) {
+          const feeKeys = ['gia_cong', 'duc', 'thiet_ke', 'resin', 'phi_phu_kien']
+          const { data: cur } = await db.from('invoice_products').select('sub_class, loai_vang, gia_cong, duc, thiet_ke, resin, phi_phu_kien').eq('id', params.itemId).single()
+          if (cur) {
+            const allZero = feeKeys.every(k => !(k in updates) && ((cur as any)[k] ?? 0) === 0)
+            const subClass = String(cur.sub_class ?? '').trim()
+            if (allZero && subClass) {
+              const { data: asmRules } = await db.from('assembly_pricing_rules').select('sub_class, gia_cong, duc, thiet_ke, resin, phi_phu_kien')
+              const rule = (asmRules ?? []).find(r => r.sub_class.toUpperCase() === subClass.toUpperCase())
+              if (rule) {
+                const loaiVang = (updates.loai_vang as string) ?? cur.loai_vang ?? null
+                updates.gia_cong     = rule.gia_cong
+                updates.duc          = rule.duc
+                updates.thiet_ke     = rule.thiet_ke
+                updates.resin        = rule.resin
+                updates.phi_phu_kien = resolvePhiPhuKien(rule.phi_phu_kien, loaiVang, subClass)
+              }
+            }
+          }
+        }
+
+        // loai_vang changes → re-resolve phi_phu_kien for existing sub_class
+        if ('loai_vang' in updates && !('sub_class' in updates) && !('phi_phu_kien' in updates)) {
+          const { data: existing } = await db.from('invoice_products').select('sub_class, phi_phu_kien').eq('id', params.itemId).single()
+          const subClass = existing?.sub_class ?? null
+          if (subClass) {
+            const { data: asmRules } = await db.from('assembly_pricing_rules').select('sub_class, phi_phu_kien').eq('sub_class', subClass).single()
+            const base = asmRules?.phi_phu_kien ?? existing?.phi_phu_kien ?? 30
+            updates.phi_phu_kien = resolvePhiPhuKien(base, String(updates.loai_vang ?? ''), subClass)
           }
         }
       }
     }
 
-    // When loai_vang changes (without sub_class) and phi_phu_kien not explicitly set,
-    // re-resolve phi_phu_kien based on existing sub_class + new metal type.
-    if ('loai_vang' in updates && !('sub_class' in updates) && !('phi_phu_kien' in updates) && hasFees) {
-      const { data: existing } = await db.from('invoice_products').select('sub_class, phi_phu_kien').eq('id', params.itemId).single()
-      const subClass = existing?.sub_class ?? null
-      if (subClass) {
-        const { data: asmRules } = await db.from('assembly_pricing_rules').select('sub_class, phi_phu_kien').eq('sub_class', subClass).single()
-        const base = asmRules?.phi_phu_kien ?? existing?.phi_phu_kien ?? 30
-        updates.phi_phu_kien = resolvePhiPhuKien(base, String(updates.loai_vang ?? ''), subClass)
-      }
-    }
-
-    // AG3 templates have no gems and no fabrication fees — always zero them out
+    // AG3 templates: no fabrication fees
     if (['CH1_AG3', 'VNSI_AG3'].includes((invoice as any).template_type ?? '')) {
       updates.gia_cong = 0; updates.duc = 0; updates.thiet_ke = 0
       updates.resin    = 0; updates.phi_phu_kien = 0
