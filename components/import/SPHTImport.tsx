@@ -171,7 +171,7 @@ const TEMPLATE_COLOR: Record<string, string> = {
   'KENH-SI': '#9F1239',
 }
 
-function PreviewTable({ rows }: { rows: ImportRow[] }) {
+function PreviewTable({ rows, onRemove }: { rows: ImportRow[], onRemove?: (index: number) => void }) {
   const th: React.CSSProperties = {
     padding: '6px 8px', background: 'var(--bg-base)',
     fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.07em',
@@ -187,7 +187,7 @@ function PreviewTable({ rows }: { rows: ImportRow[] }) {
       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
         <thead style={{ position: 'sticky', top: 0, zIndex: 1 }}>
           <tr>
-            {['#', 'SKU', 'SO-MO', 'Description', 'Loại Vàng', 'Qty', 'TL (gr)', 'Kênh'].map(h => (
+            {['#', 'SKU', 'SO-MO', 'Description', 'Loại Vàng', 'Qty', 'TL (gr)', 'Kênh', ''].map(h => (
               <th key={h} style={th}>{h}</th>
             ))}
           </tr>
@@ -214,6 +214,19 @@ function PreviewTable({ rows }: { rows: ImportRow[] }) {
                   }}>
                     {r.niniAdm || '—'}
                   </span>
+                </td>
+                <td style={{ ...td, width: 32, textAlign: 'center' }}>
+                  {onRemove && (
+                    <button
+                      onClick={() => onRemove(i)}
+                      title="Bỏ khỏi danh sách import"
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', padding: '2px 4px', opacity: 0.7 }}
+                      onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.opacity = '1')}
+                      onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.opacity = '0.7')}
+                    >
+                      <i className="fa-solid fa-xmark" />
+                    </button>
+                  )}
                 </td>
               </tr>
             )
@@ -253,12 +266,13 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
   const { canDo } = useUser()
   const canManage = canDo('manage_rates')
 
-  const [stage,      setStage]      = useState<Stage>({ s: 'idle' })
-  const [manualCode, setManualCode] = useState('')
-  const [savedUrl,   setSavedUrl]   = useState<string | null>(null)
-  const [urlInput,   setUrlInput]   = useState('')
-  const [editUrl,    setEditUrl]    = useState(false)
-  const [urlSaving,  setUrlSaving]  = useState(false)
+  const [stage,           setStage]           = useState<Stage>({ s: 'idle' })
+  const [manualCode,      setManualCode]      = useState('')
+  const [savedUrl,        setSavedUrl]        = useState<string | null>(null)
+  const [urlInput,        setUrlInput]        = useState('')
+  const [editUrl,         setEditUrl]         = useState(false)
+  const [urlSaving,       setUrlSaving]       = useState(false)
+  const [excludedIndices, setExcludedIndices] = useState<Set<number>>(new Set())
   const editInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -571,6 +585,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
   const allActiveRows  = selected ? allForSelected : allForManual
   const activeRows     = filterByTemplate(allActiveRows)
   const skippedRows    = rule.useColPFilter ? allActiveRows.filter(r => !rowMatchesTemplate(r.niniAdm, template)) : []
+  const visibleRows    = activeRows.filter((_, i) => !excludedIndices.has(i))
 
   return (
     <div>
@@ -656,6 +671,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
                       if (!hasMatch) return
                       setStage({ ...readyStage, selected: isActive ? null : opt.code })
                       setManualCode('')
+                      setExcludedIndices(new Set())
                     }}
                     style={{
                       padding: '6px 14px',
@@ -683,6 +699,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
                 onChange={e => {
                   setManualCode(e.target.value.toUpperCase())
                   setStage({ ...readyStage, selected: null })
+                  setExcludedIndices(new Set())
                 }}
                 placeholder="P60501"
                 style={{
@@ -725,7 +742,12 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
               </span>
             ))}
             <span style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--color-success)', marginLeft: 'auto' }}>
-              ✓ {activeRows.length} SP sẽ import
+              ✓ {visibleRows.length} SP sẽ import
+              {excludedIndices.size > 0 && (
+                <span style={{ fontWeight: 400, color: 'var(--color-danger)', marginLeft: 6 }}>
+                  ({excludedIndices.size} đã bỏ)
+                </span>
+              )}
             </span>
             {skippedRows.length > 0 && (
               <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)', opacity: 0.8 }}>
@@ -734,20 +756,44 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
             )}
           </div>
 
-          <PreviewTable rows={activeRows} />
+          <PreviewTable
+            rows={visibleRows}
+            onRemove={i => {
+              // i is index in visibleRows; map back to original activeRows index
+              const originalIndices = activeRows
+                .map((_, idx) => idx)
+                .filter(idx => !excludedIndices.has(idx))
+              const originalIdx = originalIndices[i]
+              if (originalIdx !== undefined) {
+                setExcludedIndices(prev => new Set([...prev, originalIdx]))
+              }
+            }}
+          />
+
+          {excludedIndices.size > 0 && (
+            <button
+              onClick={() => setExcludedIndices(new Set())}
+              style={{
+                marginTop: '0.5rem', background: 'none', border: 'none',
+                cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-muted)',
+                textDecoration: 'underline', padding: 0,
+              }}>
+              Khôi phục {excludedIndices.size} SP đã bỏ
+            </button>
+          )}
 
           <div style={{ display: 'flex', gap: '0.75rem', marginTop: '1.25rem' }}>
             <button
-              onClick={() => handleImport(activeRows, readyStage)}
-              disabled={locked}
+              onClick={() => handleImport(visibleRows, readyStage)}
+              disabled={locked || visibleRows.length === 0}
               style={{
                 padding: '0.6rem 1.75rem', background: 'var(--text-primary)', color: 'var(--bg-base)',
                 border: 'none', fontFamily: 'var(--font-body)', fontSize: 'var(--text-sm)',
-                fontWeight: 600, cursor: locked ? 'not-allowed' : 'pointer',
-                letterSpacing: '0.05em', opacity: locked ? 0.5 : 1,
+                fontWeight: 600, cursor: (locked || visibleRows.length === 0) ? 'not-allowed' : 'pointer',
+                letterSpacing: '0.05em', opacity: (locked || visibleRows.length === 0) ? 0.5 : 1,
               }}>
               <i className="fa-solid fa-file-import" style={{ marginRight: 7 }} />
-              Import {activeRows.length} sản phẩm
+              Import {visibleRows.length} sản phẩm
             </button>
             <button
               onClick={() => { setStage({ ...readyStage, selected: null }); setManualCode('') }}
