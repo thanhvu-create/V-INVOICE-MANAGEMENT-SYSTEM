@@ -6,12 +6,12 @@ import { getAuthContext } from '@/lib/auth/getRole'
 function fmt2(n: unknown): string {
   if (n == null || n === '') return ''
   const v = parseFloat(String(n))
-  return isNaN(v) ? '' : `$${v.toFixed(2)}`
+  return isNaN(v) ? '' : `$${Math.round(v)}`
 }
 function fmt4(n: unknown): string {
   if (n == null || n === '') return ''
   const v = parseFloat(String(n))
-  return isNaN(v) ? '' : v.toFixed(4)
+  return isNaN(v) ? '' : v.toFixed(2)
 }
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
