@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { AdminModal, fieldStyle, labelStyle, inputStyle, btnPrimary, btnSecondary } from '@/components/admin/AdminModal'
 import { toast } from '@/components/ui/Toast'
 import { goldPricePerGram, type NVLSnapshot } from '@/lib/formulas/pricing'
+import { useUser } from '@/contexts/UserContext'
 
 interface NVLPrice {
   id:             string
@@ -112,6 +113,8 @@ function KaratCard({ label, loai, price, isCustom, onRemove }: {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function NVLPricesPage() {
+  const { canDo } = useUser()
+  const canEdit   = canDo('manage_rates')
   const [rows,         setRows]         = useState<NVLPrice[]>([])
   const [loading,      setLoading]      = useState(true)
   const [modal,        setModal]        = useState<'add' | 'edit' | null>(null)
@@ -210,9 +213,9 @@ export default function NVLPricesPage() {
             Bảng giá nguyên vật liệu — snapshot cho invoice mới
           </p>
         </div>
-        <button onClick={openAdd} style={{ ...btnPrimary, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+        {canEdit && <button onClick={openAdd} style={{ ...btnPrimary, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <i className="fa-solid fa-plus" style={{ fontSize: 11 }} /> Add Row
-        </button>
+        </button>}
       </div>
 
       {/* ── Latest Spot Summary Cards ── */}
@@ -302,12 +305,12 @@ export default function NVLPricesPage() {
                       {i === 0 && <span style={{ marginLeft: 6, fontSize: 9, color: 'var(--color-success)', fontWeight: 700, fontFamily: 'var(--font-body)', letterSpacing: '0.06em' }}>LATEST</span>}
                     </td>
                     <td style={{ ...td, whiteSpace: 'nowrap', textAlign: 'right' }}>
-                      <button onClick={() => openEdit(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginRight: 8, fontSize: 13 }} title="Edit">
+                      {canEdit && <><button onClick={() => openEdit(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginRight: 8, fontSize: 13 }} title="Edit">
                         <i className="fa-solid fa-pen" />
                       </button>
                       <button onClick={() => handleDelete(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 13 }} title="Delete">
                         <i className="fa-solid fa-trash" />
-                      </button>
+                      </button></>}
                     </td>
                   </tr>
                 )

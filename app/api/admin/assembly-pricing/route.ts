@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 
-// GET — list all rules
+// GET — list all rules (all authenticated users can read)
 export async function GET() {
   try {
-    await requireRole('manager')
+    await requireRole('viewer')
     const db = createServiceClient()
     const { data, error } = await db
       .from('assembly_pricing_rules')

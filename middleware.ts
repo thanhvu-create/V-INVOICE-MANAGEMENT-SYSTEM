@@ -11,7 +11,6 @@ function createServiceClient() {
 
 const PUBLIC_ROUTES  = ['/login', '/api/auth/login', '/api/export/template']
 const ADMIN_ROUTES   = ['/admin/users']
-const MANAGER_ROUTES = ['/admin/metal-rates', '/admin/products', '/admin/gem-catalog']
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -50,11 +49,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // For role-protected routes, check role from app_users
-  const needsRoleCheck =
-    ADMIN_ROUTES.some(r => pathname.startsWith(r)) ||
-    MANAGER_ROUTES.some(r => pathname.startsWith(r))
-
-  if (needsRoleCheck) {
+  if (ADMIN_ROUTES.some(r => pathname.startsWith(r))) {
     const { data: profile } = await createServiceClient()
       .from('app_users')
       .select('role, is_active')
@@ -67,14 +62,7 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(loginUrl)
     }
 
-    const isAdminRoute   = ADMIN_ROUTES.some(r => pathname.startsWith(r))
-    const isManagerRoute = MANAGER_ROUTES.some(r => pathname.startsWith(r))
-
-    if (isAdminRoute && profile.role !== 'admin') {
-      return NextResponse.redirect(new URL('/unauthorized', req.url))
-    }
-
-    if (isManagerRoute && !['admin', 'manager'].includes(profile.role)) {
+    if (profile.role !== 'admin') {
       return NextResponse.redirect(new URL('/unauthorized', req.url))
     }
   }

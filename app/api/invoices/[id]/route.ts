@@ -105,10 +105,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   }
 }
 
-// DELETE /api/invoices/[id] — admin only, must not be finalized
+// DELETE /api/invoices/[id] — manager+ only, must not be finalized
 export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
-    await requireRole('admin')
+    await requireRole('manager')
     const db = createServiceClient()
 
     const { data: inv } = await db.from('invoices').select('status').eq('id', params.id).single()

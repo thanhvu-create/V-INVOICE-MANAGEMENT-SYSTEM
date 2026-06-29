@@ -60,7 +60,6 @@ export default function ClassSubClassPage() {
   const [deleting,   setDeleting]   = useState(false)
 
   useEffect(() => {
-    if (!canDo('manage_products')) { router.push('/dashboard'); return }
     load()
   }, [])
 
@@ -136,12 +135,12 @@ export default function ClassSubClassPage() {
             Mapping Description prefix → Class + Sub-Class — dùng để auto-fill khi nhập invoice
           </div>
         </div>
-        <button
+        {canDo('manage_products') && <button
           onClick={openAdd}
           style={{ background: 'var(--text-primary)', color: 'var(--text-inverse)', border: 'none', padding: '8px 20px', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', borderRadius: 0 }}
         >
           <i className="fa-solid fa-plus" style={{ marginRight: 6 }} />Add Rule
-        </button>
+        </button>}
       </div>
 
       {/* Search */}
@@ -210,12 +209,12 @@ export default function ClassSubClassPage() {
                         </span>
                       </td>
                       <td style={{ ...tdStyle, whiteSpace: 'nowrap', textAlign: 'right' }}>
-                        <button onClick={() => openEdit(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginRight: 6 }} title="Edit">
+                        {canDo('manage_products') && <><button onClick={() => openEdit(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginRight: 6 }} title="Edit">
                           <i className="fa-solid fa-pen" />
                         </button>
                         <button onClick={() => setConfirmDel(r)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }} title="Delete">
                           <i className="fa-solid fa-trash" />
-                        </button>
+                        </button></>}
                       </td>
                     </tr>
                   ))

@@ -18,10 +18,10 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/dashboard',           label: 'Dashboard',  roles: ['admin', 'manager', 'user', 'viewer'] },
   { href: '/invoices',            label: 'Invoices',   roles: ['admin', 'manager', 'user', 'viewer'] },
   { href: '/import',              label: 'Import',     roles: ['admin', 'manager', 'user'] },
-  { href: '/admin/products',      label: 'NVL Prices',  roles: ['admin', 'manager'] },
-  { href: '/admin/gem-catalog',   label: 'Gem Catalog',    roles: ['admin', 'manager'] },
-  { href: '/admin/class-subclass',    label: 'Class/SubClass',  roles: ['admin', 'manager'] },
-  { href: '/admin/assembly-pricing', label: 'Assembly Price', roles: ['admin', 'manager'] },
+  { href: '/admin/products',      label: 'NVL Prices',  roles: ['admin', 'manager', 'user', 'viewer'] },
+  { href: '/admin/gem-catalog',   label: 'Gem Catalog',    roles: ['admin', 'manager', 'user', 'viewer'] },
+  { href: '/admin/class-subclass',    label: 'Class/SubClass',  roles: ['admin', 'manager', 'user', 'viewer'] },
+  { href: '/admin/assembly-pricing', label: 'Assembly Price', roles: ['admin', 'manager', 'user', 'viewer'] },
   { href: '/admin/users',            label: 'Users',           roles: ['admin'] },
 ]
 

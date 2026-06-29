@@ -46,7 +46,6 @@ export default function GemCatalogPage() {
   const [deleting,   setDeleting]   = useState(false)
 
   useEffect(() => {
-    if (!canDo('manage_products')) { router.push('/dashboard'); return }
     load()
   }, [])
 
@@ -123,9 +122,9 @@ export default function GemCatalogPage() {
             Bảng giá xoàn theo size range — MK Price dùng cho tính T.Giá Xoàn
           </div>
         </div>
-        <button onClick={openAdd} style={{ background: 'var(--text-primary)', color: 'var(--text-inverse)', border: 'none', padding: '8px 20px', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', borderRadius: 0 }}>
+        {canDo('manage_products') && <button onClick={openAdd} style={{ background: 'var(--text-primary)', color: 'var(--text-inverse)', border: 'none', padding: '8px 20px', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', cursor: 'pointer', borderRadius: 0 }}>
           <i className="fa-solid fa-plus" style={{ marginRight: 6 }} />Add Row
-        </button>
+        </button>}
       </div>
 
       {/* Filter by type */}
@@ -171,8 +170,8 @@ export default function GemCatalogPage() {
                     {g.mk_price != null ? `$${Number(g.mk_price).toFixed(2)}` : '—'}
                   </td>
                   <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
-                    <button onClick={() => openEdit(g)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginRight: 6 }} title="Edit"><i className="fa-solid fa-pen" /></button>
-                    <button onClick={() => setConfirmDel(g)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }} title="Delete"><i className="fa-solid fa-trash" /></button>
+                    {canDo('manage_products') && <><button onClick={() => openEdit(g)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)', marginRight: 6 }} title="Edit"><i className="fa-solid fa-pen" /></button>
+                    <button onClick={() => setConfirmDel(g)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-danger)' }} title="Delete"><i className="fa-solid fa-trash" /></button></>}
                   </td>
                 </tr>
               ))}

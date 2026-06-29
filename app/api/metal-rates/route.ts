@@ -5,7 +5,7 @@ import { requireRole } from '@/lib/auth/getRole'
 // GET /api/metal-rates — returns nvl_prices rows (replaces daily_metal_rates)
 export async function GET() {
   try {
-    await requireRole('user')
+    await requireRole('viewer')
     const db = createServiceClient()
     const { data, error } = await db
       .from('nvl_prices')

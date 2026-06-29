@@ -14,8 +14,6 @@ function buildSizeRange(grade: string | null, min: number | null, max: number | 
 export async function GET(req: NextRequest) {
   const ctx = await getAuthContext()
   if (!ctx) return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-  if (!['admin', 'manager'].includes(ctx.role))
-    return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 })
 
   const db   = createServiceClient()
   const type = req.nextUrl.searchParams.get('type')

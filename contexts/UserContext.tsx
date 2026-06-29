@@ -25,9 +25,13 @@ const ROLE_ACTIONS: Record<Role, string[]> = {
     'import', 'manage_users', 'manage_rates', 'manage_rules',
     'manage_products', 'see_prices',
   ],
-  manager: ['create', 'edit', 'approve', 'import', 'see_prices'],
-  user:    ['create', 'edit', 'import'],
-  viewer:  [],
+  manager: [
+    'create', 'edit', 'delete', 'approve', 'invoice',
+    'import', 'manage_rates', 'manage_rules',
+    'manage_products', 'see_prices',
+  ],
+  user:    ['create', 'edit', 'import', 'see_prices'],
+  viewer:  ['see_prices'],
 }
 
 const defaultUser: UserProfile = {

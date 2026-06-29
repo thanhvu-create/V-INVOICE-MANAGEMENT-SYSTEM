@@ -5,8 +5,6 @@ import { getAuthContext } from '@/lib/auth/getRole'
 export async function GET(req: NextRequest) {
   const ctx = await getAuthContext()
   if (!ctx) return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 })
-  if (!['admin', 'manager'].includes(ctx.role))
-    return NextResponse.json({ success: false, message: 'Forbidden' }, { status: 403 })
 
   const db = createServiceClient()
   const { data, error } = await db

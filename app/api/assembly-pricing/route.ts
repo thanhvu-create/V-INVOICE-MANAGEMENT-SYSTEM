@@ -5,7 +5,7 @@ import { requireRole } from '@/lib/auth/getRole'
 // GET — public list for client-side lookup (any authenticated user)
 export async function GET() {
   try {
-    await requireRole('user')
+    await requireRole('viewer')
     const db = createServiceClient()
     const { data, error } = await db
       .from('assembly_pricing_rules')
