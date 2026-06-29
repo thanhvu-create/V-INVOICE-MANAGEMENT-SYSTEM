@@ -5,7 +5,7 @@ import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 import { ComboInput } from '@/components/ui/ComboInput'
 import { extractVendorModel, extractKichThuoc, buildChiTietCap } from '@/lib/formulas/description-parse'
-import { getAssemblyPrices, resolvePhiPhuKien, type AssemblyPricingRule } from '@/lib/formulas/assembly-pricing'
+import { getAssemblyPrices, resolvePhiPhuKien, hasGemsInDescription, type AssemblyPricingRule } from '@/lib/formulas/assembly-pricing'
 
 
 interface Form {
@@ -120,6 +120,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
         } else {
           setClassWarn('')
         }
+        if (next.sub_class.trim()) applyAssemblyFees(next, next.sub_class)
       }
 
       // Auto-fill Vendor Model# only when currently empty
@@ -148,6 +149,11 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
 
   function applyAssemblyFees(next: Form, subClass: string) {
     if (!hasFees || !subClass.trim()) return
+    if (!hasGemsInDescription(next.description)) {
+      next.gia_cong = '0'; next.duc = '0'; next.thiet_ke = '0'
+      next.resin = '0'; next.phi_phu_kien = '0'
+      setAutoFees(true); setFeeWarn(''); return
+    }
     const prices = getAssemblyPrices(subClass, assemblyRules, next.loai_vang)
     if (prices) {
       next.gia_cong     = String(prices.gia_cong)

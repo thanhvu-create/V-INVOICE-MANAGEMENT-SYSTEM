@@ -79,21 +79,26 @@ export async function POST(req: NextRequest, { params }: Params) {
     const nvl      = nvlFromInvoice(invoice)
     const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
 
-    // Auto-fill assembly fees for CH1/CH2: description has "cts" → lookup rules by sub_class
+    // Auto-fill assembly fees: "cts" in description → lookup rules, no "cts" → force zero
     const hasFees = ['CH1', 'CH2', 'ADM'].includes(template)
-    if (hasFees && hasGemsInDescription(body.description) && baseRow.sub_class) {
-      const { data: asmRules } = await db
-        .from('assembly_pricing_rules')
-        .select('sub_class, gia_cong, duc, thiet_ke, resin, phi_phu_kien')
-      const rule = (asmRules ?? []).find(
-        r => r.sub_class.toUpperCase() === String(baseRow.sub_class ?? '').toUpperCase()
-      )
-      if (rule) {
-        if (!body.gia_cong)     baseRow.gia_cong     = rule.gia_cong
-        if (!body.duc)          baseRow.duc          = rule.duc
-        if (!body.thiet_ke)     baseRow.thiet_ke     = rule.thiet_ke
-        if (!body.resin)        baseRow.resin        = rule.resin
-        if (!body.phi_phu_kien) baseRow.phi_phu_kien = resolvePhiPhuKien(rule.phi_phu_kien, body.loai_vang, baseRow.sub_class)
+    if (hasFees) {
+      if (!hasGemsInDescription(body.description)) {
+        baseRow.gia_cong = 0; baseRow.duc = 0; baseRow.thiet_ke = 0
+        baseRow.resin = 0; baseRow.phi_phu_kien = 0
+      } else if (baseRow.sub_class) {
+        const { data: asmRules } = await db
+          .from('assembly_pricing_rules')
+          .select('sub_class, gia_cong, duc, thiet_ke, resin, phi_phu_kien')
+        const rule = (asmRules ?? []).find(
+          r => r.sub_class.toUpperCase() === String(baseRow.sub_class ?? '').toUpperCase()
+        )
+        if (rule) {
+          if (!body.gia_cong)     baseRow.gia_cong     = rule.gia_cong
+          if (!body.duc)          baseRow.duc          = rule.duc
+          if (!body.thiet_ke)     baseRow.thiet_ke     = rule.thiet_ke
+          if (!body.resin)        baseRow.resin        = rule.resin
+          if (!body.phi_phu_kien) baseRow.phi_phu_kien = resolvePhiPhuKien(rule.phi_phu_kien, body.loai_vang, baseRow.sub_class)
+        }
       }
     }
 

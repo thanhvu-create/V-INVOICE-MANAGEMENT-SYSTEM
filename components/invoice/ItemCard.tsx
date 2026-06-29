@@ -10,7 +10,7 @@ import { DriveImageInput } from '@/components/ui/DriveImageInput'
 import { ComboInput } from '@/components/ui/ComboInput'
 
 import type { InvoiceTemplate } from '@/lib/formulas/pricing'
-import { getAssemblyPrices, type AssemblyPricingRule } from '@/lib/formulas/assembly-pricing'
+import { getAssemblyPrices, hasGemsInDescription, type AssemblyPricingRule } from '@/lib/formulas/assembly-pricing'
 
 const BASE_METAL_TYPES = ['18KY', '18KW', '18KR', '18KG', '22KY', '22KW', '24K', '14KY', '14KW', '14KR', '10KY', '10KW', 'PT950', 'PT850', 'AG', 'PD']
 
@@ -80,7 +80,8 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
     const hasFees = !isAG3
     const subClass = item.sub_class?.trim() ?? ''
     const allZero = [item.gia_cong, item.duc, item.thiet_ke, item.resin, item.phi_phu_kien].every(v => (v ?? 0) === 0)
-    const fill = (hasFees && subClass && allZero)
+    const itemHasGems = hasGemsInDescription(item.description)
+    const fill = (hasFees && subClass && allZero && itemHasGems)
       ? getAssemblyPrices(subClass, assemblyRules, item.loai_vang)
       : null
 
