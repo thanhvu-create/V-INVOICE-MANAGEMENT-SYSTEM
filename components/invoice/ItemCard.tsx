@@ -10,7 +10,8 @@ import { DriveImageInput } from '@/components/ui/DriveImageInput'
 import { ComboInput } from '@/components/ui/ComboInput'
 
 import type { InvoiceTemplate } from '@/lib/formulas/pricing'
-import { getAssemblyPrices, hasGemsInDescription, type AssemblyPricingRule } from '@/lib/formulas/assembly-pricing'
+import { getAssemblyPrices, hasGemsInDescription, resolvePhiPhuKien, type AssemblyPricingRule } from '@/lib/formulas/assembly-pricing'
+import { detectClassSubClass, extractVendorModel, extractKichThuoc, type ClassRule } from '@/lib/formulas/description-parse'
 
 const BASE_METAL_TYPES = ['18KY', '18KW', '18KR', '18KG', '22KY', '22KW', '24K', '14KY', '14KW', '14KR', '10KY', '10KW', 'PT950', 'PT850', 'AG', 'PD']
 
@@ -54,10 +55,16 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   const [classOptions,  setClassOptions]  = useState<string[]>([])
   const [subClassOptions, setSubClassOptions] = useState<string[]>([])
   const [assemblyRules, setAssemblyRules] = useState<AssemblyPricingRule[]>([])
+  const [classRules,    setClassRules]    = useState<ClassRule[]>([])
 
   useEffect(() => {
     fetch('/api/metal-types').then(r => r.json()).then(j => { if (j.success) setMetalTypes(j.data) }).catch(() => {})
-    fetch('/api/class-subclass').then(r => r.json()).then(j => { if (j.success) setClassOptions(Array.from(new Set((j.data as any[]).map(r => r.class))).sort()) }).catch(() => {})
+    fetch('/api/class-subclass').then(r => r.json()).then(j => {
+      if (j.success) {
+        setClassRules(j.data)
+        setClassOptions(Array.from(new Set((j.data as any[]).map((r: any) => r.class))).sort())
+      }
+    }).catch(() => {})
     fetch('/api/assembly-pricing').then(r => r.json()).then(j => {
       if (j.success) {
         setAssemblyRules(j.data)
@@ -115,6 +122,39 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   function f(key: string) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
       setForm(v => ({ ...v, [key]: e.target.value }))
+  }
+
+  function handleDescriptionChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const desc = e.target.value
+    setForm(v => {
+      const next: Record<string, string> = { ...v, description: desc }
+      const detected = detectClassSubClass(desc, classRules)
+      if (detected) {
+        next['class']     = detected.class
+        next['sub_class'] = detected.sub_class
+      }
+      const sc = (next['sub_class'] ?? '').trim()
+      if (hasFees && sc) {
+        if (!hasGemsInDescription(desc)) {
+          next['gia_cong'] = '0'; next['duc'] = '0'; next['thiet_ke'] = '0'
+          next['resin'] = '0'; next['phi_phu_kien'] = '0'
+        } else {
+          const prices = getAssemblyPrices(sc, assemblyRules, next['loai_vang'])
+          if (prices) {
+            next['gia_cong']     = String(prices.gia_cong)
+            next['duc']          = String(prices.duc)
+            next['thiet_ke']     = String(prices.thiet_ke)
+            next['resin']        = String(prices.resin)
+            next['phi_phu_kien'] = String(prices.phi_phu_kien)
+          }
+        }
+      }
+      if (!(v['kich_thuoc'] ?? '').trim()) {
+        const size = extractKichThuoc(desc)
+        if (size) next['kich_thuoc'] = size
+      }
+      return next
+    })
   }
 
   async function handleSave() {
@@ -342,7 +382,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                 style={inputStyle}
               /></div>
             <div><label style={labelStyle}>Description</label>
-              <input style={inputStyle} value={form.description} onChange={f('description')} /></div>
+              <input style={inputStyle} value={form.description} onChange={handleDescriptionChange} /></div>
             <div><label style={labelStyle}>Tên khách</label>
               <input style={inputStyle} value={form.customer_name ?? ''} onChange={f('customer_name')} placeholder="e.g. ADM1, CH1-Khách" /></div>
             <div><label style={labelStyle}>Class</label>

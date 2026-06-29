@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { apiCall } from '@/lib/api'
 import { ModalPortal } from '@/components/ui/ModalPortal'
 import { ComboInput } from '@/components/ui/ComboInput'
-import { extractVendorModel, extractKichThuoc, buildChiTietCap } from '@/lib/formulas/description-parse'
+import { extractVendorModel, extractKichThuoc, buildChiTietCap, detectClassSubClass, type ClassRule } from '@/lib/formulas/description-parse'
 import { getAssemblyPrices, resolvePhiPhuKien, hasGemsInDescription, type AssemblyPricingRule } from '@/lib/formulas/assembly-pricing'
 
 
@@ -36,16 +36,6 @@ interface Form {
 }
 
 const BASE_LOAI_VANG = ['18KY', '18KW', '18KR', '18KG', '22KY', '22KW', '24K', '14KY', '14KW', '14KR', '10KY', '10KW', 'PT950', 'PT850', 'AG', 'PD']
-
-interface ClassRule { description_prefix: string; class: string; sub_class: string }
-
-function detectClassSubClass(description: string, rules: ClassRule[]): { class: string; sub_class: string } | null {
-  if (!description.trim() || rules.length === 0) return null
-  const upper = description.trim().toUpperCase()
-  const sorted = [...rules].sort((a, b) => b.description_prefix.length - a.description_prefix.length)
-  const match = sorted.find(r => upper.startsWith(r.description_prefix))
-  return match ? { class: match.class, sub_class: match.sub_class } : null
-}
 
 const EMPTY: Form = {
   sku: '', vendor_model: '', so_mo: '', po_number: '', sku_ag: '',

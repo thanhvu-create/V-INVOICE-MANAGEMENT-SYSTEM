@@ -32,6 +32,16 @@ function extractFiveDigitCode(token: string): string | null {
   return m ? m[1] : null
 }
 
+export interface ClassRule { description_prefix: string; class: string; sub_class: string }
+
+export function detectClassSubClass(description: string, rules: ClassRule[]): { class: string; sub_class: string } | null {
+  if (!description.trim() || rules.length === 0) return null
+  const upper = description.trim().toUpperCase()
+  const sorted = [...rules].sort((a, b) => b.description_prefix.length - a.description_prefix.length)
+  const match = sorted.find(r => upper.startsWith(r.description_prefix))
+  return match ? { class: match.class, sub_class: match.sub_class } : null
+}
+
 export function extractVendorModel(description: string | null | undefined): string | null {
   if (!description?.trim()) return null
   const upper = description.toUpperCase()
