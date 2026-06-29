@@ -80,7 +80,21 @@ export default function InvoiceDetailPage() {
   }
 
   async function handleTemplateChange(newTemplate: string) {
-    if (newTemplate === data?.header?.template_type) { setEditingTemplate(false); return }
+    const oldTemplate = data?.header?.template_type ?? 'CH1'
+    if (newTemplate === oldTemplate) { setEditingTemplate(false); return }
+
+    // Warn when switching between incompatible families (AG3 ↔ non-AG3)
+    const isAG3 = (t: string) => t === 'CH1_AG3' || t === 'VNSI_AG3'
+    if (isAG3(oldTemplate) !== isAG3(newTemplate) && items.length > 0) {
+      const direction = isAG3(oldTemplate)
+        ? 'AG3 → CH1/CH2/ADM: items sẽ không có gems và gia công → giá tính thiếu.'
+        : 'CH1/CH2/ADM → AG3: gems và gia công sẽ bị bỏ qua khi tính giá.'
+      const ok = confirm(
+        `⚠️ Đổi template không tương thích!\n\n${direction}\n\nDữ liệu gốc KHÔNG bị xóa nhưng giá sẽ tính lại theo cấu trúc mới — có thể ra số sai.\n\nTiếp tục?`
+      )
+      if (!ok) { setEditingTemplate(false); return }
+    }
+
     setSavingField('template_type')
     try {
       const res  = await fetch(`/api/invoices/${id}`, {
