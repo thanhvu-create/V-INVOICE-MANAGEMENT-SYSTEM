@@ -8,7 +8,7 @@ import { WorkflowBar } from '@/components/invoice/WorkflowBar'
 import { AuditTimeline } from '@/components/invoice/AuditTimeline'
 import { JMFormView } from '@/components/invoice/JMFormView'
 import { DetailView } from '@/components/invoice/DetailView'
-import { templateLabel } from '@/lib/templates'
+import { templateLabel, TEMPLATE_LABELS } from '@/lib/templates'
 import { AddItemModal } from '@/components/invoice/AddItemModal'
 import { XoanUrlConfig } from '@/components/invoice/XoanUrlConfig'
 import { ExportFolderConfig } from '@/components/invoice/ExportFolderConfig'
@@ -40,12 +40,13 @@ export default function InvoiceDetailPage() {
   const [exportingSheets, setExportingSheets] = useState(false)
   const [syncingNVL,      setSyncingNVL]      = useState(false)
 
-  // Inline-edit state for invoice_code and invoice_date
-  const [editingCode, setEditingCode] = useState(false)
-  const [codeVal,     setCodeVal]     = useState('')
-  const [editingDate, setEditingDate] = useState(false)
-  const [dateVal,     setDateVal]     = useState('')
-  const [savingField, setSavingField] = useState<string | null>(null)
+  // Inline-edit state for invoice_code, invoice_date, and template_type
+  const [editingCode,     setEditingCode]     = useState(false)
+  const [codeVal,         setCodeVal]         = useState('')
+  const [editingDate,     setEditingDate]     = useState(false)
+  const [dateVal,         setDateVal]         = useState('')
+  const [editingTemplate, setEditingTemplate] = useState(false)
+  const [savingField,     setSavingField]     = useState<string | null>(null)
 
   const canSeePrice   = canDo('see_prices')
   const isLocked      = data?.header?.status === 'finalized'
@@ -76,6 +77,25 @@ export default function InvoiceDetailPage() {
       }
     } catch { alert('Lỗi kết nối') }
     finally { setSavingField(null) }
+  }
+
+  async function handleTemplateChange(newTemplate: string) {
+    if (newTemplate === data?.header?.template_type) { setEditingTemplate(false); return }
+    setSavingField('template_type')
+    try {
+      const res  = await fetch(`/api/invoices/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ template_type: newTemplate }),
+      })
+      const json = await res.json()
+      if (json.success) {
+        await fetchData()  // refetch — all item prices recalculated server-side
+      } else {
+        alert(json.message ?? 'Lỗi khi đổi template')
+      }
+    } catch { alert('Lỗi kết nối') }
+    finally { setSavingField(null); setEditingTemplate(false) }
   }
 
   async function handleSyncNVL() {
@@ -222,9 +242,39 @@ export default function InvoiceDetailPage() {
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
             <StatusBadge status={header.status} />
             {header.template_type && (
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', border: '1px solid var(--border-base)', padding: '2px 8px' }}>
-                {templateLabel(header.template_type)}
-              </span>
+              editingTemplate ? (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <select
+                    autoFocus
+                    defaultValue={header.template_type}
+                    onChange={e => handleTemplateChange(e.target.value)}
+                    onBlur={() => setEditingTemplate(false)}
+                    disabled={savingField === 'template_type'}
+                    style={{ fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', border: '1px solid var(--border-strong)', background: 'var(--bg-surface)', color: 'var(--text-primary)', padding: '2px 6px', outline: 'none', cursor: 'pointer' }}
+                  >
+                    {Object.entries(TEMPLATE_LABELS).map(([key, label]) => (
+                      <option key={key} value={key}>{label}</option>
+                    ))}
+                  </select>
+                  {savingField === 'template_type' && (
+                    <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 10, color: 'var(--text-muted)' }} />
+                  )}
+                </div>
+              ) : (
+                <span
+                  onClick={canEdit ? () => setEditingTemplate(true) : undefined}
+                  title={canEdit ? 'Click để đổi template — sẽ tính lại giá toàn bộ SP' : undefined}
+                  style={{
+                    fontSize: 'var(--text-xs)', color: 'var(--text-secondary)',
+                    border: `1px ${canEdit ? 'dashed' : 'solid'} var(--border-base)`,
+                    padding: '2px 8px',
+                    cursor: canEdit ? 'pointer' : 'default',
+                  }}
+                >
+                  {templateLabel(header.template_type)}
+                  {canEdit && <i className="fa-regular fa-pen-to-square" style={{ marginLeft: 5, opacity: 0.5, fontSize: 9 }} />}
+                </span>
+              )
             )}
 
             {/* Invoice Date — inline edit */}
