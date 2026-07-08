@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import * as XLSX from 'xlsx'
 import { apiCall } from '@/lib/api'
 import { detectStoneType, parseSizeValue } from '@/lib/formulas/size-mapping'
+import { useUser } from '@/contexts/UserContext'
 
 interface GemRow {
   ma_xoan:      string
@@ -39,6 +40,7 @@ interface Props {
 }
 
 const SETTINGS_KEY = 'xoan_sheet_url'
+const TAB_SETTINGS_KEY = 'xoan_sheet_tab'
 
 const CT_BASED_TYPES = new Set([
   'BG', 'LG-BG', 'MQ', 'LG-MQ', 'PS', 'LG-PS',
@@ -107,15 +109,24 @@ function filterRows(raw: any[][], dataStart: number, mo: string | null): GemRow[
 
 // Picks the first sheet whose first 10 rows contain the "MO" header — falls
 // back to the first sheet in the workbook if none match.
-function pickDefaultSheet(wb: XLSX.WorkBook): string {
+function detectHeuristicSheet(wb: XLSX.WorkBook): string {
   for (const name of wb.SheetNames) {
     if (findDataStart(readSheetRows(wb, name)) !== null) return name
   }
   return wb.SheetNames[0]
 }
 
+// Prefers the admin-pinned default tab (if it still exists in this workbook),
+// otherwise falls back to the MO-header heuristic.
+function resolveDefaultSheet(wb: XLSX.WorkBook, pinnedTab: string | null): string {
+  if (pinnedTab && wb.SheetNames.includes(pinnedTab)) return pinnedTab
+  return detectHeuristicSheet(wb)
+}
+
 export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: Props) {
   const mo = soMo ? extractMO(soMo) : null
+  const { canDo } = useUser()
+  const canPin = canDo('manage_rates')
 
   const [rows,       setRows]       = useState<GemRow[] | null>(null)
   const [fetching,   setFetching]   = useState(false)
@@ -127,6 +138,8 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
   const [sheetNames,    setSheetNames]    = useState<string[]>([])
   const [selectedSheet, setSelectedSheet] = useState<string>('')
   const [searchedSheet, setSearchedSheet] = useState<string | null>(null)
+  const [pinnedTab,     setPinnedTab]     = useState<string | null>(null)
+  const [pinning,       setPinning]       = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Fetch NVL Hot catalog for price lookup
@@ -157,15 +170,19 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
     })
   }, [rows, nvlHotList])
 
-  // Auto-fetch from saved URL on mount
+  // Auto-fetch from saved URL + pinned tab on mount
   useEffect(() => {
     async function init() {
       setFetching(true)
       try {
-        const res  = await fetch(`/api/settings?key=${SETTINGS_KEY}`)
-        const json = await res.json()
-        const url: string | null = json.success ? json.value : null
-        if (url) await fetchFromUrl(url)
+        const [urlJson, tabJson] = await Promise.all([
+          fetch(`/api/settings?key=${SETTINGS_KEY}`).then(r => r.json()),
+          fetch(`/api/settings?key=${TAB_SETTINGS_KEY}`).then(r => r.json()),
+        ])
+        const url:    string | null = urlJson.success ? urlJson.value : null
+        const pinned: string | null = tabJson.success ? tabJson.value : null
+        setPinnedTab(pinned)
+        if (url) await fetchFromUrl(url, pinned)
         else setFetchError('Chưa cấu hình link Google Sheet — dùng nút "Link Hột" ở trên.')
       } catch {
         setFetchError('Không tải được cấu hình.')
@@ -185,16 +202,16 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
     setAddedIds(new Set())
   }
 
-  function loadWorkbook(buf: ArrayBuffer) {
+  function loadWorkbook(buf: ArrayBuffer, pinned: string | null) {
     const wb = XLSX.read(new Uint8Array(buf), { type: 'array' })
-    const defaultSheet = pickDefaultSheet(wb)
+    const defaultSheet = resolveDefaultSheet(wb, pinned)
     setWorkbook(wb)
     setSheetNames(wb.SheetNames)
     setSelectedSheet(defaultSheet)
     runSearch(wb, defaultSheet)
   }
 
-  async function fetchFromUrl(url: string) {
+  async function fetchFromUrl(url: string, pinnedOverride?: string | null) {
     setFetching(true)
     setFetchError('')
     setRows(null)
@@ -208,7 +225,7 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
         const j = await res.json().catch(() => ({}))
         throw new Error(j.error ?? `HTTP ${res.status}`)
       }
-      loadWorkbook(await res.arrayBuffer())
+      loadWorkbook(await res.arrayBuffer(), pinnedOverride !== undefined ? pinnedOverride : pinnedTab)
     } catch (e) {
       setFetchError(String(e))
     } finally {
@@ -225,11 +242,25 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
     setSearchedSheet(null)
     setAddedIds(new Set())
     try {
-      loadWorkbook(await file.arrayBuffer())
+      loadWorkbook(await file.arrayBuffer(), pinnedTab)
     } catch (e) {
       setFetchError(`Không đọc được file: ${String(e)}`)
     } finally {
       setFetching(false)
+    }
+  }
+
+  async function handlePinTab() {
+    if (!selectedSheet || pinning) return
+    setPinning(true)
+    try {
+      await fetch('/api/settings', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: TAB_SETTINGS_KEY, value: selectedSheet }),
+      })
+      setPinnedTab(selectedSheet)
+    } finally {
+      setPinning(false)
     }
   }
 
@@ -299,7 +330,7 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
             <button onClick={async () => {
               const res  = await fetch(`/api/settings?key=${SETTINGS_KEY}`)
               const json = await res.json()
-              if (json.value) fetchFromUrl(json.value)
+              if (json.value) fetchFromUrl(json.value, pinnedTab)
             }}
               title="Tải lại" style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12 }}>
               <i className="fa-solid fa-rotate-right" />
@@ -335,7 +366,9 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
               color: 'var(--text-primary)', padding: '2px 6px', cursor: 'pointer',
             }}
           >
-            {sheetNames.map(name => <option key={name} value={name}>{name}</option>)}
+            {sheetNames.map(name => (
+              <option key={name} value={name}>{name}{name === pinnedTab ? ' ★ (mặc định)' : ''}</option>
+            ))}
           </select>
           <button
             onClick={() => workbook && runSearch(workbook, selectedSheet)}
@@ -352,6 +385,22 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
           >
             <i className="fa-solid fa-magnifying-glass" style={{ fontSize: 9 }} />Tra hột
           </button>
+          {canPin && (
+            <button
+              onClick={handlePinTab}
+              disabled={pinning || !selectedSheet}
+              title={selectedSheet === pinnedTab ? 'Tab này đang là mặc định' : 'Đặt tab này làm mặc định cho lần tra sau'}
+              style={{
+                flexShrink: 0, background: 'none', border: 'none',
+                cursor: pinning ? 'not-allowed' : 'pointer', padding: '2px 4px',
+              }}
+            >
+              {pinning
+                ? <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 11, color: 'var(--text-muted)' }} />
+                : <i className="fa-solid fa-thumbtack" style={{ fontSize: 11, color: selectedSheet === pinnedTab ? '#f59e0b' : 'var(--text-muted)' }} />
+              }
+            </button>
+          )}
         </div>
       )}
 
