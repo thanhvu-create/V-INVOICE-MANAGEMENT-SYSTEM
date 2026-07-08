@@ -63,16 +63,22 @@ function inferPChat(maXoan: string): string {
   return ''
 }
 
-function parseAndFilter(buf: ArrayBuffer, mo: string | null): GemRow[] {
-  const wb  = XLSX.read(new Uint8Array(buf), { type: 'array' })
-  const ws  = wb.Sheets[wb.SheetNames[0]]
-  const raw = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as any[][]
+function readSheetRows(wb: XLSX.WorkBook, sheetName: string): any[][] {
+  const ws = wb.Sheets[sheetName]
+  if (!ws) return []
+  return XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as any[][]
+}
 
-  let dataStart = 3
+// Scans the first 10 rows for the "MO" header at col E (index 4) — returns the
+// data start row, or null if this sheet doesn't look like a tracking-data sheet.
+function findDataStart(raw: any[][]): number | null {
   for (let i = 0; i < Math.min(10, raw.length); i++) {
-    if (String(raw[i][4] ?? '').trim().toUpperCase() === 'MO') { dataStart = i + 1; break }
+    if (String(raw[i]?.[4] ?? '').trim().toUpperCase() === 'MO') return i + 1
   }
+  return null
+}
 
+function filterRows(raw: any[][], dataStart: number, mo: string | null): GemRow[] {
   const out: GemRow[] = []
   for (let i = dataStart; i < raw.length; i++) {
     const r      = raw[i]
@@ -99,6 +105,15 @@ function parseAndFilter(buf: ArrayBuffer, mo: string | null): GemRow[] {
   return out
 }
 
+// Picks the first sheet whose first 10 rows contain the "MO" header — falls
+// back to the first sheet in the workbook if none match.
+function pickDefaultSheet(wb: XLSX.WorkBook): string {
+  for (const name of wb.SheetNames) {
+    if (findDataStart(readSheetRows(wb, name)) !== null) return name
+  }
+  return wb.SheetNames[0]
+}
+
 export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: Props) {
   const mo = soMo ? extractMO(soMo) : null
 
@@ -108,6 +123,9 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
   const [addedIds,   setAddedIds]   = useState<Set<number>>(new Set())
   const [adding,     setAdding]     = useState(false)
   const [nvlHotList, setNvlHotList] = useState<NVLHotRow[]>([])
+  const [workbook,      setWorkbook]      = useState<XLSX.WorkBook | null>(null)
+  const [sheetNames,    setSheetNames]    = useState<string[]>([])
+  const [selectedSheet, setSelectedSheet] = useState<string>('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Fetch NVL Hot catalog for price lookup
@@ -158,10 +176,19 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  function loadWorkbook(buf: ArrayBuffer) {
+    const wb = XLSX.read(new Uint8Array(buf), { type: 'array' })
+    setWorkbook(wb)
+    setSheetNames(wb.SheetNames)
+    setSelectedSheet(pickDefaultSheet(wb))
+  }
+
   async function fetchFromUrl(url: string) {
     setFetching(true)
     setFetchError('')
     setRows(null)
+    setWorkbook(null)
+    setSheetNames([])
     setAddedIds(new Set())
     try {
       const res = await fetch(`/api/proxy/sheets?url=${encodeURIComponent(url)}`)
@@ -169,7 +196,7 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
         const j = await res.json().catch(() => ({}))
         throw new Error(j.error ?? `HTTP ${res.status}`)
       }
-      setRows(parseAndFilter(await res.arrayBuffer(), mo))
+      loadWorkbook(await res.arrayBuffer())
     } catch (e) {
       setFetchError(String(e))
     } finally {
@@ -181,15 +208,27 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
     setFetching(true)
     setFetchError('')
     setRows(null)
+    setWorkbook(null)
+    setSheetNames([])
     setAddedIds(new Set())
     try {
-      setRows(parseAndFilter(await file.arrayBuffer(), mo))
+      loadWorkbook(await file.arrayBuffer())
     } catch (e) {
       setFetchError(`Không đọc được file: ${String(e)}`)
     } finally {
       setFetching(false)
     }
   }
+
+  // Re-parse rows whenever the workbook loads or the user switches tabs
+  useEffect(() => {
+    if (!workbook || !selectedSheet) return
+    const raw = readSheetRows(workbook, selectedSheet)
+    const dataStart = findDataStart(raw) ?? 3
+    setRows(filterRows(raw, dataStart, mo))
+    setAddedIds(new Set())
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workbook, selectedSheet])
 
   function buildGemBody(r: EnrichedRow) {
     return {
@@ -274,6 +313,26 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
           : <span style={{ color: 'var(--color-warning)' }}><i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 4 }} />Chưa có MO trong SO-MO</span>
         }
       </div>
+
+      {/* Tab selector — only shown when the workbook has more than one sheet */}
+      {sheetNames.length > 1 && !fetching && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.5rem' }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+            <i className="fa-solid fa-table-cells" style={{ marginRight: 4 }} />Tab:
+          </span>
+          <select
+            value={selectedSheet}
+            onChange={e => setSelectedSheet(e.target.value)}
+            style={{
+              fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)',
+              border: '1px solid var(--border-base)', background: 'var(--bg-surface)',
+              color: 'var(--text-primary)', padding: '2px 6px', cursor: 'pointer',
+            }}
+          >
+            {sheetNames.map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
+        </div>
+      )}
 
       {/* Loading */}
       {fetching && (
