@@ -322,13 +322,14 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
       {/* Tab selector — only shown when the workbook has more than one sheet */}
       {sheetNames.length > 1 && !fetching && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: '0.5rem' }}>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', flexShrink: 0 }}>
             <i className="fa-solid fa-table-cells" style={{ marginRight: 4 }} />Tab:
           </span>
           <select
             value={selectedSheet}
             onChange={e => setSelectedSheet(e.target.value)}
             style={{
+              flex: 1, minWidth: 0,
               fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)',
               border: '1px solid var(--border-base)', background: 'var(--bg-surface)',
               color: 'var(--text-primary)', padding: '2px 6px', cursor: 'pointer',
@@ -340,7 +341,8 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
             onClick={() => workbook && runSearch(workbook, selectedSheet)}
             disabled={!workbook}
             style={{
-              display: 'flex', alignItems: 'center', gap: 4,
+              flexShrink: 0,
+              display: 'flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap',
               padding: '2px 10px', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)',
               border: `1px solid ${tabIsStale ? 'var(--text-primary)' : 'var(--border-base)'}`,
               background: tabIsStale ? 'var(--text-primary)' : 'transparent',
