@@ -126,6 +126,7 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
   const [workbook,      setWorkbook]      = useState<XLSX.WorkBook | null>(null)
   const [sheetNames,    setSheetNames]    = useState<string[]>([])
   const [selectedSheet, setSelectedSheet] = useState<string>('')
+  const [searchedSheet, setSearchedSheet] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   // Fetch NVL Hot catalog for price lookup
@@ -176,11 +177,21 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  function runSearch(wb: XLSX.WorkBook, sheetName: string) {
+    const raw = readSheetRows(wb, sheetName)
+    const dataStart = findDataStart(raw) ?? 3
+    setRows(filterRows(raw, dataStart, mo))
+    setSearchedSheet(sheetName)
+    setAddedIds(new Set())
+  }
+
   function loadWorkbook(buf: ArrayBuffer) {
     const wb = XLSX.read(new Uint8Array(buf), { type: 'array' })
+    const defaultSheet = pickDefaultSheet(wb)
     setWorkbook(wb)
     setSheetNames(wb.SheetNames)
-    setSelectedSheet(pickDefaultSheet(wb))
+    setSelectedSheet(defaultSheet)
+    runSearch(wb, defaultSheet)
   }
 
   async function fetchFromUrl(url: string) {
@@ -189,6 +200,7 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
     setRows(null)
     setWorkbook(null)
     setSheetNames([])
+    setSearchedSheet(null)
     setAddedIds(new Set())
     try {
       const res = await fetch(`/api/proxy/sheets?url=${encodeURIComponent(url)}`)
@@ -210,6 +222,7 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
     setRows(null)
     setWorkbook(null)
     setSheetNames([])
+    setSearchedSheet(null)
     setAddedIds(new Set())
     try {
       loadWorkbook(await file.arrayBuffer())
@@ -220,15 +233,7 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
     }
   }
 
-  // Re-parse rows whenever the workbook loads or the user switches tabs
-  useEffect(() => {
-    if (!workbook || !selectedSheet) return
-    const raw = readSheetRows(workbook, selectedSheet)
-    const dataStart = findDataStart(raw) ?? 3
-    setRows(filterRows(raw, dataStart, mo))
-    setAddedIds(new Set())
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workbook, selectedSheet])
+  const tabIsStale = !!workbook && selectedSheet !== searchedSheet
 
   function buildGemBody(r: EnrichedRow) {
     return {
@@ -331,6 +336,28 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
           >
             {sheetNames.map(name => <option key={name} value={name}>{name}</option>)}
           </select>
+          <button
+            onClick={() => workbook && runSearch(workbook, selectedSheet)}
+            disabled={!workbook}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 4,
+              padding: '2px 10px', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)',
+              border: `1px solid ${tabIsStale ? 'var(--text-primary)' : 'var(--border-base)'}`,
+              background: tabIsStale ? 'var(--text-primary)' : 'transparent',
+              color: tabIsStale ? 'var(--text-inverse)' : 'var(--text-secondary)',
+              cursor: workbook ? 'pointer' : 'not-allowed', fontWeight: tabIsStale ? 600 : 400,
+            }}
+          >
+            <i className="fa-solid fa-magnifying-glass" style={{ fontSize: 9 }} />Tra hột
+          </button>
+        </div>
+      )}
+
+      {/* Hint when the selected tab hasn't been searched yet */}
+      {tabIsStale && !fetching && (
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)', marginBottom: '0.5rem' }}>
+          <i className="fa-solid fa-triangle-exclamation" style={{ marginRight: 4 }} />
+          Đã đổi tab — bấm &quot;Tra hột&quot; để tìm trong tab này.
         </div>
       )}
 
@@ -355,11 +382,12 @@ export function XoanLookupPanel({ invoiceId, itemId, soMo, onSaved, onClose }: P
       )}
 
       {/* Results */}
-      {enrichedRows !== null && !fetching && (
+      {enrichedRows !== null && !fetching && !tabIsStale && (
         <div>
           {enrichedRows.length === 0 ? (
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', padding: '0.2rem 0' }}>
-              Không tìm thấy dòng nào (MO={mo ?? '—'}, trạng thái=Xuất).
+              Không tìm thấy dòng nào trong tab &quot;{searchedSheet}&quot; (MO={mo ?? '—'}, trạng thái=Xuất).
+              {sheetNames.length > 1 && ' Thử chọn tab khác ở trên.'}
             </div>
           ) : (
             <>
