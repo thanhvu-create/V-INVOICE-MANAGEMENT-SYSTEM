@@ -9,6 +9,7 @@ export interface Invoice {
   invoice_code:  string          // V-INV code e.g. "P60501"
   template_type: InvoiceTemplate
   status:        InvoiceStatus
+  seq_no:        number | null   // auto-increment; null for invoices created before the feature — used to build export filename
   // NVL Snapshot — frozen after finalized
   nvl_gold_24k:       number | null
   nvl_pt_price:       number | null

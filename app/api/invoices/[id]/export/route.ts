@@ -188,7 +188,17 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
     XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([infoData]), 'Info')
 
     const buffer   = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
-    const filename = `invoice-${invoice.invoice_code ?? params.id}.xlsx`
+
+    // Build export filename: VNS0{seq}: IN-V(D.M.YY){n}p- {template}
+    // seq_no is null for old invoices (created before the feature) → number left blank.
+    // created_at is stored UTC → shift to Vietnam time (UTC+7) before extracting the date,
+    // then read UTC parts so the server's own timezone can't skew it. No leading zeros; 2-digit year.
+    const vn        = new Date(new Date(invoice.created_at).getTime() + 7 * 3600 * 1000)
+    const dateStr   = `${vn.getUTCDate()}.${vn.getUTCMonth() + 1}.${String(vn.getUTCFullYear()).slice(-2)}`
+    const itemCount = items?.length ?? 0
+    const rawName   = `VNS0${invoice.seq_no ?? ''}: IN-V(${dateStr})${itemCount}p- ${invoice.template_type ?? ''}`
+    // ':' is illegal in filenames on Windows/macOS → replace with '_'
+    const filename  = `${rawName.replace(/:/g, '_')}.xlsx`
 
     return new NextResponse(buffer, {
       headers: {
