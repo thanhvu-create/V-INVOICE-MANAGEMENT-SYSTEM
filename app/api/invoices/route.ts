@@ -59,26 +59,16 @@ export async function POST(req: NextRequest) {
   try {
     const ctx = await requireRole('user')
     const body = await req.json()
-    const { invoice_code, template_type, invoice_date } = body
+    const { template_type, invoice_date } = body
 
-    if (!invoice_code?.trim()) {
-      return NextResponse.json({ success: false, message: 'Invoice code is required' }, { status: 400 })
-    }
     if (!template_type) {
       return NextResponse.json({ success: false, message: 'Template type is required' }, { status: 400 })
     }
 
     const db = createServiceClient()
 
-    // Unique invoice_code check
-    const { count } = await db
-      .from('invoices')
-      .select('*', { count: 'exact', head: true })
-      .eq('invoice_code', invoice_code.trim())
-
-    if (count && count > 0) {
-      return NextResponse.json({ success: false, message: `Invoice code "${invoice_code}" already exists` }, { status: 409 })
-    }
+    // invoice_code is not accepted here — trg_invoices_auto_code builds it from
+    // seq_no + created_at + item count + template. See supabase/add_invoice_auto_name.sql.
 
     // Copy NVL snapshot from latest nvl_prices row
     const { data: latestNVL } = await db
@@ -107,7 +97,6 @@ export async function POST(req: NextRequest) {
     const { data, error } = await db
       .from('invoices')
       .insert({
-        invoice_code:  invoice_code.trim(),
         template_type,
         status:        'draft',
         created_by:    ctx.userId,

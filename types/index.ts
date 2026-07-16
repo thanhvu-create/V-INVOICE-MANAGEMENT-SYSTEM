@@ -6,10 +6,11 @@ export type Role     = 'admin' | 'manager' | 'user' | 'viewer'
 
 export interface Invoice {
   id:            string
-  invoice_code:  string          // V-INV code e.g. "P60501"
+  invoice_code:  string          // built by trg_invoices_auto_code, e.g. "VNS01: IN-V(16.7.26)41p- CH1"
+  invoice_code_manual: boolean   // true once edited by hand — triggers stop rebuilding invoice_code
   template_type: InvoiceTemplate
   status:        InvoiceStatus
-  seq_no:        number | null   // auto-increment; null for invoices created before the feature — used to build export filename
+  seq_no:        number | null   // auto-increment; null for invoices created before the feature
   // NVL Snapshot — frozen after finalized
   nvl_gold_24k:       number | null
   nvl_pt_price:       number | null

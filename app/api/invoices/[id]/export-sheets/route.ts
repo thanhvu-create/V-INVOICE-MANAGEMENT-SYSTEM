@@ -656,7 +656,9 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       }),
     )
 
-    const title = `V-Invoice ${invoice.invoice_code ?? params.id} (${templateLabel(invoice.template_type)})`
+    // invoice_code already carries seq, date, item count and template — wrapping it in
+    // "V-Invoice ... (CH1)" would just repeat the template. See supabase/add_invoice_auto_name.sql.
+    const title = invoice.invoice_code ?? params.id
 
     // 1. Create spreadsheet with four sheets
     const created = await sheetsPost(accessToken, '', {

@@ -65,7 +65,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const body = await req.json()
     const allowed = [
-      'invoice_code', 'invoice_date', 'template_type',
+      'invoice_date', 'template_type',
       'nvl_gold_24k', 'nvl_pt_price', 'nvl_ag_price', 'nvl_pd_price',
       'nvl_loss_gold', 'nvl_loss_pt', 'nvl_cif_rate',
       'nvl_tag_multiplier', 'nvl_fr_multiplier',
@@ -73,6 +73,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const updates: Record<string, unknown> = {}
     for (const key of allowed) {
       if (key in body) updates[key] = body[key]
+    }
+
+    // invoice_code is normally built by trg_invoices_auto_code. Editing it by hand pins it
+    // (invoice_code_manual = true) so the triggers stop overwriting; clearing it hands the
+    // name back to the trigger. On revert we must not write invoice_code itself — for a legacy
+    // invoice (seq_no NULL) the trigger skips, and an empty string would wipe its hand-typed code.
+    if ('invoice_code' in body) {
+      const code = String(body.invoice_code ?? '').trim()
+      if (code) {
+        updates.invoice_code        = code
+        updates.invoice_code_manual = true
+      } else {
+        updates.invoice_code_manual = false
+      }
     }
 
     const { data, error } = await db

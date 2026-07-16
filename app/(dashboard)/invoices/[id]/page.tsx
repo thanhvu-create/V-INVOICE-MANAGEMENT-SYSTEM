@@ -215,8 +215,10 @@ export default function InvoiceDetailPage() {
               <form
                 onSubmit={async e => {
                   e.preventDefault()
-                  const v = codeVal.trim().toUpperCase()
-                  if (v && v !== header.invoice_code) await patchHeader({ invoice_code: v })
+                  // No .toUpperCase() — the auto name's lowercase 'p' (as in "41p") is meaningful.
+                  // Empty means "hand the name back to the trigger", so blank is a valid submit.
+                  const v = codeVal.trim()
+                  if (v !== (header.invoice_code ?? '')) await patchHeader({ invoice_code: v })
                   setEditingCode(false)
                 }}
                 onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setEditingCode(false) }}
@@ -226,12 +228,13 @@ export default function InvoiceDetailPage() {
                   autoFocus
                   value={codeVal}
                   onChange={e => setCodeVal(e.target.value)}
+                  placeholder="Để trống = tên tự động"
                   style={{
                     fontFamily: 'var(--font-heading)', fontSize: 'var(--text-2xl)', fontWeight: 400,
                     border: 'none', borderBottom: '2px solid var(--text-primary)',
                     background: 'transparent', outline: 'none', padding: '0 2px',
-                    width: `${Math.max(8, codeVal.length + 2)}ch`,
-                    color: 'var(--text-primary)', textTransform: 'uppercase',
+                    width: `${Math.max(24, codeVal.length + 2)}ch`,
+                    color: 'var(--text-primary)',
                   }}
                 />
                 <button type="submit" disabled={!!savingField} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, padding: 4 }}>
@@ -246,7 +249,7 @@ export default function InvoiceDetailPage() {
                 {canEdit && (
                   <button
                     onClick={() => { setCodeVal(header.invoice_code ?? ''); setEditingCode(true) }}
-                    title="Đổi Invoice Code"
+                    title="Đổi Invoice Code — để trống để quay lại tên tự động"
                     style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 11, padding: '2px 4px', opacity: 0.6 }}
                   >
                     <i className="fa-regular fa-pen-to-square" />
