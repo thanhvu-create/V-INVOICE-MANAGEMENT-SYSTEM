@@ -122,9 +122,11 @@ export async function POST(req: NextRequest) {
       ...recalcItem(row, [], nvl, template),
     }))
 
-    const { error: insertErr } = await db
+    // Return the created items so the client can auto-attach gems by MO (so_mo).
+    const { data: created, error: insertErr } = await db
       .from('invoice_products')
       .insert(itemsWithCalc)
+      .select('id, seq, so_mo')
 
     if (insertErr) throw insertErr
 
@@ -135,7 +137,7 @@ export async function POST(req: NextRequest) {
       metadata: { count: rows.length },
     })
 
-    return NextResponse.json({ success: true, data: { imported: rows.length } })
+    return NextResponse.json({ success: true, data: { imported: rows.length, items: created ?? [] } })
   } catch (err: any) {
     if (err?.status) return NextResponse.json({ success: false, message: err.message }, { status: err.status })
     return NextResponse.json({ success: false, message: String(err) }, { status: 500 })

@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import * as XLSX from 'xlsx'
 import { useUser } from '@/contexts/UserContext'
 
-const SETTINGS_KEY = 'xoan_sheet_url'
+const URL_KEY = 'xoan_sheet_url'
+const TAB_KEY = 'xoan_sheet_tab'
 
 interface Props {
   template: string
@@ -20,21 +22,26 @@ export function XoanUrlConfig({ template }: Props) {
   const { canDo } = useUser()
   const canManage = canDo('manage_rates')
 
-  // Only relevant for gem templates
-  const hasGems = template === 'CH1' || template === 'CH2' || template === 'ADM'
-  if (!hasGems) return null
-
   const [savedUrl, setSavedUrl] = useState<string | null>(null)
   const [open,     setOpen]     = useState(false)
   const [input,    setInput]    = useState('')
   const [saving,   setSaving]   = useState(false)
+
+  // Fixed-tab (pin) state — replaces the pin control that used to live in XoanLookupPanel
+  const [tabNames,   setTabNames]   = useState<string[]>([])
+  const [pinnedTab,  setPinnedTab]  = useState<string | null>(null)
+  const [selectedTab, setSelectedTab] = useState<string>('')
+  const [loadingTabs, setLoadingTabs] = useState(false)
+  const [pinning,     setPinning]     = useState(false)
+  const [tabError,    setTabError]    = useState('')
+
   const wrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    fetch(`/api/settings?key=${SETTINGS_KEY}`)
-      .then(r => r.json())
-      .then(j => { if (j.success) setSavedUrl(j.value ?? null) })
-      .catch(() => {})
+    fetch(`/api/settings?key=${URL_KEY}`).then(r => r.json())
+      .then(j => { if (j.success) setSavedUrl(j.value ?? null) }).catch(() => {})
+    fetch(`/api/settings?key=${TAB_KEY}`).then(r => r.json())
+      .then(j => { if (j.success && j.value) { setPinnedTab(j.value); setSelectedTab(j.value) } }).catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -45,23 +52,65 @@ export function XoanUrlConfig({ template }: Props) {
     return () => document.removeEventListener('mousedown', onOutside)
   }, [open])
 
+  // Load the workbook's tab names (only when the popover is open + a URL is configured).
+  const loadTabs = useCallback(async (url: string) => {
+    setLoadingTabs(true)
+    setTabError('')
+    try {
+      const res = await fetch(`/api/proxy/sheets?url=${encodeURIComponent(url)}`)
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}))
+        throw new Error(j.error ?? `HTTP ${res.status}`)
+      }
+      const wb = XLSX.read(new Uint8Array(await res.arrayBuffer()), { type: 'array', bookSheets: true })
+      setTabNames(wb.SheetNames ?? [])
+      setSelectedTab(prev => prev || (wb.SheetNames?.[0] ?? ''))
+    } catch (e) {
+      setTabError(String(e))
+      setTabNames([])
+    } finally {
+      setLoadingTabs(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (open && savedUrl && tabNames.length === 0 && !loadingTabs) loadTabs(savedUrl)
+  }, [open, savedUrl, tabNames.length, loadingTabs, loadTabs])
+
+  // Only relevant for gem templates — early return AFTER all hooks (rules-of-hooks safe).
+  const hasGems = template === 'CH1' || template === 'CH2' || template === 'ADM'
+  if (!hasGems) return null
+
   function handleOpen() {
     setInput(savedUrl ?? '')
     setOpen(v => !v)
   }
 
-  async function handleSave() {
+  async function handleSaveUrl() {
     const url = input.trim()
     if (!url) return
     setSaving(true)
     await fetch('/api/settings', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: SETTINGS_KEY, value: url }),
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: URL_KEY, value: url }),
     })
     setSavedUrl(url)
+    setTabNames([])   // force reload of tab list for the new URL
     setSaving(false)
-    setOpen(false)
+  }
+
+  async function handlePinTab() {
+    if (!selectedTab || pinning) return
+    setPinning(true)
+    try {
+      await fetch('/api/settings', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: TAB_KEY, value: selectedTab }),
+      })
+      setPinnedTab(selectedTab)
+    } finally {
+      setPinning(false)
+    }
   }
 
   const configured = !!savedUrl
@@ -91,7 +140,7 @@ export function XoanUrlConfig({ template }: Props) {
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 4px)', right: 0,
-          width: 360, background: 'var(--bg-surface)',
+          width: 380, background: 'var(--bg-surface)',
           border: '1px solid var(--border-base)',
           boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
           zIndex: 9999, padding: '0.85rem 1rem',
@@ -107,7 +156,7 @@ export function XoanUrlConfig({ template }: Props) {
                 autoFocus
                 value={input}
                 onChange={e => setInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setOpen(false) }}
+                onKeyDown={e => { if (e.key === 'Enter') handleSaveUrl(); if (e.key === 'Escape') setOpen(false) }}
                 placeholder="https://docs.google.com/spreadsheets/d/…"
                 style={{
                   width: '100%', boxSizing: 'border-box',
@@ -116,21 +165,78 @@ export function XoanUrlConfig({ template }: Props) {
                   color: 'var(--text-primary)', outline: 'none', marginBottom: '0.5rem',
                 }}
               />
-              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', marginBottom: configured ? '0.75rem' : 0 }}>
                 <button onClick={() => setOpen(false)}
                   style={{ padding: '4px 10px', border: '1px solid var(--border-base)', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)' }}>
-                  Hủy
+                  Đóng
                 </button>
-                <button onClick={handleSave} disabled={saving || !input.trim()}
+                <button onClick={handleSaveUrl} disabled={saving || !input.trim()}
                   style={{ padding: '4px 14px', background: 'var(--text-primary)', color: 'var(--text-inverse)', border: 'none', cursor: saving || !input.trim() ? 'not-allowed' : 'pointer', opacity: saving || !input.trim() ? 0.6 : 1, fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>
-                  {saving ? <i className="fa-solid fa-circle-notch fa-spin" /> : 'Lưu'}
+                  {saving ? <i className="fa-solid fa-circle-notch fa-spin" /> : 'Lưu link'}
                 </button>
               </div>
+
+              {/* Fixed tab — pick + pin */}
+              {configured && (
+                <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.65rem' }}>
+                  <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>
+                    <i className="fa-solid fa-thumbtack" style={{ marginRight: 5, color: pinnedTab ? '#f59e0b' : 'var(--text-muted)' }} />
+                    Tab cố định (auto tra hột)
+                  </div>
+
+                  {loadingTabs ? (
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>
+                      <i className="fa-solid fa-circle-notch fa-spin" style={{ marginRight: 5 }} />Đang tải danh sách tab…
+                    </div>
+                  ) : tabError ? (
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }}>
+                      {tabError}
+                      <button onClick={() => savedUrl && loadTabs(savedUrl)}
+                        style={{ marginLeft: 6, background: 'none', border: 'none', cursor: 'pointer', color: 'var(--color-info)', fontSize: 'var(--text-xs)', textDecoration: 'underline' }}>
+                        Thử lại
+                      </button>
+                    </div>
+                  ) : tabNames.length > 0 ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <select
+                        value={selectedTab}
+                        onChange={e => setSelectedTab(e.target.value)}
+                        style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', border: '1px solid var(--border-base)', background: 'var(--bg-base)', color: 'var(--text-primary)', padding: '4px 6px', cursor: 'pointer' }}
+                      >
+                        {tabNames.map(name => (
+                          <option key={name} value={name}>{name}{name === pinnedTab ? ' ★' : ''}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handlePinTab}
+                        disabled={pinning || !selectedTab || selectedTab === pinnedTab}
+                        title={selectedTab === pinnedTab ? 'Tab này đang được ghim' : 'Ghim tab này làm tab cố định'}
+                        style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 4, padding: '4px 10px', border: '1px solid var(--border-base)', background: selectedTab === pinnedTab ? 'transparent' : 'var(--text-primary)', color: selectedTab === pinnedTab ? 'var(--text-muted)' : 'var(--text-inverse)', cursor: pinning || selectedTab === pinnedTab ? 'default' : 'pointer', fontFamily: 'var(--font-body)', fontSize: 'var(--text-xs)', fontWeight: 600 }}
+                      >
+                        {pinning
+                          ? <i className="fa-solid fa-circle-notch fa-spin" style={{ fontSize: 10 }} />
+                          : <><i className="fa-solid fa-thumbtack" style={{ fontSize: 10 }} />{selectedTab === pinnedTab ? 'Đã ghim' : 'Ghim'}</>}
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>Không có tab nào.</div>
+                  )}
+
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginTop: 6 }}>
+                    {pinnedTab
+                      ? <>Đang ghim: <strong style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>{pinnedTab}</strong></>
+                      : 'Chưa ghim — auto sẽ tự dò tab có cột "MO".'}
+                  </div>
+                </div>
+              )}
             </>
           ) : (
             <div style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', wordBreak: 'break-all' }}>
               {savedUrl
-                ? <><i className="fa-solid fa-circle-check" style={{ color: '#34A853', marginRight: 5 }} />{shortUrl(savedUrl)}</>
+                ? <>
+                    <i className="fa-solid fa-circle-check" style={{ color: '#34A853', marginRight: 5 }} />{shortUrl(savedUrl)}
+                    <div style={{ marginTop: 6 }}>Tab: <strong style={{ color: 'var(--text-primary)' }}>{pinnedTab ?? '(tự dò)'}</strong></div>
+                  </>
                 : <span style={{ color: 'var(--color-warning)' }}>Chưa cấu hình — liên hệ admin</span>
               }
             </div>

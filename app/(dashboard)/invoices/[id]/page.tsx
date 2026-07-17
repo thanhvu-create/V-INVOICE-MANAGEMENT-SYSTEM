@@ -12,6 +12,11 @@ import { templateLabel, TEMPLATE_LABELS } from '@/lib/templates'
 import { AddItemModal } from '@/components/invoice/AddItemModal'
 import { XoanUrlConfig } from '@/components/invoice/XoanUrlConfig'
 import { ExportFolderConfig } from '@/components/invoice/ExportFolderConfig'
+import { autoFillGems, summarize } from '@/lib/xoan-autofill'
+import { toast } from '@/components/ui/Toast'
+
+// Templates with a gem section — where "Tra lại tất cả hột" applies.
+const GEM_TEMPLATES = ['CH1', 'CH2', 'ADM']
 
 type InvoiceView = 'jm-form' | 'detail'
 
@@ -39,6 +44,7 @@ export default function InvoiceDetailPage() {
   const [addItemOpen,     setAddItemOpen]  = useState(false)
   const [exportingSheets, setExportingSheets] = useState(false)
   const [syncingNVL,      setSyncingNVL]      = useState(false)
+  const [rematchingGems,  setRematchingGems]  = useState(false)
 
   // Inline-edit state for invoice_code, invoice_date, and template_type
   const [editingCode,     setEditingCode]     = useState(false)
@@ -150,6 +156,23 @@ export default function InvoiceDetailPage() {
       alert('Lỗi kết nối.')
     } finally {
       setExportingSheets(false)
+    }
+  }
+
+  // Re-run gem lookup (by MO) for every item that has no gems yet — the bulk
+  // replacement for the removed per-item "Tra hột" panel. Skips items already gemmed.
+  async function handleRematchGems() {
+    const pending = (data?.items ?? [])
+      .filter(it => !(it.invoice_diamonds?.length))
+      .map(it => ({ id: it.id, so_mo: it.so_mo }))
+    if (pending.length === 0) { toast('Mọi item đều đã có hột.', 'info'); return }
+    setRematchingGems(true)
+    try {
+      const res = await autoFillGems({ invoiceId: id, items: pending, template: data?.header?.template_type ?? 'CH1' })
+      await fetchData()
+      toast(summarize(res), res.error || !res.configured ? 'error' : 'success')
+    } finally {
+      setRematchingGems(false)
     }
   }
 
@@ -366,6 +389,17 @@ export default function InvoiceDetailPage() {
               style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '0.45rem 0.75rem', border: '1px solid var(--border-base)', background: 'transparent', color: syncingNVL ? 'var(--text-muted)' : 'var(--text-secondary)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)', cursor: syncingNVL ? 'not-allowed' : 'pointer', opacity: syncingNVL ? 0.6 : 1 }}
             >
               <i className={`fa-solid ${syncingNVL ? 'fa-circle-notch fa-spin' : 'fa-rotate'}`} style={{ fontSize: 12 }} />
+            </button>
+          )}
+          {canEdit && GEM_TEMPLATES.includes(header.template_type ?? '') && (
+            <button
+              onClick={handleRematchGems}
+              disabled={rematchingGems}
+              title="Tra lại hột theo MO cho các item chưa có hột"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.75rem', border: '1px solid var(--border-base)', background: 'transparent', color: rematchingGems ? 'var(--text-muted)' : 'var(--text-secondary)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)', cursor: rematchingGems ? 'not-allowed' : 'pointer', opacity: rematchingGems ? 0.6 : 1 }}
+            >
+              <i className={`fa-solid ${rematchingGems ? 'fa-circle-notch fa-spin' : 'fa-gem'}`} style={{ fontSize: 12 }} />
+              Tra hột
             </button>
           )}
           <div style={{ display: 'inline-flex', alignItems: 'stretch' }}>

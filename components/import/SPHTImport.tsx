@@ -5,7 +5,11 @@ import * as XLSX from 'xlsx'
 import { toast } from '@/components/ui/Toast'
 import { useUser } from '@/contexts/UserContext'
 import { templateLabel } from '@/lib/templates'
+import { autoFillGems, summarize, type AutoFillItem } from '@/lib/xoan-autofill'
 import type { ImportRow } from '@/types'
+
+// Templates with a gem section — auto-attach gems by MO after import.
+const GEM_TEMPLATES = ['CH1', 'CH2', 'ADM']
 
 const SPHT_URL_KEY = 'spht_sheet_url'
 
@@ -243,7 +247,7 @@ interface Props {
   invoiceId: string
   template:  string
   locked:    boolean
-  onDone:    (count: number) => void
+  onDone:    (count: number, gemSummary?: string) => void
 }
 
 type ReadyStage = {
@@ -342,7 +346,14 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
       })
       const json = await res.json()
       if (!json.success) throw new Error(json.message || 'Import failed')
-      onDone(rows.length)
+
+      // Auto-attach gems by MO for gem templates, using the created items' so_mo.
+      let gemSummary: string | undefined
+      if (GEM_TEMPLATES.includes(template)) {
+        const created = (json.data?.items ?? []) as AutoFillItem[]
+        gemSummary = summarize(await autoFillGems({ invoiceId, items: created, template }))
+      }
+      onDone(rows.length, gemSummary)
     } catch (err) {
       toast(String(err), 'error', 5000)
       setStage(prevStage)

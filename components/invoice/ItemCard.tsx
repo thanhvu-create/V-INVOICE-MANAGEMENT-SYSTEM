@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { apiCall } from '@/lib/api'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { GemModal } from './GemModal'
-import { XoanLookupPanel } from './XoanLookupPanel'
 import { DriveImage } from './DriveImage'
 import { DriveImageInput } from '@/components/ui/DriveImageInput'
 import { ComboInput } from '@/components/ui/ComboInput'
@@ -77,7 +76,6 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   const [gemModal, setGemModal] = useState<{ open: boolean; gem?: any }>({ open: false })
   const [confirmDeleteGem, setConfirmDeleteGem] = useState<any | null>(null)
   const [deletingGem, setDeletingGem] = useState(false)
-  const [xoanPanel, setXoanPanel] = useState(false)
 
   const gems: any[] = item.invoice_diamonds ?? []
   const notesVal = isAG3 ? item.chi_tiet_tap : (!isAdm ? item.nini_adm : null)
@@ -503,11 +501,6 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
                   style={{ background: 'none', border: '1px solid var(--border-base)', cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', padding: '2px 8px', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 4 }}>
                   <i className="fa-solid fa-plus" style={{ fontSize: 9 }} /> Thêm xoàn
                 </button>
-                <button onClick={() => setXoanPanel(v => !v)}
-                  title="Tra hột từ file TỔNG HỢP THEO DÕI XOÀN"
-                  style={{ background: xoanPanel ? 'var(--text-primary)' : 'none', border: '1px solid var(--border-base)', cursor: 'pointer', fontSize: 'var(--text-xs)', color: xoanPanel ? 'var(--text-inverse)' : 'var(--text-secondary)', padding: '2px 8px', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: 4 }}>
-                  <i className="fa-solid fa-magnifying-glass" style={{ fontSize: 9 }} /> Tra hột
-                </button>
               </div>
             )}
           </div>
@@ -581,16 +574,6 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
         </div>
       )}
 
-      {/* Xoan lookup panel */}
-      {hasGems && xoanPanel && (
-        <XoanLookupPanel
-          invoiceId={invoiceId}
-          itemId={item.id}
-          soMo={item.so_mo}
-          onSaved={onRefresh}
-          onClose={() => setXoanPanel(false)}
-        />
-      )}
 
       {/* Dialogs */}
       <ConfirmDialog open={confirmDelete} title="Delete Item" message={`Delete item "${item.sku}" (seq ${item.seq})?`} okText={deleting ? 'Deleting…' : 'Delete'} danger onOk={handleDelete} onCancel={() => setConfirmDelete(false)} />

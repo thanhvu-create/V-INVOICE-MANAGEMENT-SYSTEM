@@ -61,8 +61,8 @@ function ImportContent() {
         invoiceId={invoiceId}
         template={invoice?.template_type ?? 'CH1'}
         locked={!!locked}
-        onDone={count => {
-          toast(`${count} sản phẩm đã import từ SPHT.`, 'success')
+        onDone={(count, gemSummary) => {
+          toast(`${count} sản phẩm đã import${gemSummary ? ` · ${gemSummary}` : ''}`, 'success')
           router.push(`/invoices/${invoiceId}`)
         }}
       />
