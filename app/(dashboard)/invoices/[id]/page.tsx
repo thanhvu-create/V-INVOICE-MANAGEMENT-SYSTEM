@@ -8,7 +8,6 @@ import { WorkflowBar } from '@/components/invoice/WorkflowBar'
 import { AuditTimeline } from '@/components/invoice/AuditTimeline'
 import { JMFormView } from '@/components/invoice/JMFormView'
 import { DetailView } from '@/components/invoice/DetailView'
-import { SheetView } from '@/components/invoice/SheetView'
 import { templateLabel, TEMPLATE_LABELS } from '@/lib/templates'
 import { AddItemModal } from '@/components/invoice/AddItemModal'
 import { XoanUrlConfig } from '@/components/invoice/XoanUrlConfig'
@@ -19,7 +18,7 @@ import { toast } from '@/components/ui/Toast'
 // Templates with a gem section — where "Tra lại tất cả hột" applies.
 const GEM_TEMPLATES = ['CH1', 'CH2', 'ADM']
 
-type InvoiceView = 'jm-form' | 'detail' | 'sheet'
+type InvoiceView = 'jm-form' | 'detail'
 
 // New workflow: draft ↔ finalized (manager/admin only)
 const ALLOWED_TRANSITIONS: Record<string, Record<string, string[]>> = {
@@ -407,10 +406,11 @@ export default function InvoiceDetailPage() {
             <button
               onClick={handleExportSheets}
               disabled={exportingSheets}
-              title="Export lên Google Sheets"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.75rem', border: '1px solid var(--border-base)', borderRight: 'none', background: 'transparent', color: exportingSheets ? 'var(--text-muted)' : 'var(--text-secondary)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)', cursor: exportingSheets ? 'not-allowed' : 'pointer', opacity: exportingSheets ? 0.6 : 1 }}
+              title="Mở Google Sheet — 4 tab đầy đủ (JM FORM / SUMMARY / NVL / CÔNG THỨC)"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0.45rem 0.9rem', border: '1px solid var(--border-base)', borderRight: 'none', background: 'transparent', color: exportingSheets ? 'var(--text-muted)' : 'var(--text-secondary)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-body)', cursor: exportingSheets ? 'not-allowed' : 'pointer', opacity: exportingSheets ? 0.6 : 1, whiteSpace: 'nowrap' }}
             >
               <i className={`${exportingSheets ? 'fa-solid fa-circle-notch fa-spin' : 'fa-brands fa-google-drive'}`} style={{ fontSize: 12, color: exportingSheets ? undefined : '#34A853' }} />
+              {exportingSheets ? 'Đang mở…' : 'Mở Google Sheet'}
             </button>
             <ExportFolderConfig />
           </div>
@@ -440,7 +440,7 @@ export default function InvoiceDetailPage() {
 
       {/* View toggle */}
       <div className="no-print" style={{ display: 'flex', borderBottom: '1px solid var(--border-base)', marginBottom: '1.5rem' }}>
-        {(['detail', 'sheet', 'jm-form'] as const).map(v => (
+        {(['detail', 'jm-form'] as const).map(v => (
           <button key={v} onClick={() => setView(v)} style={{
             padding: '10px 24px', border: 'none', background: 'transparent',
             borderBottom: view === v ? '2px solid var(--border-strong)' : '2px solid transparent',
@@ -450,8 +450,6 @@ export default function InvoiceDetailPage() {
           }}>
             {v === 'jm-form' ? (
               <><i className="fa-solid fa-table" style={{ marginRight: 6 }} />JM Form View</>
-            ) : v === 'sheet' ? (
-              <><i className="fa-solid fa-table-cells" style={{ marginRight: 6 }} />Sheet View</>
             ) : (
               <><i className="fa-solid fa-list" style={{ marginRight: 6 }} />Detail View</>
             )}
@@ -459,12 +457,7 @@ export default function InvoiceDetailPage() {
         ))}
       </div>
 
-      {view === 'sheet' ? (
-        <SheetView
-          onOpenSheet={handleExportSheets}
-          opening={exportingSheets}
-        />
-      ) : view === 'jm-form' ? (
+      {view === 'jm-form' ? (
         <JMFormView
           invoiceId={id}
           items={items}
