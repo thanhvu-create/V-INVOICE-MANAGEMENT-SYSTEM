@@ -34,6 +34,17 @@ function extractFolderId(url: string): string | null {
   return m ? m[1] : null
 }
 
+// Best-effort delete of a previously generated sheet so re-exporting keeps just
+// one file per invoice. Failures (already gone / moved) are ignored on purpose.
+async function driveDeleteFile(accessToken: string, fileId: string): Promise<void> {
+  try {
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+  } catch { /* ignore */ }
+}
+
 async function moveFileToDriveFolder(
   accessToken: string,
   fileId: string,
@@ -1203,6 +1214,17 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         { updateDimensionProperties: { range: { sheetId: 2, dimension: 'COLUMNS', startIndex: 1, endIndex: 2 }, properties: { pixelSize: 110 }, fields: 'pixelSize' } },
       ],
     })
+
+    // One file per invoice: delete the previously generated sheet (if any), then
+    // remember the new one. Keeps Drive clean instead of a new file every export.
+    // Best-effort so a missing gsheet_id column (migration not yet run) never breaks export.
+    try {
+      const oldSheetId = (invoice as any).gsheet_id
+      if (oldSheetId && oldSheetId !== spreadsheetId) {
+        await driveDeleteFile(accessToken, oldSheetId)
+      }
+      await db.from('invoices').update({ gsheet_id: spreadsheetId }).eq('id', params.id)
+    } catch { /* reuse tracking is optional */ }
 
     return NextResponse.json({
       success: true,
