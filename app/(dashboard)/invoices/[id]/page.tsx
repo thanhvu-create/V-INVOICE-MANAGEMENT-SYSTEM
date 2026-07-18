@@ -461,9 +461,9 @@ export default function InvoiceDetailPage() {
 
       {view === 'sheet' ? (
         <SheetView
-          items={items}
-          canSeePrice={canSeePrice}
-          template={header.template_type ?? 'CH1'}
+          invoiceId={id}
+          onSaveToDrive={handleExportSheets}
+          savingToDrive={exportingSheets}
         />
       ) : view === 'jm-form' ? (
         <JMFormView
