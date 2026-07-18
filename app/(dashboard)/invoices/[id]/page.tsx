@@ -216,12 +216,17 @@ export default function InvoiceDetailPage() {
 
   const { header, items } = data
 
+  // Group items by Description (A→Z so identical descriptions sit together) and renumber No.
+  const groupedItems = [...items]
+    .sort((a: any, b: any) => String(a.description ?? '').localeCompare(String(b.description ?? '')))
+    .map((it: any, i: number) => ({ ...it, seq: i + 1 }))
+
   // Filter items by SKU / SO / MO (so_mo holds "SO…-MO…"; po_number is the AG3 SO).
   const q = itemSearch.trim().toLowerCase()
   const filteredItems = q
-    ? items.filter((it: any) =>
+    ? groupedItems.filter((it: any) =>
         [it.sku, it.so_mo, it.po_number].some(f => String(f ?? '').toLowerCase().includes(q)))
-    : items
+    : groupedItems
 
   return (
     <div>

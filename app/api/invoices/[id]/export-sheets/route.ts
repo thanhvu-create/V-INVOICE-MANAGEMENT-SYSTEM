@@ -691,6 +691,11 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       }),
     )
 
+    // Group items by Description (A→Z so identical descriptions sit together) and renumber
+    // STT/No. 1,2,3 — applies to both the SUMMARY and JM FORM tabs which use this list.
+    processedItems.sort((a: any, b: any) => String(a.description ?? '').localeCompare(String(b.description ?? '')))
+    processedItems.forEach((it: any, i: number) => { it.seq = i + 1 })
+
     // invoice_code already carries seq, date, item count and template — wrapping it in
     // "V-Invoice ... (CH1)" would just repeat the template. See supabase/add_invoice_auto_name.sql.
     const title = invoice.invoice_code ?? params.id
@@ -1227,6 +1232,8 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         { updateBorders: { range: { sheetId: 0, startRowIndex: 2, endRowIndex: 3, startColumnIndex: 0, endColumnIndex: jmColCount }, top: thin, bottom: thin, left: thin, right: thin, innerHorizontal: thinLight, innerVertical: thinLight } },
         // Borders: data area (rows 4-150)
         { updateBorders: { range: { sheetId: 0, startRowIndex: 3, endRowIndex: 150, startColumnIndex: 0, endColumnIndex: jmColCount }, top: thinLight, bottom: thinLight, left: thinLight, right: thinLight, innerHorizontal: thinLight, innerVertical: thinLight } },
+        // Column F (SKU# new) highlight — amber, data rows
+        { repeatCell: { range: { sheetId: 0, startRowIndex: 3, endRowIndex: 150, startColumnIndex: 5, endColumnIndex: 6 }, cell: { userEnteredFormat: { backgroundColor: { red: 0.996, green: 0.953, blue: 0.78 } } }, fields: 'userEnteredFormat.backgroundColor' } },
         // Column widths
         ...jmColWidths,
         // Number formats
