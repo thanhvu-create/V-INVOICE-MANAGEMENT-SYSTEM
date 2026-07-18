@@ -236,7 +236,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   return (
     <div style={{ marginBottom: '1rem', border: '1px solid var(--border-base)', background: 'var(--bg-surface)' }}>
       {/* Card header */}
-      <div style={{ padding: '0.65rem 1rem', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', background: 'var(--bg-base)' }}>
+      <div style={{ padding: '0.65rem 1rem', borderBottom: '2px solid rgba(233,29,121,0.35)', borderLeft: '3px solid #e91d79', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem', background: 'rgba(233,29,121,0.07)' }}>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
           <DriveImage url={item.image_url} alt={item.sku} size={44} />
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)', color: 'var(--text-muted)' }}>#{item.seq}</span>
