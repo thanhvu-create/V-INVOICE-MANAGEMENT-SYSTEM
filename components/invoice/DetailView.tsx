@@ -46,6 +46,16 @@ export function DetailView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
   const totVonSX  = items.reduce((s, i) => s + (i.von_san_xuat ?? 0), 0)
   const totCif    = items.reduce((s, i) => s + (i.cif_price    ?? 0), 0)
 
+  // Tiền vàng grouped by loại vàng (18KW, 18KY, 24K…)
+  const goldByType = (() => {
+    const m = new Map<string, number>()
+    for (const i of items) {
+      const t = String(i.loai_vang ?? '').trim() || '—'
+      m.set(t, (m.get(t) ?? 0) + (i.tien_vang ?? 0))
+    }
+    return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+  })()
+
   return (
     <div>
       {/* Scrollable item list — keeps a long invoice from stretching the whole page */}
@@ -78,6 +88,22 @@ export function DetailView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
           {canSeePrice && <TotalField label="Tổng Vốn SX" value={fmt2(totVonSX)} mono bold />}
           {canSeePrice && template !== 'CH2' && <TotalField label="Tổng CIF" value={fmt2(totCif)} mono bold />}
         </div>
+
+        {/* Tiền vàng phân theo loại vàng */}
+        {canSeePrice && goldByType.length > 1 && (
+          <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.25)' }}>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
+              Tiền vàng theo loại
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem 1.5rem' }}>
+              {goldByType.map(([t, sum]) => (
+                <span key={t} style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)' }}>
+                  <b style={{ color: '#FFFFFF' }}>{t}</b>: {fmt2(sum)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Sticky bottom summary bar */}
