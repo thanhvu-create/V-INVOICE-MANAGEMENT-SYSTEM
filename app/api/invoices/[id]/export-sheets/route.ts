@@ -36,22 +36,19 @@ function extractFolderId(url: string): string | null {
 
 // Best-effort delete of a previously generated sheet so re-exporting keeps just
 // one file per invoice. Failures (already gone / moved) are ignored on purpose.
-// Returns an error message if the delete failed (so the caller can surface it),
-// or null on success. 404 (already gone) counts as success.
-async function driveDeleteFile(accessToken: string, fileId: string): Promise<string | null> {
+// Read a spreadsheet's sheet ids/titles — used to decide whether the invoice's
+// previous sheet can be reused (updated in place) instead of creating a new file.
+// Returns null if the file is gone / inaccessible.
+async function getSpreadsheetSheets(accessToken: string, spreadsheetId: string): Promise<{ sheetId: number }[] | null> {
   try {
-    // supportsAllDrives=true so a file living in a Shared Drive can be found/deleted.
-    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
-      method: 'DELETE',
+    const res = await fetch(`${SHEETS_BASE}/${spreadsheetId}?fields=sheets.properties.sheetId`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
-    if (!res.ok && res.status !== 404) {
-      const e = await res.json().catch(() => ({}))
-      return e?.error?.message ?? `HTTP ${res.status}`
-    }
+    if (!res.ok) return null
+    const j = await res.json()
+    return ((j.sheets ?? []) as any[]).map(s => ({ sheetId: s.properties?.sheetId }))
+  } catch {
     return null
-  } catch (e) {
-    return String(e)
   }
 }
 
@@ -683,18 +680,44 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     // "V-Invoice ... (CH1)" would just repeat the template. See supabase/add_invoice_auto_name.sql.
     const title = invoice.invoice_code ?? params.id
 
-    // 1. Create spreadsheet with four sheets
-    const created = await sheetsPost(accessToken, '', {
-      properties: { title },
-      sheets: [
-        { properties: { title: 'JM FORM',    sheetId: 0, index: 0 } },
-        { properties: { title: 'SUMMARY',    sheetId: 1, index: 1 } },
-        { properties: { title: 'NVL',        sheetId: 2, index: 2 } },
-        { properties: { title: 'CÔNG THỨC', sheetId: 3, index: 3 } },
-      ],
-    })
+    // 1. Reuse the invoice's existing sheet (update in place) when it still has the 4
+    //    expected tabs, so re-exporting NEVER creates a new file and NEVER needs delete
+    //    permission in a Shared Drive. Otherwise create a fresh one.
+    const FOUR_SHEETS = [
+      { properties: { title: 'JM FORM',    sheetId: 0, index: 0 } },
+      { properties: { title: 'SUMMARY',    sheetId: 1, index: 1 } },
+      { properties: { title: 'NVL',        sheetId: 2, index: 2 } },
+      { properties: { title: 'CÔNG THỨC', sheetId: 3, index: 3 } },
+    ]
+    const existingId = (invoice as any).gsheet_id as string | null | undefined
+    let spreadsheetId = ''
+    let reused = false
 
-    const spreadsheetId  = created.spreadsheetId
+    if (existingId) {
+      const meta = await getSpreadsheetSheets(accessToken, existingId)
+      const ids  = (meta ?? []).map(s => s.sheetId)
+      if (meta && [0, 1, 2, 3].every(i => ids.includes(i))) {
+        spreadsheetId = existingId
+        reused = true
+        // Wipe old values/formatting/merges and refresh the file title so nothing from
+        // a previous export lingers, then the write+format steps below repopulate it.
+        await sheetsPost(accessToken, `${spreadsheetId}:batchUpdate`, {
+          requests: [
+            { updateSpreadsheetProperties: { properties: { title }, fields: 'title' } },
+            ...[0, 1, 2, 3].flatMap(sheetId => [
+              { unmergeCells: { range: { sheetId } } },
+              { updateCells:  { range: { sheetId }, fields: 'userEnteredValue,userEnteredFormat' } },
+            ]),
+          ],
+        })
+      }
+    }
+
+    if (!reused) {
+      const created = await sheetsPost(accessToken, '', { properties: { title }, sheets: FOUR_SHEETS })
+      spreadsheetId = created.spreadsheetId
+    }
+
     const spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
 
     // 2. Write JM FORM data
@@ -772,9 +795,10 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       { values: formulaRows },
     )
 
-    // 4. Move to configured Drive folder (if set)
+    // 4. Move to configured Drive folder (only for a brand-new file — a reused one
+    //    is already in its folder from the first export).
     let folderWarning: string | null = null
-    if (folderId) {
+    if (folderId && !reused) {
       try {
         await moveFileToDriveFolder(accessToken, spreadsheetId, folderId)
       } catch (moveErr: any) {
@@ -1227,24 +1251,20 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       ],
     })
 
-    // One file per invoice: delete the previously generated sheet (if any), then
-    // remember the new one. Keeps Drive clean instead of a new file every export.
-    // Best-effort so a missing gsheet_id column (migration not yet run) never breaks export.
-    let cleanupWarning: string | null = null
-    try {
-      const oldSheetId = (invoice as any).gsheet_id
-      if (oldSheetId && oldSheetId !== spreadsheetId) {
-        const delErr = await driveDeleteFile(accessToken, oldSheetId)
-        if (delErr) cleanupWarning = `Không xoá được file cũ (${delErr}). Kiểm tra quyền xoá trong Shared Drive — file mới vẫn tạo bình thường.`
-      }
-      await db.from('invoices').update({ gsheet_id: spreadsheetId }).eq('id', params.id)
-    } catch { /* reuse tracking is optional */ }
+    // Remember this invoice's sheet so the next export reuses (updates) it in place.
+    // Only needed for a newly created file; a reused one already points here.
+    // Best-effort so a missing gsheet_id column (migration not run) never breaks export.
+    if (!reused) {
+      try {
+        await db.from('invoices').update({ gsheet_id: spreadsheetId }).eq('id', params.id)
+      } catch { /* reuse tracking is optional */ }
+    }
 
     return NextResponse.json({
       success: true,
       spreadsheetUrl,
       folderUrl: folderId ? folderUrl : null,
-      warning: [folderWarning, cleanupWarning].filter(Boolean).join(' · ') || null,
+      warning: folderWarning,
     })
   } catch (err: any) {
     const msg = String(err?.message ?? err)
