@@ -36,14 +36,23 @@ function extractFolderId(url: string): string | null {
 
 // Best-effort delete of a previously generated sheet so re-exporting keeps just
 // one file per invoice. Failures (already gone / moved) are ignored on purpose.
-async function driveDeleteFile(accessToken: string, fileId: string): Promise<void> {
+// Returns an error message if the delete failed (so the caller can surface it),
+// or null on success. 404 (already gone) counts as success.
+async function driveDeleteFile(accessToken: string, fileId: string): Promise<string | null> {
   try {
     // supportsAllDrives=true so a file living in a Shared Drive can be found/deleted.
-    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
+    const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${accessToken}` },
     })
-  } catch { /* ignore */ }
+    if (!res.ok && res.status !== 404) {
+      const e = await res.json().catch(() => ({}))
+      return e?.error?.message ?? `HTTP ${res.status}`
+    }
+    return null
+  } catch (e) {
+    return String(e)
+  }
 }
 
 async function moveFileToDriveFolder(
@@ -1221,10 +1230,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     // One file per invoice: delete the previously generated sheet (if any), then
     // remember the new one. Keeps Drive clean instead of a new file every export.
     // Best-effort so a missing gsheet_id column (migration not yet run) never breaks export.
+    let cleanupWarning: string | null = null
     try {
       const oldSheetId = (invoice as any).gsheet_id
       if (oldSheetId && oldSheetId !== spreadsheetId) {
-        await driveDeleteFile(accessToken, oldSheetId)
+        const delErr = await driveDeleteFile(accessToken, oldSheetId)
+        if (delErr) cleanupWarning = `Không xoá được file cũ (${delErr}). Kiểm tra quyền xoá trong Shared Drive — file mới vẫn tạo bình thường.`
       }
       await db.from('invoices').update({ gsheet_id: spreadsheetId }).eq('id', params.id)
     } catch { /* reuse tracking is optional */ }
@@ -1233,7 +1244,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       success: true,
       spreadsheetUrl,
       folderUrl: folderId ? folderUrl : null,
-      warning: folderWarning,
+      warning: [folderWarning, cleanupWarning].filter(Boolean).join(' · ') || null,
     })
   } catch (err: any) {
     const msg = String(err?.message ?? err)
