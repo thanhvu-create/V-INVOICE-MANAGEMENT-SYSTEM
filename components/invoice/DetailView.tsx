@@ -92,7 +92,7 @@ export function DetailView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
         </div>
 
         {/* Tiền vàng phân theo loại vàng */}
-        {canSeePrice && goldByType.length > 1 && (
+        {canSeePrice && goldByType.length > 0 && (
           <div style={{ marginTop: '0.85rem', paddingTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.25)' }}>
             <div style={{ fontSize: 'var(--text-xs)', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.5rem' }}>
               Tiền vàng theo loại
