@@ -8,6 +8,7 @@ import { WorkflowBar } from '@/components/invoice/WorkflowBar'
 import { AuditTimeline } from '@/components/invoice/AuditTimeline'
 import { JMFormView } from '@/components/invoice/JMFormView'
 import { DetailView } from '@/components/invoice/DetailView'
+import { SheetView } from '@/components/invoice/SheetView'
 import { templateLabel, TEMPLATE_LABELS } from '@/lib/templates'
 import { AddItemModal } from '@/components/invoice/AddItemModal'
 import { XoanUrlConfig } from '@/components/invoice/XoanUrlConfig'
@@ -18,7 +19,7 @@ import { toast } from '@/components/ui/Toast'
 // Templates with a gem section — where "Tra lại tất cả hột" applies.
 const GEM_TEMPLATES = ['CH1', 'CH2', 'ADM']
 
-type InvoiceView = 'jm-form' | 'detail'
+type InvoiceView = 'jm-form' | 'detail' | 'sheet'
 
 // New workflow: draft ↔ finalized (manager/admin only)
 const ALLOWED_TRANSITIONS: Record<string, Record<string, string[]>> = {
@@ -439,7 +440,7 @@ export default function InvoiceDetailPage() {
 
       {/* View toggle */}
       <div className="no-print" style={{ display: 'flex', borderBottom: '1px solid var(--border-base)', marginBottom: '1.5rem' }}>
-        {(['detail', 'jm-form'] as const).map(v => (
+        {(['detail', 'sheet', 'jm-form'] as const).map(v => (
           <button key={v} onClick={() => setView(v)} style={{
             padding: '10px 24px', border: 'none', background: 'transparent',
             borderBottom: view === v ? '2px solid var(--border-strong)' : '2px solid transparent',
@@ -449,6 +450,8 @@ export default function InvoiceDetailPage() {
           }}>
             {v === 'jm-form' ? (
               <><i className="fa-solid fa-table" style={{ marginRight: 6 }} />JM Form View</>
+            ) : v === 'sheet' ? (
+              <><i className="fa-solid fa-table-cells" style={{ marginRight: 6 }} />Sheet View</>
             ) : (
               <><i className="fa-solid fa-list" style={{ marginRight: 6 }} />Detail View</>
             )}
@@ -456,7 +459,13 @@ export default function InvoiceDetailPage() {
         ))}
       </div>
 
-      {view === 'jm-form' ? (
+      {view === 'sheet' ? (
+        <SheetView
+          items={items}
+          canSeePrice={canSeePrice}
+          template={header.template_type ?? 'CH1'}
+        />
+      ) : view === 'jm-form' ? (
         <JMFormView
           invoiceId={id}
           items={items}
