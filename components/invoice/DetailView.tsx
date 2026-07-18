@@ -73,7 +73,7 @@ export function DetailView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.75rem' }}>
           <TotalField label="Tổng Qty (pcs)" value={totQty} />
           <TotalField label="Tổng T.Phẩm (gr)" value={fmtGram(totWt)} mono />
-          {totGemWt > 0 && <TotalField label="Σ TL Xoàn (gr)" value={fmt4(totGemWt)} mono muted />}
+          {totGemWt > 0 && <TotalField label="Σ TL Xoàn (ct)" value={fmt4(totGemWt * 5)} mono muted />}
           {canSeePrice && <TotalField label="Tổng Tiền vàng" value={fmt2(totGoldV)} mono />}
           {canSeePrice && <TotalField label="Tổng Vốn SX" value={fmt2(totVonSX)} mono bold />}
           {canSeePrice && template !== 'CH2' && <TotalField label="Tổng CIF" value={fmt2(totCif)} mono bold />}
