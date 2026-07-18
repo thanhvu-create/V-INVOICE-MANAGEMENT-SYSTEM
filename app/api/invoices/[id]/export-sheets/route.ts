@@ -788,7 +788,9 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     if (!_isAG3gt && processedItems.length > 0) {
       const map = new Map<string, number>()
       for (const it of processedItems) {
-        const t = String(it.loai_vang ?? '').trim() || '—'
+        const raw = String(it.loai_vang ?? '').trim() || '—'
+        const km  = raw.match(/^(\d+)\s*K/i)   // 18KW + 18KY → "18K"; PT/AG/PD kept as-is
+        const t   = km ? `${km[1]}K` : raw
         const v = n(it.tien_vang)
         map.set(t, (map.get(t) ?? 0) + (typeof v === 'number' ? v : 0))
       }

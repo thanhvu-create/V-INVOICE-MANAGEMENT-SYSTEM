@@ -46,12 +46,14 @@ export function DetailView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
   const totVonSX  = items.reduce((s, i) => s + (i.von_san_xuat ?? 0), 0)
   const totCif    = items.reduce((s, i) => s + (i.cif_price    ?? 0), 0)
 
-  // Tiền vàng grouped by loại vàng (18KW, 18KY, 24K…)
+  // Tiền vàng grouped by karat (18KW + 18KY → "18K"); PT/AG/PD kept as-is.
   const goldByType = (() => {
     const m = new Map<string, number>()
     for (const i of items) {
-      const t = String(i.loai_vang ?? '').trim() || '—'
-      m.set(t, (m.get(t) ?? 0) + (i.tien_vang ?? 0))
+      const raw = String(i.loai_vang ?? '').trim() || '—'
+      const km  = raw.match(/^(\d+)\s*K/i)
+      const key = km ? `${km[1]}K` : raw
+      m.set(key, (m.get(key) ?? 0) + (i.tien_vang ?? 0))
     }
     return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]))
   })()
