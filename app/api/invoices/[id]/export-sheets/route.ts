@@ -38,7 +38,8 @@ function extractFolderId(url: string): string | null {
 // one file per invoice. Failures (already gone / moved) are ignored on purpose.
 async function driveDeleteFile(accessToken: string, fileId: string): Promise<void> {
   try {
-    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+    // supportsAllDrives=true so a file living in a Shared Drive can be found/deleted.
+    await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?supportsAllDrives=true`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${accessToken}` },
     })
@@ -50,9 +51,11 @@ async function moveFileToDriveFolder(
   fileId: string,
   folderId: string,
 ): Promise<void> {
-  // First get current parents
+  // supportsAllDrives=true is REQUIRED when the target folder lives in a Shared Drive —
+  // without it the Drive API returns 404 "File not found" for the folder even with full
+  // drive scope and correct access. Harmless for My Drive folders.
   const metaRes = await fetch(
-    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=parents`,
+    `https://www.googleapis.com/drive/v3/files/${fileId}?fields=parents&supportsAllDrives=true`,
     { headers: { Authorization: `Bearer ${accessToken}` } },
   )
   const meta = await metaRes.json()
@@ -60,7 +63,7 @@ async function moveFileToDriveFolder(
 
   const moveRes = await fetch(
     `https://www.googleapis.com/drive/v3/files/${fileId}` +
-    `?addParents=${folderId}&removeParents=${currentParents}&fields=id,parents`,
+    `?addParents=${folderId}&removeParents=${currentParents}&fields=id,parents&supportsAllDrives=true`,
     {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
