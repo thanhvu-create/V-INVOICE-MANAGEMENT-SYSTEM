@@ -904,6 +904,27 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       )
     }
 
+    // ── SUMMARY column background colors (CH1/CH2 layout only) ────────────────
+    // Match the reference template so key columns are easy to scan. ADM/AG3 have a
+    // different column layout, so these indices only apply to CH1/CH2.
+    if (!isAG3f && !isADMf && summaryGrandTotalRowIdx > 3) {
+      const GREEN = { red: 0.851, green: 0.918, blue: 0.827 }  // Tên khách
+      const BLUE  = { red: 0.812, green: 0.886, blue: 0.953 }  // input (TL ct trước)
+      const PINK  = { red: 0.957, green: 0.800, blue: 0.800 }  // gold/gem totals
+      const GREY  = { red: 0.851, green: 0.851, blue: 0.851 }  // computed / fees
+      const colorCols = (cols: number[], color: any) => cols.forEach(c => summaryExtraFmt.push({
+        repeatCell: {
+          range: { sheetId: 1, startRowIndex: 3, endRowIndex: summaryGrandTotalRowIdx, startColumnIndex: c, endColumnIndex: c + 1 },
+          cell: { userEnteredFormat: { backgroundColor: color } },
+          fields: 'userEnteredFormat.backgroundColor',
+        },
+      }))
+      colorCols([3],                    GREEN) // D  Tên khách
+      colorCols([16],                   BLUE)  // Q  TL (ct.) trước xử lý
+      colorCols([11, 20, 22],           PINK)  // L T.Phẩm vàng TT · U T.GIÁ XOÀN · W T.Phí
+      colorCols([8, 23, 24, 25, 26, 27], GREY) // I Tiền vàng · X..AB gia công/đúc/TK/resin/phụ kiện
+    }
+
     // ── SUMMARY group-header merges ──────────────────────────────────────────
     // Cells that have sub-headers in row 1 are NOT vertically merged (they keep their group label in row 0 only).
     // Cells with NO sub-header in row 1 are vertically merged rows 0-1 so they look like a single tall header.
