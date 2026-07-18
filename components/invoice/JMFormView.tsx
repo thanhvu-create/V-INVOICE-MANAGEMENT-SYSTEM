@@ -251,7 +251,7 @@ export function JMFormView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
 
   return (
     <>
-      <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '70vh', WebkitOverflowScrolling: 'touch' }}>
         <table style={{ minWidth: 1400, width: '100%', borderCollapse: 'collapse', borderLeft: '1px solid var(--border-light)' }}>
           <thead>
             <tr>

@@ -48,19 +48,22 @@ export function DetailView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
 
   return (
     <div>
-      {items.map(item => (
-        <ItemCard
-          key={item.id}
-          invoiceId={invoiceId}
-          item={item}
-          canSeePrice={canSeePrice}
-          canEdit={canEdit}
-          isLocked={isLocked}
-          template={template as any}
-          onRefresh={onRefresh}
-          onItemUpdate={onItemUpdate}
-        />
-      ))}
+      {/* Scrollable item list — keeps a long invoice from stretching the whole page */}
+      <div style={{ maxHeight: '70vh', overflowY: 'auto', border: '1px solid var(--border-light)', padding: '0.75rem 0.75rem 0' }}>
+        {items.map(item => (
+          <ItemCard
+            key={item.id}
+            invoiceId={invoiceId}
+            item={item}
+            canSeePrice={canSeePrice}
+            canEdit={canEdit}
+            isLocked={isLocked}
+            template={template as any}
+            onRefresh={onRefresh}
+            onItemUpdate={onItemUpdate}
+          />
+        ))}
+      </div>
 
       {/* Invoice Total Summary */}
       <div style={{ marginTop: '1.5rem', background: '#e91d79', color: '#FAFAF7', padding: '1rem 1.25rem' }}>
