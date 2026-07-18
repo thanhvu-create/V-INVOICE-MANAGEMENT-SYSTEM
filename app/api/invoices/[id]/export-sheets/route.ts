@@ -781,6 +781,29 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       }
     }
 
+    // Per-gold-type subtotal of Tiền vàng, appended below the grand total.
+    // Non-AG3 layout: col 7 = Loại vàng, col 8 = Tiền vàng.
+    let goldByTypeHeaderRow = -1
+    let goldByTypeCount = 0
+    if (!_isAG3gt && processedItems.length > 0) {
+      const map = new Map<string, number>()
+      for (const it of processedItems) {
+        const t = String(it.loai_vang ?? '').trim() || '—'
+        const v = n(it.tien_vang)
+        map.set(t, (map.get(t) ?? 0) + (typeof v === 'number' ? v : 0))
+      }
+      const entries = Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]))
+      if (entries.length > 0) {
+        summaryRows.push(Array(_gtNCols).fill(''))                                   // spacer
+        goldByTypeHeaderRow = summaryRows.length
+        const title = Array(_gtNCols).fill(''); title[7] = 'TIỀN VÀNG THEO LOẠI'; summaryRows.push(title)
+        for (const [t, sum] of entries) {
+          const r = Array(_gtNCols).fill(''); r[7] = t; r[8] = Math.round(sum); summaryRows.push(r)
+        }
+        goldByTypeCount = entries.length
+      }
+    }
+
     await sheetsPut(
       accessToken,
       `${spreadsheetId}/values/${encodeURIComponent('SUMMARY!A1')}?valueInputOption=USER_ENTERED`,
@@ -923,6 +946,24 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       colorCols([16],                   BLUE)  // Q  TL (ct.) trước xử lý
       colorCols([11, 20, 22],           PINK)  // L T.Phẩm vàng TT · U T.GIÁ XOÀN · W T.Phí
       colorCols([8, 23, 24, 25, 26, 27], GREY) // I Tiền vàng · X..AB gia công/đúc/TK/resin/phụ kiện
+    }
+
+    // ── "TIỀN VÀNG THEO LOẠI" subtotal block styling ─────────────────────────
+    if (goldByTypeHeaderRow >= 0) {
+      const gEnd = goldByTypeHeaderRow + 1 + goldByTypeCount
+      summaryExtraFmt.push(
+        { repeatCell: {
+          range: { sheetId: 1, startRowIndex: goldByTypeHeaderRow, endRowIndex: goldByTypeHeaderRow + 1, startColumnIndex: 7, endColumnIndex: 9 },
+          cell: { userEnteredFormat: { textFormat: { bold: true, fontSize: 10 }, backgroundColor: { red: 0.98, green: 0.94, blue: 0.80 } } },
+          fields: 'userEnteredFormat(textFormat,backgroundColor)',
+        }},
+        { repeatCell: {
+          range: { sheetId: 1, startRowIndex: goldByTypeHeaderRow + 1, endRowIndex: gEnd, startColumnIndex: 7, endColumnIndex: 9 },
+          cell: { userEnteredFormat: { textFormat: { bold: true } } },
+          fields: 'userEnteredFormat.textFormat.bold',
+        }},
+        { updateBorders: { range: { sheetId: 1, startRowIndex: goldByTypeHeaderRow, endRowIndex: gEnd, startColumnIndex: 7, endColumnIndex: 9 }, top: thin, bottom: thin, left: thin, right: thin, innerHorizontal: thinLight, innerVertical: thinLight } },
+      )
     }
 
     // ── SUMMARY group-header merges ──────────────────────────────────────────
