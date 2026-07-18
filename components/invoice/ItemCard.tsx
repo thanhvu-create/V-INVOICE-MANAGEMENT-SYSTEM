@@ -295,7 +295,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               ...(isAG3 && item.chi_tiet_tap           ? [['Chi tiết/Cặp', item.chi_tiet_tap]]    : []),
             ].map(([label, val]) => (
               <div key={String(label)}>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 2 }}>{label}</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 3, paddingBottom: 2, borderBottom: '1.5px solid var(--border-base)' }}>{label}</div>
                 <div style={{ fontSize: 'var(--text-sm)', fontFamily: 'var(--font-mono)', color: isBaSao && (String(label) === 'Notes' || String(label) === 'Chi tiết/Cặp') ? '#DC2626' : 'inherit', fontWeight: isBaSao && (String(label) === 'Notes' || String(label) === 'Chi tiết/Cặp') ? 700 : 400 }}>{val ?? '—'}</div>
               </div>
             ))}
