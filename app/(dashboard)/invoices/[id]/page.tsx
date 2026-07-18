@@ -41,6 +41,7 @@ export default function InvoiceDetailPage() {
   const [data,            setData]         = useState<{ header: any; items: any[] } | null>(cached)
   const [loading,         setLoading]      = useState(!cached)
   const [view,            setView]         = useState<InvoiceView>('detail')
+  const [itemSearch,      setItemSearch]   = useState('')
   const [addItemOpen,     setAddItemOpen]  = useState(false)
   const [exportingSheets, setExportingSheets] = useState(false)
   const [syncingNVL,      setSyncingNVL]      = useState(false)
@@ -214,6 +215,13 @@ export default function InvoiceDetailPage() {
   if (!data) return null
 
   const { header, items } = data
+
+  // Filter items by SKU / SO / MO (so_mo holds "SO…-MO…"; po_number is the AG3 SO).
+  const q = itemSearch.trim().toLowerCase()
+  const filteredItems = q
+    ? items.filter((it: any) =>
+        [it.sku, it.so_mo, it.po_number].some(f => String(f ?? '').toLowerCase().includes(q)))
+    : items
 
   return (
     <div>
@@ -457,10 +465,33 @@ export default function InvoiceDetailPage() {
         ))}
       </div>
 
+      {/* Item search — by SKU / SO / MO (applies to both views) */}
+      <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '1rem' }}>
+        <div style={{ position: 'relative', flex: '0 1 340px' }}>
+          <i className="fa-solid fa-magnifying-glass" style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--text-muted)' }} />
+          <input
+            value={itemSearch}
+            onChange={e => setItemSearch(e.target.value)}
+            placeholder="Tìm item theo SKU / SO / MO…"
+            style={{ width: '100%', boxSizing: 'border-box', padding: '6px 28px 6px 30px', border: '1px solid var(--border-base)', background: 'var(--bg-surface)', fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', color: 'var(--text-primary)', outline: 'none' }}
+          />
+          {itemSearch && (
+            <button onClick={() => setItemSearch('')} title="Xoá tìm kiếm" style={{ position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', fontSize: 12 }}>
+              <i className="fa-solid fa-xmark" />
+            </button>
+          )}
+        </div>
+        {itemSearch && (
+          <span style={{ fontSize: 'var(--text-xs)', color: filteredItems.length ? 'var(--text-muted)' : 'var(--color-danger)' }}>
+            {filteredItems.length}/{items.length} item khớp
+          </span>
+        )}
+      </div>
+
       {view === 'jm-form' ? (
         <JMFormView
           invoiceId={id}
-          items={items}
+          items={filteredItems}
           canSeePrice={canSeePrice}
           canEdit={canEdit}
           isLocked={isLocked}
@@ -471,7 +502,7 @@ export default function InvoiceDetailPage() {
       ) : (
         <DetailView
           invoiceId={id}
-          items={items}
+          items={filteredItems}
           canSeePrice={canSeePrice}
           canEdit={canEdit}
           isLocked={isLocked}
