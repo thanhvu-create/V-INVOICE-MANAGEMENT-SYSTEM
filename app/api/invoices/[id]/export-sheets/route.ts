@@ -682,7 +682,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const db           = createServiceClient()
     const canSeePrice  = ctx.role === 'admin' || ctx.role === 'manager'
 
-    const [{ data: invoice }, { data: items }, { data: userRow }] = await Promise.all([
+    const [{ data: invoice }, { data: items }, { data: userRow }, { data: sheetRow }] = await Promise.all([
       db.from('invoices').select('*').eq('id', params.id).single(),
       db.from('invoice_products')
         .select('*, invoice_diamonds(*)')
@@ -691,6 +691,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       // Per-user export folder — each user exports into their OWN Drive folder using
       // their own connected account. No folder set → exports to their root Drive.
       db.from('app_users').select('export_drive_folder_url').eq('id', ctx.userId).maybeSingle(),
+      // Per-user exported sheet — reuse THIS user's own sheet, never another user's.
+      db.from('invoice_user_sheets')
+        .select('gsheet_id')
+        .eq('invoice_id', params.id)
+        .eq('user_id', ctx.userId)
+        .maybeSingle(),
     ])
 
     const folderUrl = (userRow as any)?.export_drive_folder_url?.trim() ?? ''
@@ -726,7 +732,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       { properties: { title: 'NVL',        sheetId: 2, index: 2 } },
       { properties: { title: 'CÔNG THỨC', sheetId: 3, index: 3 } },
     ]
-    const existingId = (invoice as any).gsheet_id as string | null | undefined
+    const existingId = (sheetRow as any)?.gsheet_id as string | null | undefined
     let spreadsheetId = ''
     let reused = false
 
@@ -1394,7 +1400,10 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     // Best-effort so a missing gsheet_id column (migration not run) never breaks export.
     if (!reused) {
       try {
-        await db.from('invoices').update({ gsheet_id: spreadsheetId }).eq('id', params.id)
+        await db.from('invoice_user_sheets').upsert(
+          { invoice_id: params.id, user_id: ctx.userId, gsheet_id: spreadsheetId, updated_at: new Date().toISOString() },
+          { onConflict: 'invoice_id,user_id' },
+        )
       } catch { /* reuse tracking is optional */ }
     }
 

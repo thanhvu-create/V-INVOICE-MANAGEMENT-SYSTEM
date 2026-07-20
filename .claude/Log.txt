@@ -1,3 +1,18 @@
+## 2026-07-20 — Feature: per-user exported sheet tracking (invoice_user_sheets)
+
+Vấn đề: gsheet_id là 1 ô chung trên invoice, nhưng folder giờ riêng theo user → khi user B
+export invoice mà user A đã export, B không đọc được sheet của A (file riêng tư) nên tạo file
+mới rồi ghi đè gsheet_id → ping-pong, tạo file trùng, hoặc lỗi permission nếu sheet có share.
+
+Giải pháp (đã chọn: mỗi user 1 file riêng): track sheet theo (invoice, user).
+- supabase/add_invoice_user_sheets.sql (MỚI) — bảng invoice_user_sheets(invoice_id, user_id,
+  gsheet_id, updated_at, PK(invoice_id,user_id)), FK cascade tới invoices/app_users. Seed từ
+  invoices.gsheet_id hiện có cho created_by_user_id. CHẠY TAY trong Supabase SQL Editor.
+- export-sheets/route.ts — existingId đọc từ invoice_user_sheets theo ctx.userId (thay cho
+  invoice.gsheet_id); sau khi tạo file mới thì upsert vào bảng này thay vì update invoices.
+Degrade an toàn: nếu bảng chưa tồn tại, query lỗi bị bỏ qua → luôn tạo sheet mới (không reuse),
+export vẫn chạy. Reuse hoạt động sau khi migration chạy.
+
 ## 2026-07-20 — Feature: per-user Google Drive export folder
 
 Chuyển folder export từ 1 giá trị chung (app_settings key 'export_drive_folder_url') sang
