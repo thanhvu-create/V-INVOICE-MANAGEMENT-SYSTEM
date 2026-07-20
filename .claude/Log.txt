@@ -1,3 +1,40 @@
+## 2026-07-20 — Feature: per-user Google Drive export folder
+
+Chuyển folder export từ 1 giá trị chung (app_settings key 'export_drive_folder_url') sang
+lưu theo TỪNG user (app_users.export_drive_folder_url). Mỗi user export vào folder riêng của
+mình bằng tài khoản Google riêng → nhiều user / nhiều tài khoản không đụng nhau.
+Quyết định: chưa cấu hình → export vào root Drive của chính user; chỉ admin/manager được đặt folder.
+
+Changes:
+- supabase/add_user_export_folder.sql (MỚI) — ALTER TABLE app_users ADD COLUMN
+  export_drive_folder_url TEXT. CHẠY TAY trong Supabase SQL Editor (project xgpkztkrlymfvlbabigl).
+- app/api/user/export-folder/route.ts (MỚI) — GET (mọi user, đọc folder của mình) +
+  PATCH (admin/manager, ghi folder của mình).
+- export-sheets/route.ts — đọc folder từ app_users.export_drive_folder_url của ctx.userId
+  thay vì app_settings global.
+- ExportFolderConfig.tsx — gọi /api/user/export-folder thay cho /api/settings; đổi copy sang "của bạn".
+Lưu ý: reuse theo invoices.gsheet_id vẫn cập nhật đúng file cũ (không di chuyển lại), nên
+per-user folder chủ yếu áp dụng ở lần export ĐẦU của mỗi invoice.
+
+## 2026-07-20 — Fix: Google Sheet export "The caller does not have permission"
+
+Root cause: export-sheets uses the DB-stored google_refresh_token (getGoogleAccessToken),
+never the browser token. That token was minted with the old `drive.readonly` scope (before
+commit a658808 upgraded the scope to full `drive`). Refreshing never upgrades scopes, so the
+Sheet is created OK (spreadsheets scope) but the Drive move-into-folder is denied. Re-linking
+didn't help: DriveAuthButton "disconnect" only cleared localStorage — never the DB token — and
+reconnect didn't force a fresh grant, so Google returned no new refresh token.
+
+Changes:
+- NEW app/api/auth/google-drive/disconnect/route.ts — revokes the grant at Google + nulls
+  app_users.google_refresh_token, so the next connect is a fresh grant with full `drive` scope.
+- DriveAuthButton.tsx — disconnect now POSTs to that endpoint before clearToken().
+- driveToken.ts — added `select_account: true` so the user can pick the folder-owning account.
+- export-sheets/route.ts — added tokenScopes() helper; the folder-move failure message now
+  distinguishes a missing drive-write scope (→ reconnect) from a wrong-account/Shared-Drive case.
+Immediate unblock for existing users: revoke app at myaccount.google.com/permissions, then
+disconnect + reconnect in the app.
+
 ## 2026-06-10 — Fix v2: Logic Rewrite (JM-FORM-SUMMARY-logic-flow.md)
 
 ### Critical bugs fixed:

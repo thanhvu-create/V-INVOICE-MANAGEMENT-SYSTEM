@@ -42,6 +42,9 @@ export function DriveAuthButton() {
   async function handleClick() {
     if (connected) {
       manualDisconnect.current = true
+      // Revoke + clear the DB refresh token too — clearing localStorage alone leaves the
+      // server using the old (possibly short-scoped) token on export. Best-effort.
+      try { await fetch('/api/auth/google-drive/disconnect', { method: 'POST' }) } catch {}
       clearToken()
       return
     }

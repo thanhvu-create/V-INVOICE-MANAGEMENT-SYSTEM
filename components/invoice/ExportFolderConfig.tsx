@@ -3,8 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useUser } from '@/contexts/UserContext'
 
-const SETTINGS_KEY = 'export_drive_folder_url'
-
 function shortUrl(url: string) {
   try {
     const m = url.match(/\/folders\/([a-zA-Z0-9_-]{6,12})/)
@@ -23,7 +21,7 @@ export function ExportFolderConfig() {
   const wrapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    fetch(`/api/settings?key=${SETTINGS_KEY}`)
+    fetch('/api/user/export-folder')
       .then(r => r.json())
       .then(j => { if (j.success) setSavedUrl(j.value ?? null) })
       .catch(() => {})
@@ -46,10 +44,10 @@ export function ExportFolderConfig() {
     const url = input.trim()
     if (!url) return
     setSaving(true)
-    await fetch('/api/settings', {
+    await fetch('/api/user/export-folder', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: SETTINGS_KEY, value: url }),
+      body: JSON.stringify({ value: url }),
     })
     setSavedUrl(url)
     setSaving(false)
@@ -58,10 +56,10 @@ export function ExportFolderConfig() {
 
   async function handleClear() {
     setSaving(true)
-    await fetch('/api/settings', {
+    await fetch('/api/user/export-folder', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ key: SETTINGS_KEY, value: '' }),
+      body: JSON.stringify({ value: '' }),
     })
     setSavedUrl(null)
     setInput('')
@@ -101,11 +99,11 @@ export function ExportFolderConfig() {
         }}>
           <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
             <i className="fa-brands fa-google-drive" style={{ marginRight: 5, color: '#34A853' }} />
-            Drive Folder — Nơi lưu Google Sheet export
+            Drive Folder — Nơi lưu Google Sheet export (của bạn)
           </div>
 
           <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: '0.6rem' }}>
-            Dán link thư mục Google Drive. Mỗi lần export sẽ tạo file mới trong thư mục này.
+            Dán link thư mục Google Drive của riêng bạn. File export sẽ lưu vào đây bằng tài khoản Google bạn đã kết nối. Chưa cấu hình → lưu vào root Drive của bạn.
           </div>
 
           {canManage ? (
@@ -150,7 +148,7 @@ export function ExportFolderConfig() {
             <div style={{ fontSize: 'var(--text-xs)', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', wordBreak: 'break-all' }}>
               {savedUrl
                 ? <><i className="fa-solid fa-circle-check" style={{ color: '#34A853', marginRight: 5 }} />{shortUrl(savedUrl)}</>
-                : <span style={{ color: 'var(--color-warning)' }}>Chưa cấu hình — file sẽ lưu vào root Drive</span>
+                : <span style={{ color: 'var(--color-warning)' }}>Chỉ admin/manager cấu hình được — file của bạn sẽ lưu vào root Drive</span>
               }
             </div>
           )}

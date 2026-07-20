@@ -82,6 +82,21 @@ async function moveFileToDriveFolder(
   }
 }
 
+// Return the scopes actually granted to this access token (space-separated), or ''.
+// Used to tell a missing-write-scope failure apart from a wrong-account / Shared-Drive one.
+async function tokenScopes(accessToken: string): Promise<string> {
+  try {
+    const r = await fetch(
+      'https://www.googleapis.com/oauth2/v3/tokeninfo?access_token=' + encodeURIComponent(accessToken),
+    )
+    if (!r.ok) return ''
+    const j = await r.json()
+    return String(j.scope ?? '')
+  } catch {
+    return ''
+  }
+}
+
 function n(v: unknown): number | string {
   if (v == null || v === '') return ''
   const f = parseFloat(String(v))
@@ -667,16 +682,18 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const db           = createServiceClient()
     const canSeePrice  = ctx.role === 'admin' || ctx.role === 'manager'
 
-    const [{ data: invoice }, { data: items }, { data: folderSetting }] = await Promise.all([
+    const [{ data: invoice }, { data: items }, { data: userRow }] = await Promise.all([
       db.from('invoices').select('*').eq('id', params.id).single(),
       db.from('invoice_products')
         .select('*, invoice_diamonds(*)')
         .eq('invoice_id', params.id)
         .order('seq', { ascending: true }),
-      db.from('app_settings').select('value').eq('key', 'export_drive_folder_url').maybeSingle(),
+      // Per-user export folder — each user exports into their OWN Drive folder using
+      // their own connected account. No folder set → exports to their root Drive.
+      db.from('app_users').select('export_drive_folder_url').eq('id', ctx.userId).maybeSingle(),
     ])
 
-    const folderUrl = folderSetting?.value?.trim() ?? ''
+    const folderUrl = (userRow as any)?.export_drive_folder_url?.trim() ?? ''
     const folderId  = folderUrl ? extractFolderId(folderUrl) : null
 
     if (!invoice) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
@@ -848,10 +865,16 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
         await moveFileToDriveFolder(accessToken, spreadsheetId, folderId)
       } catch (moveErr: any) {
         const msg = String(moveErr.message ?? '')
-        if (msg.includes('insufficient') || msg.includes('scope')) {
-          folderWarning = 'Token Google chưa có quyền "Drive files". Vào Settings → ngắt kết nối Google Drive → kết nối lại để cấp quyền mới. File đã tạo ở root Drive.'
+        const scopes = (await tokenScopes(accessToken)).split(' ')
+        const hasFullDrive = scopes.includes('https://www.googleapis.com/auth/drive')
+        if (!hasFullDrive) {
+          // Stored token only has drive.readonly (granted before the scope upgrade) —
+          // it can create/write the Sheet but not move it. Reconnect mints a full-drive token.
+          folderWarning = 'Token Google chỉ có quyền chỉ-đọc Drive (drive.readonly) nên không di chuyển được file vào folder. Vào Settings → ngắt kết nối Google Drive → kết nối lại để cấp quyền Drive đầy đủ. File đã tạo ở root Drive.'
         } else {
-          folderWarning = `Không thể di chuyển vào folder (${msg}). Kiểm tra lại link folder và quyền truy cập. File đã tạo ở root Drive.`
+          // Full drive scope but still denied → the folder belongs to another Google account
+          // or a Shared Drive the connected account can't organize files in.
+          folderWarning = `Không thể di chuyển file vào folder (${msg}). Folder có thể thuộc tài khoản Google khác hoặc Shared Drive mà tài khoản đã kết nối không có quyền ghi. Kiểm tra lại link folder và tài khoản kết nối. File đã tạo ở root Drive.`
         }
       }
     }

@@ -91,6 +91,9 @@ export function requestCodeWithConsent(): Promise<string | null> {
       client_id: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID,
       scope: 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/spreadsheets',
       ux_mode: 'popup',
+      // Force the account chooser so the user connects the account that owns the export
+      // folder — connecting the wrong account is a common cause of "caller has no permission".
+      select_account: true,
       callback: async (res: any) => {
         if (!res?.code) { resolve(null); return }
         try {
