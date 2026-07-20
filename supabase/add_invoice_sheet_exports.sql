@@ -19,10 +19,10 @@ CREATE TABLE IF NOT EXISTS invoice_sheet_exports (
 INSERT INTO invoice_sheet_exports (invoice_id, folder_key, gsheet_id)
 SELECT i.id,
        COALESCE(substring(u.export_drive_folder_url from '/folders/([A-Za-z0-9_-]+)'),
-                'root:' || i.created_by_user_id::text),
+                'root:' || i.created_by::text),
        i.gsheet_id
 FROM invoices i
-JOIN app_users u ON u.id = i.created_by_user_id
+JOIN app_users u ON u.id = i.created_by
 WHERE i.gsheet_id IS NOT NULL
 ON CONFLICT (invoice_id, folder_key) DO NOTHING;
 
