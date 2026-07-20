@@ -1,17 +1,21 @@
-## 2026-07-20 — Feature: per-user exported sheet tracking (invoice_user_sheets)
+## 2026-07-20 — Feature: exported sheet tracking keyed by (invoice, folder)
 
 Vấn đề: gsheet_id là 1 ô chung trên invoice, nhưng folder giờ riêng theo user → khi user B
 export invoice mà user A đã export, B không đọc được sheet của A (file riêng tư) nên tạo file
 mới rồi ghi đè gsheet_id → ping-pong, tạo file trùng, hoặc lỗi permission nếu sheet có share.
 
-Giải pháp (đã chọn: mỗi user 1 file riêng): track sheet theo (invoice, user).
-- supabase/add_invoice_user_sheets.sql (MỚI) — bảng invoice_user_sheets(invoice_id, user_id,
-  gsheet_id, updated_at, PK(invoice_id,user_id)), FK cascade tới invoices/app_users. Seed từ
-  invoices.gsheet_id hiện có cho created_by_user_id. CHẠY TAY trong Supabase SQL Editor.
-- export-sheets/route.ts — existingId đọc từ invoice_user_sheets theo ctx.userId (thay cho
-  invoice.gsheet_id); sau khi tạo file mới thì upsert vào bảng này thay vì update invoices.
-Degrade an toàn: nếu bảng chưa tồn tại, query lỗi bị bỏ qua → luôn tạo sheet mới (không reuse),
-export vẫn chạy. Reuse hoạt động sau khi migration chạy.
+Giải pháp (đã chọn): khóa sheet theo (invoice, folder) — cùng invoice + cùng folder → 1 sheet
+dùng chung (share folder = share file); khác folder / root riêng → sheet riêng.
+- supabase/add_invoice_sheet_exports.sql (MỚI) — bảng invoice_sheet_exports(invoice_id,
+  folder_key, gsheet_id, updated_at, PK(invoice_id,folder_key)). folder_key = folder id, hoặc
+  'root:<user_id>' khi không cấu hình folder (root namespaced theo user). Seed từ
+  invoices.gsheet_id theo folder_key của người tạo. DROP bảng cũ invoice_user_sheets.
+  CHẠY TAY trong Supabase SQL Editor.
+- export-sheets/route.ts — folderKey = folderId ?? 'root:'+userId; existingId đọc từ
+  invoice_sheet_exports theo (invoice_id, folder_key); reuse batchUpdate bọc try/catch →
+  nếu chỉ đọc được mà không ghi được (folder share read-only) thì tạo file riêng thay vì lỗi;
+  cuối cùng upsert theo folder_key.
+Degrade an toàn: bảng chưa tồn tại → query lỗi bị bỏ qua → luôn tạo sheet mới, export vẫn chạy.
 
 ## 2026-07-20 — Feature: per-user Google Drive export folder
 

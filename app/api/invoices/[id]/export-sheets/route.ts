@@ -682,7 +682,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const db           = createServiceClient()
     const canSeePrice  = ctx.role === 'admin' || ctx.role === 'manager'
 
-    const [{ data: invoice }, { data: items }, { data: userRow }, { data: sheetRow }] = await Promise.all([
+    const [{ data: invoice }, { data: items }, { data: userRow }] = await Promise.all([
       db.from('invoices').select('*').eq('id', params.id).single(),
       db.from('invoice_products')
         .select('*, invoice_diamonds(*)')
@@ -691,16 +691,15 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       // Per-user export folder — each user exports into their OWN Drive folder using
       // their own connected account. No folder set → exports to their root Drive.
       db.from('app_users').select('export_drive_folder_url').eq('id', ctx.userId).maybeSingle(),
-      // Per-user exported sheet — reuse THIS user's own sheet, never another user's.
-      db.from('invoice_user_sheets')
-        .select('gsheet_id')
-        .eq('invoice_id', params.id)
-        .eq('user_id', ctx.userId)
-        .maybeSingle(),
     ])
 
     const folderUrl = (userRow as any)?.export_drive_folder_url?.trim() ?? ''
     const folderId  = folderUrl ? extractFolderId(folderUrl) : null
+    // Sheet identity is keyed by (invoice, folder): the same invoice exported to the SAME
+    // folder reuses ONE sheet — so users sharing a folder share the file. A different folder,
+    // or no folder (each user's own Drive root), gets its own sheet. Root is namespaced per
+    // user so two users without a folder never collide.
+    const folderKey = folderId ?? `root:${ctx.userId}`
 
     if (!invoice) return NextResponse.json({ success: false, message: 'Not found' }, { status: 404 })
 
@@ -732,6 +731,12 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       { properties: { title: 'NVL',        sheetId: 2, index: 2 } },
       { properties: { title: 'CÔNG THỨC', sheetId: 3, index: 3 } },
     ]
+    const { data: sheetRow } = await db
+      .from('invoice_sheet_exports')
+      .select('gsheet_id')
+      .eq('invoice_id', params.id)
+      .eq('folder_key', folderKey)
+      .maybeSingle()
     const existingId = (sheetRow as any)?.gsheet_id as string | null | undefined
     let spreadsheetId = ''
     let reused = false
@@ -740,19 +745,25 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       const meta = await getSpreadsheetSheets(accessToken, existingId)
       const ids  = (meta ?? []).map(s => s.sheetId)
       if (meta && [0, 1, 2, 3].every(i => ids.includes(i))) {
-        spreadsheetId = existingId
-        reused = true
-        // Wipe old values/formatting/merges and refresh the file title so nothing from
-        // a previous export lingers, then the write+format steps below repopulate it.
-        await sheetsPost(accessToken, `${spreadsheetId}:batchUpdate`, {
-          requests: [
-            { updateSpreadsheetProperties: { properties: { title }, fields: 'title' } },
-            ...[0, 1, 2, 3].flatMap(sheetId => [
-              { unmergeCells: { range: { sheetId } } },
-              { updateCells:  { range: { sheetId }, fields: 'userEnteredValue,userEnteredFormat' } },
-            ]),
-          ],
-        })
+        try {
+          // Wipe old values/formatting/merges and refresh the file title so nothing from
+          // a previous export lingers, then the write+format steps below repopulate it.
+          await sheetsPost(accessToken, `${existingId}:batchUpdate`, {
+            requests: [
+              { updateSpreadsheetProperties: { properties: { title }, fields: 'title' } },
+              ...[0, 1, 2, 3].flatMap(sheetId => [
+                { unmergeCells: { range: { sheetId } } },
+                { updateCells:  { range: { sheetId }, fields: 'userEnteredValue,userEnteredFormat' } },
+              ]),
+            ],
+          })
+          spreadsheetId = existingId
+          reused = true
+        } catch {
+          // Can read the shared sheet but not write it (e.g. folder shared read-only) —
+          // fall through and create our own copy instead of hard-failing.
+          reused = false
+        }
       }
     }
 
@@ -1400,9 +1411,9 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     // Best-effort so a missing gsheet_id column (migration not run) never breaks export.
     if (!reused) {
       try {
-        await db.from('invoice_user_sheets').upsert(
-          { invoice_id: params.id, user_id: ctx.userId, gsheet_id: spreadsheetId, updated_at: new Date().toISOString() },
-          { onConflict: 'invoice_id,user_id' },
+        await db.from('invoice_sheet_exports').upsert(
+          { invoice_id: params.id, folder_key: folderKey, gsheet_id: spreadsheetId, updated_at: new Date().toISOString() },
+          { onConflict: 'invoice_id,folder_key' },
         )
       } catch { /* reuse tracking is optional */ }
     }
