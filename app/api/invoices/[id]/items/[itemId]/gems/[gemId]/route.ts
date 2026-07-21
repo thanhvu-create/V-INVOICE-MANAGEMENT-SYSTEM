@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     const { data: updatedItem } = await db
       .from('invoice_products')
-      .select('*, invoice_diamonds(*)')
+      .select('*, invoice_diamonds(*), invoice_item_metals(*)')
       .eq('id', params.itemId)
       .single()
 
@@ -88,7 +88,7 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
     const { data: updatedItem } = await db
       .from('invoice_products')
-      .select('*, invoice_diamonds(*)')
+      .select('*, invoice_diamonds(*), invoice_item_metals(*)')
       .eq('id', params.itemId)
       .single()
 

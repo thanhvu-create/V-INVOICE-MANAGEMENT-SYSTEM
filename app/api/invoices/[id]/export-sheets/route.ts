@@ -685,7 +685,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     const [{ data: invoice }, { data: items }, { data: userRow }] = await Promise.all([
       db.from('invoices').select('*').eq('id', params.id).single(),
       db.from('invoice_products')
-        .select('*, invoice_diamonds(*)')
+        .select('*, invoice_diamonds(*), invoice_item_metals(*)')
         .eq('invoice_id', params.id)
         .order('seq', { ascending: true }),
       // Per-user export folder — each user exports into their OWN Drive folder using

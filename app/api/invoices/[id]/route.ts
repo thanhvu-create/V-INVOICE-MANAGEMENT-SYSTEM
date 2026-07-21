@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
         .eq('id', params.id)
         .single(),
       db.from('invoice_products')
-        .select('*, invoice_diamonds(*)')
+        .select('*, invoice_diamonds(*), invoice_item_metals(*)')
         .eq('invoice_id', params.id)
         .order('seq', { ascending: true }),
     ])

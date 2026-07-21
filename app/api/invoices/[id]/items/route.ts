@@ -107,7 +107,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     const { data: item, error } = await db
       .from('invoice_products')
       .insert({ ...baseRow, ...derived })
-      .select('*, invoice_diamonds(*)')
+      .select('*, invoice_diamonds(*), invoice_item_metals(*)')
       .single()
 
     if (error) throw error
