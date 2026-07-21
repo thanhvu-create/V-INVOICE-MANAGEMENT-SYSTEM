@@ -64,6 +64,8 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
   const [assemblyRules, setAssemblyRules] = useState<AssemblyPricingRule[]>([])
   const [autoFilled,  setAutoFilled]  = useState(false)
   const [autoFees,    setAutoFees]    = useState(false)
+  // Optional multi-metal rows (non-AG3). Empty → item uses the single "Loại Vàng" above.
+  const [metalRows,   setMetalRows]   = useState<{ loai_vang: string; weight_gr: string }[]>([])
   const skuRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -88,7 +90,7 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
   const [feeWarn,   setFeeWarn]   = useState('')
 
   useEffect(() => {
-    if (open) { setForm(EMPTY); setError(''); setAutoFilled(false); setAutoFees(false); setClassWarn(''); setFeeWarn('') }
+    if (open) { setForm(EMPTY); setError(''); setAutoFilled(false); setAutoFees(false); setClassWarn(''); setFeeWarn(''); setMetalRows([]) }
   }, [open])
 
   function handleDescriptionChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -249,14 +251,28 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
       chi_tiet_tap:     isAG3 ? (form.chi_tiet_tap.trim() || null) : null,
       image_url:        form.image_url.trim()   || null,
     }
-    const data = await apiCall(
+    const created = await apiCall<any>(
       () => fetch(`/api/invoices/${invoiceId}/items`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       }),
       { successMsg: 'Item added.' }
     )
+    if (created !== null) {
+      // Chain the optional metal rows onto the freshly-created item (sequential → stable seq).
+      const validMetals = metalRows.filter(r => r.loai_vang.trim())
+      for (const r of validMetals) {
+        await fetch(`/api/invoices/${invoiceId}/items/${(created as any).id}/metals`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ loai_vang: r.loai_vang.trim().toUpperCase(), weight_gr: parseFloat(r.weight_gr) || 0 }),
+        }).catch(() => {})
+      }
+    }
     setSaving(false)
-    if (data !== null) { onSaved(); onClose() }
+    if (created !== null) { onSaved(); onClose() }
+  }
+
+  function updateMetalRow(i: number, key: 'loai_vang' | 'weight_gr', val: string) {
+    setMetalRows(rows => rows.map((r, j) => (j === i ? { ...r, [key]: val } : r)))
   }
 
   const labelStyle: React.CSSProperties = {
@@ -423,6 +439,30 @@ export function AddItemModal({ open, invoiceId, template, onClose, onSaved }: Pr
               <input style={inputStyle} placeholder='e.g. "8in", "Size 5"' value={form.kich_thuoc} onChange={f('kich_thuoc')} />
             </div>
           </div>
+
+          {/* Nhiều loại vàng (tùy chọn) — non-AG3 */}
+          {!isAG3 && (
+            <div style={{ borderTop: '1px solid var(--border-light)', paddingTop: '0.75rem', marginBottom: '0.75rem' }}>
+              <div style={{ fontSize: 'var(--text-xs)', letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--text-muted)', marginBottom: '0.35rem' }}>
+                Nhiều loại vàng (tùy chọn)
+              </div>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-muted)', marginBottom: '0.5rem' }}>
+                Bỏ trống nếu chỉ 1 loại (dùng "Loại Vàng" ở trên). Thêm ≥1 dòng → tiền vàng = Σ từng loại, trọng lượng vàng = Σ TL các dòng.
+              </div>
+              {metalRows.map((row, i) => (
+                <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6, alignItems: 'center' }}>
+                  <div style={{ flex: 1 }}>
+                    <ComboInput value={row.loai_vang} onChange={v => updateMetalRow(i, 'loai_vang', v)} options={metalTypes} placeholder="Loại vàng…" uppercase style={inputStyle} />
+                  </div>
+                  <input type="number" min="0" step="0.0001" placeholder="TL (gr)" value={row.weight_gr} onChange={e => updateMetalRow(i, 'weight_gr', e.target.value)} style={{ ...inputStyle, width: 110 }} />
+                  <button type="button" onClick={() => setMetalRows(rows => rows.filter((_, j) => j !== i))} style={{ background: 'none', border: '1px solid var(--border-base)', cursor: 'pointer', color: 'var(--color-danger)', fontSize: 12, padding: '5px 9px' }} title="Xóa"><i className="fa-solid fa-trash" /></button>
+                </div>
+              ))}
+              <button type="button" onClick={() => setMetalRows(rows => [...rows, { loai_vang: '', weight_gr: '' }])} style={{ background: 'none', border: '1px solid var(--border-base)', cursor: 'pointer', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', padding: '5px 10px', display: 'flex', alignItems: 'center', gap: 4 }}>
+                <i className="fa-solid fa-plus" style={{ fontSize: 9 }} /> Thêm loại vàng
+              </button>
+            </div>
+          )}
 
           {/* Fees (CH1/CH2/ADM) */}
           {hasFees && (
