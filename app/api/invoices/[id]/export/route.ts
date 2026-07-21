@@ -13,6 +13,13 @@ function fmt4(n: unknown): string {
   const v = parseFloat(String(n))
   return isNaN(v) ? '' : v.toFixed(2)
 }
+// Multi-metal item → "18KW 3g + 14KY 2g"; otherwise the single loai_vang.
+function metalLabel(item: any): string {
+  const ms = (item?.invoice_item_metals ?? []) as any[]
+  if (!ms.length) return item?.loai_vang ?? ''
+  return ms.slice().sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
+    .map(m => `${m.loai_vang ?? ''} ${m.weight_gr ?? 0}g`).join(' + ')
+}
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -103,7 +110,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
           item.class            ?? '',
           item.sub_class        ?? '',
           item.kich_thuoc       ?? '',
-          item.loai_vang        ?? '',
+          metalLabel(item),
           item.qt_pcs           ?? 0,
           fmt4(item.t_pham_co_nvl_da),
           fmt4(item.t_pham_tru_nvl_da),

@@ -109,6 +109,18 @@ function driveImageFormula(publicUrl: string | null | undefined): string {
   return `=IMAGE("${publicUrl}")`
 }
 
+// "Loại vàng" cell text. Multi-metal item → combined label "18KW 3g + 14KY 2g";
+// otherwise the item's single loai_vang.
+function metalLabel(item: any): string {
+  const ms = (item?.invoice_item_metals ?? []) as any[]
+  if (!ms.length) return item?.loai_vang ?? ''
+  return ms
+    .slice()
+    .sort((a, b) => (a.seq ?? 0) - (b.seq ?? 0))
+    .map(m => `${m.loai_vang ?? ''} ${m.weight_gr ?? 0}g`)
+    .join(' + ')
+}
+
 function extractDriveFileId(url: string | null | undefined): string | null {
   if (!url?.trim()) return null
   const patterns = [
@@ -457,7 +469,7 @@ function buildSummaryRowsAG3(items: any[]) {
     row[3] = item.kich_thuoc   ?? ''
     row[4] = n(item.qt_pcs)
     row[5] = item.vendor_model ?? ''
-    row[6] = item.loai_vang    ?? ''
+    row[6] = metalLabel(item)
     // H = Tiền vàng (pre-computed from DB)
     row[7] = n(item.tien_vang)
     row[8] = n(item.t_pham_co_nvl_da)   // I = TL T.Phẩm — INPUT
@@ -530,7 +542,7 @@ function buildSummaryRowsADM(items: any[]) {
         row[4]  = item.kich_thuoc   ?? ''
         row[5]  = n(item.qt_pcs)
         row[6]  = item.vendor_model ?? ''
-        row[7]  = item.loai_vang    ?? ''
+        row[7]  = metalLabel(item)
         row[9]  = n(item.t_pham_co_nvl_da)   // J = T.Phẩm có NVL đá — INPUT
         // Pre-computed values from DB
         row[10] = n(item.t_pham_tru_nvl_da)     // K = T.Phẩm trừ NVL đá
@@ -628,7 +640,7 @@ function buildSummaryRows(invoice: any, items: any[]) {
         row[4]  = item.kich_thuoc   ?? ''
         row[5]  = n(item.qt_pcs)
         row[6]  = item.vendor_model ?? ''
-        row[7]  = item.loai_vang    ?? ''
+        row[7]  = metalLabel(item)
         row[9]  = n(item.t_pham_co_nvl_da)   // J = T.Phẩm có NVL đá — INPUT
         row[23] = n(item.gia_cong);     row[24] = n(item.duc)
         row[25] = n(item.thiet_ke);     row[26] = n(item.resin)
@@ -841,12 +853,21 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
     let goldByTypeCount = 0
     if (!_isAG3gt && processedItems.length > 0) {
       const map = new Map<string, number>()
-      for (const it of processedItems) {
-        const raw = String(it.loai_vang ?? '').trim() || '—'
+      const addToMap = (loai: unknown, val: unknown) => {
+        const raw = String(loai ?? '').trim() || '—'
         const km  = raw.match(/^(\d+)\s*K/i)   // 18KW + 18KY → "18K"; PT/AG/PD kept as-is
         const t   = km ? `${km[1]}K` : raw
-        const v = n(it.tien_vang)
+        const v   = n(val)
         map.set(t, (map.get(t) ?? 0) + (typeof v === 'number' ? v : 0))
+      }
+      for (const it of processedItems) {
+        const metals = (it.invoice_item_metals ?? []) as any[]
+        if (metals.length > 0) {
+          // Multi-metal: sum each metal's own tien_vang under its karat.
+          for (const m of metals) addToMap(m.loai_vang, m.tien_vang)
+        } else {
+          addToMap(it.loai_vang, it.tien_vang)
+        }
       }
       const entries = Array.from(map.entries()).sort((a, b) => a[0].localeCompare(b[0]))
       if (entries.length > 0) {
