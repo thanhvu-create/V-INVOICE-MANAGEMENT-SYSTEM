@@ -47,13 +47,19 @@ export function DetailView({ invoiceId, items, canSeePrice, canEdit, isLocked, t
   const totCif    = items.reduce((s, i) => s + (i.cif_price    ?? 0), 0)
 
   // Tiền vàng grouped by karat (18KW + 18KY → "18K"); PT/AG/PD kept as-is.
+  // Multi-metal items contribute each metal's own tien_vang under its karat.
   const goldByType = (() => {
     const m = new Map<string, number>()
-    for (const i of items) {
-      const raw = String(i.loai_vang ?? '').trim() || '—'
+    const add = (loai: unknown, val: number) => {
+      const raw = String(loai ?? '').trim() || '—'
       const km  = raw.match(/^(\d+)\s*K/i)
       const key = km ? `${km[1]}K` : raw
-      m.set(key, (m.get(key) ?? 0) + (i.tien_vang ?? 0))
+      m.set(key, (m.get(key) ?? 0) + (val ?? 0))
+    }
+    for (const i of items) {
+      const metals: any[] = i.invoice_item_metals ?? []
+      if (metals.length > 0) metals.forEach((mm: any) => add(mm.loai_vang, mm.tien_vang ?? 0))
+      else add(i.loai_vang, i.tien_vang ?? 0)
     }
     return Array.from(m.entries()).sort((a, b) => a[0].localeCompare(b[0]))
   })()

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { apiCall } from '@/lib/api'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { GemModal } from './GemModal'
+import { MetalSection } from './MetalSection'
 import { DriveImage } from './DriveImage'
 import { DriveImageInput } from '@/components/ui/DriveImageInput'
 import { ComboInput } from '@/components/ui/ComboInput'
@@ -78,6 +79,10 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
   const [deletingGem, setDeletingGem] = useState(false)
 
   const gems: any[] = item.invoice_diamonds ?? []
+  const itemMetals: any[] = (item.invoice_item_metals ?? []).slice().sort((a: any, b: any) => (a.seq ?? 0) - (b.seq ?? 0))
+  const loaiVangLabel = itemMetals.length > 0
+    ? itemMetals.map((m: any) => `${m.loai_vang ?? ''} ${m.weight_gr ?? 0}g`).join(' + ')
+    : (item.loai_vang ?? '—')
   const notesVal = isAG3 ? item.chi_tiet_tap : (!isAdm ? item.nini_adm : null)
   const isBaSao  = notesVal?.toLowerCase().includes('ba sao') ?? false
 
@@ -280,7 +285,7 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
               ...(template === 'CH1_AG3' && item.sku_ag ? [['SKU# AG', item.sku_ag]]      : []),
               ['Qty (pcs)', item.qt_pcs],
               ...(item.kich_thuoc                     ? [['Kích thước', item.kich_thuoc]] : []),
-              ['Loại vàng', item.loai_vang ?? '—'],
+              ['Loại vàng', loaiVangLabel],
               ...(!isAG3 && item.so_mo                ? [['SO-MO', item.so_mo]]           : []),
               ['Wt. (gr)', fmtGram(item.t_pham_co_nvl_da ?? item.wt_gr)],
               ...(!isAG3 ? [
@@ -574,6 +579,19 @@ export function ItemCard({ invoiceId, item, canSeePrice, canEdit, isLocked, temp
         </div>
       )}
 
+
+      {/* Loại vàng nhiều loại (multi-metal) */}
+      {!isAG3 && (
+        <MetalSection
+          invoiceId={invoiceId}
+          item={item}
+          canSeePrice={canSeePrice}
+          canEdit={canEdit}
+          isLocked={isLocked}
+          metalTypes={metalTypes}
+          onItemUpdate={onItemUpdate}
+        />
+      )}
 
       {/* Dialogs */}
       <ConfirmDialog open={confirmDelete} title="Delete Item" message={`Delete item "${item.sku}" (seq ${item.seq})?`} okText={deleting ? 'Deleting…' : 'Delete'} danger onOk={handleDelete} onCancel={() => setConfirmDelete(false)} />
