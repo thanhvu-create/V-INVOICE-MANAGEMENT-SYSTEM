@@ -1,3 +1,15 @@
+## 2026-07-21 — Feature: item nhiều loại vàng (multi-metal per item)
+
+Spec: DOCS/superpowers/specs/2026-07-20-multi-metal-per-item-design.md
+Plan: DOCS/superpowers/plans/2026-07-20-multi-metal-per-item.md
+Bảng con invoice_item_metals(product_id, loai_vang, weight_gr, tien_vang, seq) — mirror
+invoice_diamonds. Item có ≥1 dòng metal → tien_vang = Σ(weight_gr × giá/gram), trọng lượng
+vàng = Σ weight_gr (không trừ hột); 0 dòng → logic 1 loại vàng cũ. recalcMetal + recalcItem
+(param metals) trong pricing.ts; triggerItemRecalc/bulkRecalcInvoice/item PATCH truyền metals.
+API /items/[itemId]/metals (GET/POST/PATCH/DELETE). Export SUMMARY nhãn gộp "18KW 3g + 14KY 2g"
++ TIỀN VÀNG THEO LOẠI theo metal. UI: MetalSection trong ItemCard + nhập nhiều loại khi tạo mới
+(AddItemModal). MIGRATION cần chạy tay: supabase/add_invoice_item_metals.sql.
+
 ## 2026-07-20 — Feature: exported sheet tracking keyed by (invoice, folder)
 
 Vấn đề: gsheet_id là 1 ô chung trên invoice, nhưng folder giờ riêng theo user → khi user B
