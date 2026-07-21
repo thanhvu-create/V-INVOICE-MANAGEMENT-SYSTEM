@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
-import { recalcItem, recalcDiamond, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
+import { recalcItem, recalcDiamond, recalcMetal, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
 import { resolvePhiPhuKien, hasGemsInDescription } from '@/lib/formulas/assembly-pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 
@@ -150,7 +150,10 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     {
       const nvl      = nvlFromInvoice(invoice)
       const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
-      const { data: diamonds } = await db.from('invoice_diamonds').select('*').eq('product_id', params.itemId)
+      const [{ data: diamonds }, { data: metals }] = await Promise.all([
+        db.from('invoice_diamonds').select('*').eq('product_id', params.itemId),
+        db.from('invoice_item_metals').select('*').eq('product_id', params.itemId).order('seq'),
+      ])
       const gemList = diamonds ?? []
 
       const recalcedGems = gemList.map(d => {
@@ -162,14 +165,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           db.from('invoice_diamonds').update(g._update).eq('id', g.id)
         ))
       }
+      const metalList = (metals ?? []).map(m => ({ ...m, ...recalcMetal(m, nvl) }))
+      if (metalList.length) {
+        await Promise.all(metalList.map(m =>
+          db.from('invoice_item_metals').update({ tien_vang: m.tien_vang }).eq('id', m.id)
+        ))
+      }
       const cleanGems = recalcedGems.map(({ _update, ...rest }) => rest)
-      const recalc = recalcItem(item, cleanGems as any, nvl, template)
+      const recalc = recalcItem(item, cleanGems as any, nvl, template, metalList as any)
       await db.from('invoice_products').update(recalc).eq('id', params.itemId)
     }
 
     const { data: updatedItem } = await db
       .from('invoice_products')
-      .select('*, invoice_diamonds(*)')
+      .select('*, invoice_diamonds(*), invoice_item_metals(*)')
       .eq('id', params.itemId)
       .single()
 
