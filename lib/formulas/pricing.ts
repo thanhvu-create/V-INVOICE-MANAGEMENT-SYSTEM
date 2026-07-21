@@ -3,7 +3,7 @@
 // See: .claude/rules/v-invoice.md for full specification
 // ──────────────────────────────────────────────────────────────────────────────
 
-import type { InvoiceProduct, InvoiceDiamond } from '@/types'
+import type { InvoiceProduct, InvoiceDiamond, InvoiceItemMetal } from '@/types'
 
 const OUNCE_PER_GRAM = 31.103
 
@@ -130,19 +130,37 @@ export function calcCIFPrice(purchase: number, template: InvoiceTemplate, cifRat
 }
 
 /**
+ * Computed field for one metal row: tien_vang = weight_gr × giá/gram(loai_vang).
+ * Unknown karat (gpg null) → 0, matching single-metal behaviour.
+ */
+export function recalcMetal(m: Partial<InvoiceItemMetal>, nvl: NVLSnapshot): { tien_vang: number } {
+  const gpg = goldPricePerGram(m.loai_vang ?? '', nvl)
+  return { tien_vang: gpg !== null ? (m.weight_gr ?? 0) * gpg : 0 }
+}
+
+/**
  * Full recalculate for one invoice product — returns only the derived fields to UPDATE.
  * Diamonds must already have tl_xoan_gr/t_gia_xoan/t_phi set (call recalcDiamond first).
+ * metals: when non-empty, gold weight and tien_vang come from the metals (Σ) and the
+ * item's loai_vang is synced to the first metal; otherwise the single-metal path is used.
  */
 export function recalcItem(
   item:     Partial<InvoiceProduct>,
   diamonds: InvoiceDiamond[],
   nvl:      NVLSnapshot,
-  template: InvoiceTemplate = 'CH1'
+  template: InvoiceTemplate = 'CH1',
+  metals:   InvoiceItemMetal[] = []
 ): Partial<InvoiceProduct> {
-  const weightNoGem = calcWeightNoGem(item.t_pham_co_nvl_da ?? 0, diamonds)
-
-  const gpg       = goldPricePerGram(item.loai_vang ?? '', nvl)
-  const goldValue = gpg !== null ? weightNoGem * gpg : 0
+  let weightNoGem: number
+  let goldValue:   number
+  if (metals.length > 0) {
+    weightNoGem = metals.reduce((s, m) => s + (m.weight_gr ?? 0), 0)
+    goldValue   = metals.reduce((s, m) => s + recalcMetal(m, nvl).tien_vang, 0)
+  } else {
+    weightNoGem = calcWeightNoGem(item.t_pham_co_nvl_da ?? 0, diamonds)
+    const gpg   = goldPricePerGram(item.loai_vang ?? '', nvl)
+    goldValue   = gpg !== null ? weightNoGem * gpg : 0
+  }
 
   const isAG3 = template === 'CH1_AG3' || template === 'VNSI_AG3'
 
@@ -167,6 +185,7 @@ export function recalcItem(
     tag_price:           tag,
     fb_price:            fb,
     ...(isAG3 ? { gia_cong: 0, duc: 0, thiet_ke: 0, resin: 0, phi_phu_kien: 0 } : {}),
+    ...(metals.length > 0 ? { loai_vang: metals[0].loai_vang } : {}),
   }
 }
 
