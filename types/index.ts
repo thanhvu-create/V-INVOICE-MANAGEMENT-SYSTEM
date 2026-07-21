@@ -79,10 +79,22 @@ export interface InvoiceProduct {
   created_at:            string
   updated_at:            string
   invoice_diamonds?:     InvoiceDiamond[]
+  invoice_item_metals?:  InvoiceItemMetal[]
 }
 
 // Backward-compat alias
 export type InvoiceItem = InvoiceProduct
+
+// One gold type within an item. When an item has ≥1 of these, gold weight and
+// tien_vang come from the metals (Σ), not from loai_vang + (t_pham − gems).
+export interface InvoiceItemMetal {
+  id:         string
+  product_id: string
+  loai_vang:  string
+  weight_gr:  number         // net gold weight (stones already excluded)
+  tien_vang:  number | null  // = weight_gr × goldPricePerGram(loai_vang) — server-computed
+  seq:        number
+}
 
 export interface InvoiceDiamond {
   id:                string
