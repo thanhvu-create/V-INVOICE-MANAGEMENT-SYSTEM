@@ -56,9 +56,36 @@ interface ImportSegment {
   endRow:   number | null       // 1-indexed inclusive last data row; null = to end of sheet
   match:    (r: any[]) => boolean  // row filter (V-INV presence is checked separately)
 }
+// segments may be a static list, or a builder that computes them from the parsed
+// sheet rows (used by CH1_AG3 to detect the 2nd table's boundary dynamically).
+type SegmentBuilder = ImportSegment[] | ((all: any[][]) => ImportSegment[])
 interface ImportRule {
-  segments:      ImportSegment[]
+  segments:      SegmentBuilder
   useColPFilter: boolean        // also filter by TÊN KHÁCH (cột P) against TEMPLATE_CHANNELS (preview stage)
+}
+
+// SPHT tabs stack two data tables: a header at row 11 (data 12+), then a REPEATED
+// header (~row 102) starting a second table. Find that repeated header by matching a
+// candidate row against the first header row on key label columns — lets table 2 run
+// to the end of the sheet with no hardcoded cap, so a long bottom table never truncates.
+const HEADER_ROW0 = 10 // 0-based index of the first header (sheet row 11)
+function findRepeatedHeaderIdx(all: any[][]): number | null {
+  const header = all[HEADER_ROW0]
+  if (!header) return null
+  const keyCols = [0, 3, 4, 5, 7, 17, 21] // CH, SKU, SO, MO, LOẠI VÀNG, V-INV, NGUỒN NHẬP
+  const norm = (v: any) => String(v ?? '').trim().toLowerCase()
+  const sig = keyCols.map(c => norm(header[c]))
+  if (sig.filter(Boolean).length < 3) return null // first row isn't header-like → caller falls back
+  for (let i = HEADER_ROW0 + 1; i < all.length; i++) {
+    let checked = 0, matches = 0
+    for (let k = 0; k < keyCols.length; k++) {
+      if (!sig[k]) continue
+      checked++
+      if (norm(all[i]?.[keyCols[k]]) === sig[k]) matches++
+    }
+    if (checked >= 3 && matches >= Math.ceil(checked * 0.7)) return i
+  }
+  return null
 }
 
 function importRuleFor(template: string): ImportRule {
@@ -67,12 +94,27 @@ function importRuleFor(template: string): ImportRule {
       return { segments: [{ startRow: 12, endRow: 99, match: r => ['214', '359'].includes(cell(r, 0)) }], useColPFilter: false }
     case 'VNSI_AG3':  // KENHSI — kênh sỉ, rows 12–99
       return { segments: [{ startRow: 12, endRow: 99, match: r => cell(r, 0).toLowerCase().includes('sỉ') }], useColPFilter: false }
-    case 'CH1_AG3':   // VN_US_AG3 — 2 sections, AG3 nhận diện bằng NGUỒN NHẬP (cột V) = "AG-L3"
+    case 'CH1_AG3':   // VN_US_AG3 — 2 sections stacked; AG3 = NGUỒN NHẬP (cột V) "AG-L3".
+      // Table 2's end is detected at parse time (repeated header) — no hardcoded cap,
+      // so a long bottom table is never truncated. Falls back to the classic split
+      // (but still uncapped) when the repeated header can't be found.
       return {
-        segments: [
-          { startRow: 12,  endRow: 99,  match: r => cell(r, 21) === 'AG-L3' },                               // bảng 1 (section trên)
-          { startRow: 103, endRow: 325, match: r => cell(r, 21) === 'AG-L3' && cell(r, 16) === 'Đã ship' },   // bảng 2 (section dưới, đã ship)
-        ],
+        segments: (all) => {
+          const isAG3     = (r: any[]) => cell(r, 21) === 'AG-L3'
+          const isAG3Ship = (r: any[]) => cell(r, 21) === 'AG-L3' && cell(r, 16) === 'Đã ship'
+          const h2 = findRepeatedHeaderIdx(all)  // 0-based index of repeated header
+          if (h2 == null) {
+            return [
+              { startRow: 12,  endRow: 99,   match: isAG3 },      // bảng 1 (section trên)
+              { startRow: 103, endRow: null, match: isAG3Ship },  // bảng 2 → hết sheet (bỏ trần 325)
+            ]
+          }
+          const headerRow2 = h2 + 1  // 1-indexed sheet row of the repeated header
+          return [
+            { startRow: 12,             endRow: headerRow2 - 1, match: isAG3 },      // bảng 1: tới ngay trước header lặp
+            { startRow: headerRow2 + 1, endRow: null,           match: isAG3Ship },  // bảng 2: sau header lặp → hết sheet
+          ]
+        },
         useColPFilter: false,
       }
     default:          // CH1, ADM, MANUAL — hàng gửi US đã ship, toàn sheet
@@ -109,7 +151,8 @@ function parseSingleSheet(buf: ArrayBuffer, sheetName: string, rule: ImportRule)
   const rowsByVinv: Record<string, ImportRow[]> = {}
   let fallbackIdx = 0
 
-  for (const seg of rule.segments) {
+  const segments = typeof rule.segments === 'function' ? rule.segments(all) : rule.segments
+  for (const seg of segments) {
     // slice(start, end): start = startRow (index startRow-1); end exclusive = endRow (row N at index N-1 → included)
     const dataRows = all.slice(seg.startRow - 1, seg.endRow ?? undefined)
 
