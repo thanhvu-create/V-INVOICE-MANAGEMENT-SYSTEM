@@ -82,9 +82,14 @@ function importRuleFor(template: string): ImportRule {
 
 // ── Sheet helpers ───────────────────────────────────────────────────────────
 
+// Accept HT-prefixed month tabs with a flexible month/year/separator, plus an
+// optional trailing annotation after the year (must be preceded by whitespace):
+// HT06.26, HT6.26, HT 6.26, HT06-2026, HT7/26, "HT07.26 (315SP chưa ship)" — but
+// still skip summary/pivot tabs. Row-level "Đã ship" filter still governs imports.
+const HT_TAB_RE = /^HT\s*\d{1,2}\s*[.\-/ ]\s*\d{2,4}(?:\s|$)/i
 function getHTSheets(buf: ArrayBuffer): string[] {
   const wb = XLSX.read(new Uint8Array(buf), { type: 'array', bookSheets: true })
-  return (wb.SheetNames ?? []).filter(n => /^HT\d{2}\.\d{2}$/i.test(n))
+  return (wb.SheetNames ?? []).filter(n => HT_TAB_RE.test(n.trim()))
 }
 
 interface VinvOption { code: string; count: number; channels: string[] }
@@ -325,7 +330,7 @@ export function SPHTImport({ invoiceId, template, locked, onDone }: Props) {
       const buf    = await res.arrayBuffer()
       const sheets = getHTSheets(buf)
       if (sheets.length === 0) {
-        toast('Không tìm thấy tab sheet nào dạng HT06.26, HT07.26,...', 'warn', 5000)
+        toast('Không tìm thấy tab nào dạng HT + tháng.năm (vd HT06.26, HT6.26, HT06-2026).', 'warn', 5000)
         setStage({ s: 'idle' }); return
       }
       // Default: check all sheets
