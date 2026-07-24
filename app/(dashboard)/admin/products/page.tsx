@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState } from 'react'
 import { AdminModal, fieldStyle, labelStyle, inputStyle, btnPrimary, btnSecondary } from '@/components/admin/AdminModal'
 import { toast } from '@/components/ui/Toast'
 import { goldPricePerGram, type NVLSnapshot } from '@/lib/formulas/pricing'
 import { useUser } from '@/contexts/UserContext'
+import { MetalTypeRegistry } from '@/components/admin/MetalTypeRegistry'
 
 interface NVLPrice {
   id:             string
@@ -35,13 +36,6 @@ const EMPTY_FORM: Record<string, string> = {
   loss_gold: '0.06', loss_pt: '0.17',
   tag_multiplier: '', fr_multiplier: '',
 }
-
-// ─── Custom karat localStorage ───────────────────────────────────────────────
-const LS_KEY = 'nvl_custom_karats'
-function loadCustomKarats(): string[] {
-  try { return JSON.parse(localStorage.getItem(LS_KEY) ?? '[]') } catch { return [] }
-}
-function saveCustomKarats(list: string[]) { localStorage.setItem(LS_KEY, JSON.stringify(list)) }
 
 // ─── Default karat groups ────────────────────────────────────────────────────
 const GOLD_KARATS  = ['24K','23K','22K','18K','17K','16K','15K','14K','10K']
@@ -122,13 +116,6 @@ export default function NVLPricesPage() {
   const [form,         setForm]         = useState<Record<string, string>>(EMPTY_FORM)
   const [error,        setError]        = useState('')
   const [saving,       setSaving]       = useState(false)
-  const [customKarats, setCustomKarats] = useState<string[]>([])
-  const [newKarat,     setNewKarat]     = useState('')
-  const newKaratRef = useRef<HTMLInputElement>(null)
-
-  useEffect(() => {
-    setCustomKarats(loadCustomKarats())
-  }, [])
 
   async function fetchRows() {
     setLoading(true)
@@ -167,24 +154,6 @@ export default function NVLPricesPage() {
     else { toast('Đã xóa.', 'success'); fetchRows() }
   }
 
-  function addKarat() {
-    const raw   = newKarat.trim().toUpperCase().replace(/\s/g, '')
-    if (!raw) return
-    const label = /^\d+$/.test(raw) ? `${raw}K` : raw
-    const all   = [...GOLD_KARATS, ...METAL_KARATS, ...customKarats]
-    if (all.some(k => k.toUpperCase() === label)) {
-      toast('Karat này đã có trong danh sách.', 'warn'); setNewKarat(''); return
-    }
-    const updated = [...customKarats, label]
-    setCustomKarats(updated); saveCustomKarats(updated); setNewKarat('')
-    newKaratRef.current?.focus()
-  }
-
-  function removeKarat(label: string) {
-    const updated = customKarats.filter(k => k !== label)
-    setCustomKarats(updated); saveCustomKarats(updated)
-  }
-
   // Build NVL snapshot from latest row
   const latest = rows[0] ?? null
   const nvlSnap: NVLSnapshot | null = latest ? {
@@ -198,9 +167,6 @@ export default function NVLPricesPage() {
     fr_multiplier:  latest.fr_multiplier  ?? 0,
     cif_rate:       null,  // use template default
   } : null
-
-  const allGoldKarats   = [...GOLD_KARATS,  ...customKarats.filter(k => !METAL_KARATS.some(m => m.toUpperCase() === k))]
-  const allMetalKarats  = [...METAL_KARATS, ...customKarats.filter(k =>  METAL_KARATS.some(m => m.toUpperCase() === k))]
 
   return (
     <div style={{ maxWidth: 1200 }}>
@@ -336,39 +302,18 @@ export default function NVLPricesPage() {
                 Tính từ spot price LATEST · Ounce per gram = 31.103
               </div>
             </div>
-            {/* Add custom karat */}
-            <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
-              <input
-                ref={newKaratRef}
-                type="text"
-                value={newKarat}
-                onChange={e => setNewKarat(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') addKarat() }}
-                placeholder="VD: 8K, 9K, 12K"
-                style={{
-                  padding: '0.35rem 0.6rem', border: '1px solid var(--border-base)',
-                  fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)',
-                  background: 'var(--bg-surface)', color: 'var(--text-primary)',
-                  width: 130, outline: 'none',
-                }}
-              />
-              <button onClick={addKarat} style={{ ...btnPrimary, padding: '0.35rem 0.9rem', fontSize: 'var(--text-xs)' }}>
-                + Thêm karat
-              </button>
-            </div>
           </div>
 
           {/* Gold karats */}
           <div style={{ marginBottom: '0.5rem', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Vàng (Au)</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem', marginBottom: '1.25rem' }}>
-            {allGoldKarats.map(label => {
+            {GOLD_KARATS.map(label => {
               const loai = label
               return (
                 <KaratCard
                   key={label} label={label} loai={loai}
                   price={goldPricePerGram(loai, nvlSnap)}
-                  isCustom={customKarats.includes(label)}
-                  onRemove={() => removeKarat(label)}
+                  isCustom={false}
                 />
               )
             })}
@@ -377,20 +322,21 @@ export default function NVLPricesPage() {
           {/* Precious metals */}
           <div style={{ marginBottom: '0.5rem', fontSize: 'var(--text-xs)', color: 'var(--text-muted)', fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Kim loại quý</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '0.5rem' }}>
-            {allMetalKarats.map(label => {
+            {METAL_KARATS.map(label => {
               const loai = label === 'PT950' ? 'PT' : label
               return (
                 <KaratCard
                   key={label} label={label} loai={loai}
                   price={goldPricePerGram(loai, nvlSnap)}
-                  isCustom={customKarats.includes(label)}
-                  onRemove={() => removeKarat(label)}
+                  isCustom={false}
                 />
               )
             })}
           </div>
         </div>
       )}
+
+      <MetalTypeRegistry nvlSnap={nvlSnap} canEdit={canEdit} />
 
       {/* ── Modal ── */}
       {modal && (
