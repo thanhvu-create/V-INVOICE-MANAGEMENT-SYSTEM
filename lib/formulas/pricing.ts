@@ -172,8 +172,8 @@ export function calcCIFPrice(purchase: number, template: InvoiceTemplate, cifRat
  * Computed field for one metal row: tien_vang = weight_gr × giá/gram(loai_vang).
  * Unknown karat (gpg null) → 0, matching single-metal behaviour.
  */
-export function recalcMetal(m: Partial<InvoiceItemMetal>, nvl: NVLSnapshot): { tien_vang: number } {
-  const gpg = goldPricePerGram(m.loai_vang ?? '', nvl)
+export function recalcMetal(m: Partial<InvoiceItemMetal>, nvl: NVLSnapshot, registry: MetalTypeRule[] = []): { tien_vang: number } {
+  const gpg = resolveMetalPricePerGram(m.loai_vang ?? '', nvl, registry)
   return { tien_vang: gpg !== null ? (m.weight_gr ?? 0) * gpg : 0 }
 }
 
@@ -188,16 +188,17 @@ export function recalcItem(
   diamonds: InvoiceDiamond[],
   nvl:      NVLSnapshot,
   template: InvoiceTemplate = 'CH1',
-  metals:   InvoiceItemMetal[] = []
+  metals:   InvoiceItemMetal[] = [],
+  registry: MetalTypeRule[] = []
 ): Partial<InvoiceProduct> {
   let weightNoGem: number
   let goldValue:   number
   if (metals.length > 0) {
     weightNoGem = metals.reduce((s, m) => s + (m.weight_gr ?? 0), 0)
-    goldValue   = metals.reduce((s, m) => s + recalcMetal(m, nvl).tien_vang, 0)
+    goldValue   = metals.reduce((s, m) => s + recalcMetal(m, nvl, registry).tien_vang, 0)
   } else {
     weightNoGem = calcWeightNoGem(item.t_pham_co_nvl_da ?? 0, diamonds)
-    const gpg   = goldPricePerGram(item.loai_vang ?? '', nvl)
+    const gpg   = resolveMetalPricePerGram(item.loai_vang ?? '', nvl, registry)
     goldValue   = gpg !== null ? weightNoGem * gpg : 0
   }
 

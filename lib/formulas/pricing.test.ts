@@ -47,3 +47,28 @@ describe('resolveMetalPricePerGram', () => {
     expect(resolveMetalPricePerGram('X', nvl, reg)).toBeNull()
   })
 })
+
+import { recalcMetal, recalcItem } from './pricing'
+
+describe('recalcMetal with registry', () => {
+  it('uses fixed override for tien_vang', () => {
+    const reg: MetalTypeRule[] = [{ code: 'SV925', price_mode: 'fixed', fixed_per_gram: 3.2 }]
+    expect(recalcMetal({ loai_vang: 'SV925', weight_gr: 10 }, nvl, reg).tien_vang).toBeCloseTo(32, 6)
+  })
+  it('without registry falls back (18K formula)', () => {
+    const expected = (goldPricePerGram('18K', nvl)! * 2)
+    expect(recalcMetal({ loai_vang: '18K', weight_gr: 2 }, nvl).tien_vang).toBeCloseTo(expected, 6)
+  })
+})
+
+describe('recalcItem with registry', () => {
+  const reg: MetalTypeRule[] = [{ code: 'SV925', price_mode: 'fixed', fixed_per_gram: 3.2 }]
+  it('single-metal path applies override', () => {
+    const out = recalcItem({ loai_vang: 'SV925', t_pham_co_nvl_da: 10 }, [], nvl, 'CH1', [], reg)
+    expect(out.tien_vang).toBeCloseTo(32, 6)
+  })
+  it('metals[] path applies override', () => {
+    const out = recalcItem({}, [], nvl, 'CH1', [{ loai_vang: 'SV925', weight_gr: 10 } as any], reg)
+    expect(out.tien_vang).toBeCloseTo(32, 6)
+  })
+})
