@@ -24,7 +24,16 @@ export async function GET() {
     })
   }
 
+  const { data: mtData } = await db
+    .from('metal_types')
+    .select('code')
+    .eq('active', true)
+  const registryCodes: string[] = (mtData ?? [])
+    .map((r: any) => r.code?.trim().toUpperCase())
+    .filter(Boolean)
+
   const merged = [...BASE]
+  registryCodes.forEach(v => { if (!merged.includes(v)) merged.push(v) })
   used.forEach(v => { if (!merged.includes(v)) merged.push(v) })
 
   return NextResponse.json({ success: true, data: merged })
