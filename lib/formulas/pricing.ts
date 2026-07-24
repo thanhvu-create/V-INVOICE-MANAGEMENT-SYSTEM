@@ -59,6 +59,45 @@ export function goldPricePerGram(loai_vang: string, nvl: NVLSnapshot): number | 
 }
 
 /**
+ * Registry ngoại lệ (metal_types). Override phủ lên goldPricePerGram theo mã chính xác.
+ */
+export interface MetalTypeRule {
+  code:                string
+  price_mode:          'dynamic' | 'fixed'
+  base_kind?:          'karat' | 'ag' | 'pt' | 'pd' | null
+  karat?:              number | null
+  surcharge_per_gram?: number | null
+  fixed_per_gram?:     number | null
+  active?:             boolean
+}
+
+/**
+ * Giá $/gram cho một mã loại vàng, tra registry TRƯỚC rồi fallback goldPricePerGram.
+ * registry rỗng ⇒ y hệt goldPricePerGram (backward compatible).
+ */
+export function resolveMetalPricePerGram(
+  code: string,
+  nvl:  NVLSnapshot,
+  registry: MetalTypeRule[] = []
+): number | null {
+  const key  = (code ?? '').trim().toUpperCase()
+  const rule = registry.find(r => r.active !== false && r.code.trim().toUpperCase() === key)
+  if (rule) {
+    if (rule.price_mode === 'fixed') {
+      return rule.fixed_per_gram ?? null
+    }
+    let base: number | null = null
+    if      (rule.base_kind === 'karat' && rule.karat) base = goldPricePerGram(`${rule.karat}K`, nvl)
+    else if (rule.base_kind === 'ag')                  base = goldPricePerGram('AG', nvl)
+    else if (rule.base_kind === 'pt')                  base = goldPricePerGram('PT', nvl)
+    else if (rule.base_kind === 'pd')                  base = goldPricePerGram('PD', nvl)
+    if (base === null) return null
+    return base + (rule.surcharge_per_gram ?? 0)
+  }
+  return goldPricePerGram(code, nvl)
+}
+
+/**
  * T.Phẩm vàng thực tế = T.Phẩm có NVL đá − Σ TL xoàn (gr)
  * tl_xoan_gr = (tl_truoc_xu_ly_ct ?? tl_sau_xu_ly_ct) / 5 (written by recalcDiamond)
  */
