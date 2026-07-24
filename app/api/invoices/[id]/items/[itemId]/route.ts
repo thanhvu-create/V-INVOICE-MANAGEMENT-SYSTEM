@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { recalcItem, recalcDiamond, recalcMetal, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
+import { loadActiveMetalTypes } from '@/lib/metal-types'
 import { resolvePhiPhuKien, hasGemsInDescription } from '@/lib/formulas/assembly-pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 
@@ -149,6 +150,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
 
     {
       const nvl      = nvlFromInvoice(invoice)
+      const registry = await loadActiveMetalTypes(db)
       const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
       const [{ data: diamonds }, { data: metals }] = await Promise.all([
         db.from('invoice_diamonds').select('*').eq('product_id', params.itemId),
@@ -165,14 +167,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           db.from('invoice_diamonds').update(g._update).eq('id', g.id)
         ))
       }
-      const metalList = (metals ?? []).map(m => ({ ...m, ...recalcMetal(m, nvl) }))
+      const metalList = (metals ?? []).map(m => ({ ...m, ...recalcMetal(m, nvl, registry) }))
       if (metalList.length) {
         await Promise.all(metalList.map(m =>
           db.from('invoice_item_metals').update({ tien_vang: m.tien_vang }).eq('id', m.id)
         ))
       }
       const cleanGems = recalcedGems.map(({ _update, ...rest }) => rest)
-      const recalc = recalcItem(item, cleanGems as any, nvl, template, metalList as any)
+      const recalc = recalcItem(item, cleanGems as any, nvl, template, metalList as any, registry)
       await db.from('invoice_products').update(recalc).eq('id', params.itemId)
     }
 

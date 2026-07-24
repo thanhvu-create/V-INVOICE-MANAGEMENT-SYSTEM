@@ -1,5 +1,6 @@
 import { createServiceClient } from '@/lib/supabase/server'
 import { recalcItem, recalcDiamond, recalcMetal, nvlFromInvoice, InvoiceTemplate } from './pricing'
+import { loadActiveMetalTypes } from '@/lib/metal-types'
 
 type DB = ReturnType<typeof createServiceClient>
 
@@ -13,6 +14,7 @@ export async function triggerItemRecalc(db: DB, itemId: string, invoice: Record<
 
   const template = (invoice.template_type ?? 'CH1') as InvoiceTemplate
   const nvl = nvlFromInvoice(invoice)
+  const registry = await loadActiveMetalTypes(db)
   const gemList = diamonds ?? []
 
   const recalced = gemList.map(d => {
@@ -26,7 +28,7 @@ export async function triggerItemRecalc(db: DB, itemId: string, invoice: Record<
     ))
   }
 
-  const metalList = (metals ?? []).map(m => ({ ...m, ...recalcMetal(m, nvl) }))
+  const metalList = (metals ?? []).map(m => ({ ...m, ...recalcMetal(m, nvl, registry) }))
   if (metalList.length) {
     await Promise.all(metalList.map(m =>
       db.from('invoice_item_metals').update({ tien_vang: m.tien_vang }).eq('id', m.id)
@@ -34,7 +36,7 @@ export async function triggerItemRecalc(db: DB, itemId: string, invoice: Record<
   }
 
   const cleanGems = recalced.map(({ _update, ...rest }) => rest)
-  const updates = recalcItem(item, cleanGems as any, nvl, template, metalList as any)
+  const updates = recalcItem(item, cleanGems as any, nvl, template, metalList as any, registry)
   await db.from('invoice_products').update(updates).eq('id', itemId)
 
   return updates
@@ -50,6 +52,7 @@ export async function bulkRecalcInvoice(db: DB, invoiceId: string, invoice: Reco
 
   const template = (invoice.template_type ?? 'CH1') as InvoiceTemplate
   const nvl = nvlFromInvoice(invoice)
+  const registry = await loadActiveMetalTypes(db)
 
   const ops: PromiseLike<any>[] = []
   for (const item of items) {
@@ -63,12 +66,12 @@ export async function bulkRecalcInvoice(db: DB, invoiceId: string, invoice: Reco
 
     const metals: any[] = (item.invoice_item_metals ?? []).slice().sort((a: any, b: any) => (a.seq ?? 0) - (b.seq ?? 0))
     const recalcedMetals = metals.map(m => {
-      const derived = recalcMetal(m, nvl)
+      const derived = recalcMetal(m, nvl, registry)
       ops.push(db.from('invoice_item_metals').update(derived).eq('id', m.id))
       return { ...m, ...derived }
     })
 
-    const updates = recalcItem(item, recalcedGems, nvl, template, recalcedMetals as any)
+    const updates = recalcItem(item, recalcedGems, nvl, template, recalcedMetals as any, registry)
     ops.push(db.from('invoice_products').update(updates).eq('id', item.id))
   }
 

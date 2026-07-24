@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { recalcItem, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
+import { loadActiveMetalTypes } from '@/lib/metal-types'
 import { extractVendorModel, extractKichThuoc, buildChiTietCap } from '@/lib/formulas/description-parse'
 import { resolvePhiPhuKien, hasGemsInDescription } from '@/lib/formulas/assembly-pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
@@ -48,6 +49,7 @@ export async function POST(req: NextRequest) {
     const startSeq = (maxRow?.seq ?? 0) + 1
 
     const nvl      = nvlFromInvoice(invoice)
+    const registry = await loadActiveMetalTypes(db)
     const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
     const isAG3    = template === 'CH1_AG3' || template === 'VNSI_AG3'
 
@@ -119,7 +121,7 @@ export async function POST(req: NextRequest) {
 
     const itemsWithCalc = itemsToInsert.map(row => ({
       ...row,
-      ...recalcItem(row, [], nvl, template),
+      ...recalcItem(row, [], nvl, template, [], registry),
     }))
 
     // Return the created items so the client can auto-attach gems by MO (so_mo).

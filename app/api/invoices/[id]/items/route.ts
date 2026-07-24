@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireRole } from '@/lib/auth/getRole'
 import { writeAuditLog } from '@/lib/audit/log'
 import { recalcItem, nvlFromInvoice, InvoiceTemplate } from '@/lib/formulas/pricing'
+import { loadActiveMetalTypes } from '@/lib/metal-types'
 import { hasGemsInDescription, resolvePhiPhuKien } from '@/lib/formulas/assembly-pricing'
 import { checkEditPermission } from '@/lib/auth/editGuard'
 
@@ -77,6 +78,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     const nvl      = nvlFromInvoice(invoice)
+    const registry = await loadActiveMetalTypes(db)
     const template = ((invoice as any).template_type ?? 'CH1') as InvoiceTemplate
 
     // Auto-fill assembly fees: "cts" in description → lookup rules, no "cts" → force zero
@@ -102,7 +104,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       }
     }
 
-    const derived  = recalcItem(baseRow, [], nvl, template)
+    const derived  = recalcItem(baseRow, [], nvl, template, [], registry)
 
     const { data: item, error } = await db
       .from('invoice_products')
